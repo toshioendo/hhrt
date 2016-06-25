@@ -1,0 +1,23 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include "hhrt.h"
+
+int HH_initHeap(size_t heapsize)
+{
+  /* ignored */
+  return 0;
+}
+
+int HH_logNode()
+{
+  /* ignored */
+  return 0;
+}
+
+int HH_logVp()
+{
+  /* ignored */
+  return 0;
+}
+

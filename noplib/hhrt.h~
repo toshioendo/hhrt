@@ -1,0 +1,12 @@
+#ifndef HHRT_H
+#define HHRT_H
+
+#  define HH(X) X
+
+/*** No-op version */
+
+int HH_initHeap(size_t heapsize);
+int HH_logNode();
+int HH_logVp();
+
+#endif /* HHRT_H */
