@@ -1,4 +1,4 @@
-# HHRT: Hybrid Hierarchical Runtime (HHRT) library
+# HHRT: Hybrid Hierarchical Runtime library
 
 ## Overview
 
@@ -54,4 +54,14 @@ Here "-bt 8" specifies temporal block size.
 
 ### On GPU cluster
 
-%
+## References
+
+Toshio Endo, Guanghao Jin. Software Technologies Coping with Memory Hierarchy of GPGPU Clusters for Stencil Computations . In Proceedings of IEEE Cluster Computing (CLUSTER2014), pp.132-139, Madrid, September 25, 2014. [DOI:10.1109/CLUSTER.2014.6968747]
+
+Toshio Endo, Yuki Takasaki, Satoshi Matsuoka. Realizing Extremely Large-Scale Stencil Applications on GPU Supercomputers . In Proceedings of The 21st IEEE International Conference on Parallel and Distributed Systems (ICPADS 2015), pp. 625-632, Melbourne, December, 2015. 
+[DOI: 10.1109/ICPADS.2015.84]
+
+## Contact
+
+Toshio Endo (endo@is.titech.ac.jp)
+Twitter: toshioendo
