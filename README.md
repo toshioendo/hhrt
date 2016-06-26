@@ -63,5 +63,6 @@ Toshio Endo, Yuki Takasaki, Satoshi Matsuoka. Realizing Extremely Large-Scale St
 
 ## Contact
 
-Toshio Endo (endo@is.titech.ac.jp)
+Toshio Endo (endo-at-is.titech.ac.jp)
+
 Twitter: toshioendo
