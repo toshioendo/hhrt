@@ -1,6 +1,6 @@
 # HHRT: Hybrid Hierarchical Runtime library
 
-## Overview
+## Introduction
 
 The objective of Hybrid Hierarchical Runtime (HHRT) library is to extend applications' supportable problem scales.
 The main targets of HHRT are applications whose problem scales have been limited by the capacity of upper memory layer, such as GPU device memory in GPU clusters.
@@ -15,16 +15,15 @@ Basically we assume that the target applications of HHRT have the following char
 
 For example, many stencil applications on GPU clusters have these characteristics, since they are written in MPI to support multiple nodes, and regions to be simulated are distributed among processes so that each process has smaller local region than device memory capacity.
 
-## Usage
+## Basic usage
 
 * Edit make.inc for your environment.
-* "make" makes lib/libhhrt.a, which is the HHRT library
+* `make` makes lib/libhhrt.a, which is the HHRT library.
   Also a sample program 7p2dd (7-point stencil with 2d division) is made.
 * Edit application code by adding
   `#include <hhrt.h>`
 * Application should be compiled and linked with
-  -I[HHRT_ROOT]/lib
-  -L[HHRT_ROOT]/lib
+  `-I[HHRT_ROOT]/lib -L[HHRT_ROOT]/lib`
 
 ## Execution of the sample program
 
@@ -99,6 +98,8 @@ Toshio Endo, Guanghao Jin. Software Technologies Coping with Memory Hierarchy of
 
 Toshio Endo, Yuki Takasaki, Satoshi Matsuoka. Realizing Extremely Large-Scale Stencil Applications on GPU Supercomputers . In Proceedings of The 21st IEEE International Conference on Parallel and Distributed Systems (ICPADS 2015), pp. 625-632, Melbourne, December, 2015. 
 [DOI: 10.1109/ICPADS.2015.84]
+
+(See docs/ directory)
 
 ## Acknowledgements
 
