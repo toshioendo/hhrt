@@ -71,19 +71,19 @@ First, users determine the number of processes per GPU, considering the problem 
 
 Write a machine file as follows (each node appeas 8 times.).
 `
-node1
-node1
-node1
-node1
-node1
-node1
-node1
-node1
-node2
-node2
-  :
-node6
-node6
+node1  
+node1  
+node1  
+node1  
+node1  
+node1  
+node1  
+node1  
+node2  
+node2  
+  :  
+node6  
+node6  
 `
 
 Then execute the sample program with 8 x 6 = 48processes.
