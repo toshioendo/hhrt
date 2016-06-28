@@ -69,22 +69,21 @@ Here the application should be invoked so that multiple MPI processes are invoke
 The following is an example of execution on 6-node GPU cluster. 
 First, users determine the number of processes per GPU, considering the problem size per GPU; in this example, let it be 8.
 
-Write a machine file as follows (each node appeas 8 times.).
-`
-node1  
-node1  
-node1  
-node1  
-node1  
-node1  
-node1  
-node1  
-node2  
-node2  
-  :  
-node6  
-node6  
-`
+Write a machine file as follows (each node appears 8 times.).
+
+    node1  
+    node1  
+    node1  
+    node1  
+    node1  
+    node1  
+    node1  
+    node1  
+    node2  
+    node2  
+      :  
+    node6  
+    node6  
 
 Then execute the sample program with 8 x 6 = 48processes.
 
