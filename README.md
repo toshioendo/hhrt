@@ -30,29 +30,69 @@ For example, many stencil applications on GPU clusters have these characteristic
 
 The usage of 7p2dd sample is as follows:
 
+`
 % ./7p2dd [-p PY PZ] [-bt BT] [-nt NT] [NX NY NZ]
+`
 
 like
 
+`
 % ./7p2dd 512 512 512
+`
 
 But this does not exceed the device memory capacity.
-In order to do it, process oversubscription is used.
+In order to do it, "process oversubscription" is used as follows.
 
 ### On single GPU/node envorinment
 
+`
 % mpirun -np 8 ./7p2dd -p 2 4 1024 1024 2048
+`
 
-In this execution, the total problem size (1024x1024x2048xsizeof(float)x2 = 8MiB) exceeds the device memory capacity.
-However, the execution speed is very slow for costs for HHRT's implicit memory swapping.
+In this execution, a single GPU is shared by 8 processes, instead of 1 process as above.
+Here the total problem size (1024x1024x2048xsizeof(float)x2 = 8MiB) exceeds the device memory capacity of a GPU.
 
+However, there is still a severe problem in speed; the execution speed is very slow for costs for HHRT's implicit memory swapping.
 In order to this relieve it, this sample is equipped with "temporal blocking" that improves locality.
 
+`
 % mpirun -np 8 ./7p2dd -p 2 4 -bt 8 1024 1024 2048
+`
 
 Here "-bt 8" specifies temporal block size.
 
 ### On GPU cluster
+
+When multiple GPU nodes are available, even larger problem sizes are supported.
+Here the application should be invoked so that multiple MPI processes are invoked for each process.
+
+The following is an example of execution on 6-node GPU cluster. 
+First, users determine the number of processes per GPU, considering the problem size per GPU; in this example, let it be 8.
+
+Write a machine file as follows (each node appeas 8 times.).
+`
+node1
+node1
+node1
+node1
+node1
+node1
+node1
+node1
+node2
+node2
+  :
+node6
+node6
+`
+
+Then execute the sample program with 8 x 6 = 48processes.
+
+`
+% mpirun -np 48 -machinefile my-machine-file ./7p2dd -p 6 8 -bt 8 2048 2048 2048
+`
+
+## Current limitations
 
 ## References
 
@@ -61,8 +101,14 @@ Toshio Endo, Guanghao Jin. Software Technologies Coping with Memory Hierarchy of
 Toshio Endo, Yuki Takasaki, Satoshi Matsuoka. Realizing Extremely Large-Scale Stencil Applications on GPU Supercomputers . In Proceedings of The 21st IEEE International Conference on Parallel and Distributed Systems (ICPADS 2015), pp. 625-632, Melbourne, December, 2015. 
 [DOI: 10.1109/ICPADS.2015.84]
 
+## Acknowledgements
+
+This work is supported by JST-CREST, "Software Technology that Deals with Deeper Memory Hierarchy in Post-petascale Era".
+
 ## Contact
 
 Toshio Endo (endo-at-is.titech.ac.jp)
 
 Twitter: toshioendo
+
+Copyright (C) 2013-2016, Toshio Endo. All Rights Reserved.
