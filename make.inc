@@ -1,15 +1,1 @@
-CC = mpicc
-CXX = mpicxx
-#MPIDIR = /usr/apps.sp3/mpi/openmpi/1.6.5/g4.3.4
-#MPIDIR = /usr/apps.sp3/mpi/openmpi/1.6.5/i2013.1.046
-MPIDIR=/usr/apps.sp3/mpi/mvapich2/2.0rc1/g4.3.4_cuda7.5
-
-CUDADIR = /usr/apps.sp3/cuda/7.5
-#CUDADIR = /opt/cuda/6.0
-LD = mpicxx
-
-CFLAGS = -O -g -I$(CUDADIR)/include -I$(MPIDIR)/include
-# -O
-NVFLAGS = $(CFLAGS) -arch sm_35
-
-LDFLAGS = -lpthread -lm -L$(CUDADIR)/lib64 -lcudart 
+make.inc.memkf05

@@ -456,32 +456,7 @@ int hostswapper::swapIn(int initing)
 
 /*** fileswapper ******/
 
-static int convsfnum(char **ipp, char **opp, int num)
-{
-  char *ip = *ipp;
-  char *op = *opp;
-  int res;
-
-  // string like "$L%4" raises mod calculation 
-  if (*ip == '%') {
-    ip++;
-    long modnum = strtol(ip, &ip, 10);
-    res = num % (int)modnum;
-  }
-  else {
-    res = num;
-  }
-
-  /* write string of (int)res into op */
-  sprintf(op, "%d", res);
-  op = strchr(op, '\0');
-
-  *ipp = ip;
-  *opp = op;
-  return res;
-}
-
-int fileswapper::makeSFileName(int id)
+int HH_makeSFileName(int id, char sfname[256])
 {
   char *op = sfname;
   fsdir *fsd = HH_curfsdir();
@@ -498,15 +473,16 @@ int fileswapper::makeSFileName(int id)
   sprintf(op, "/hhswap-r%d-p%d-%d", HH_MYID, getpid(), id);
 
 #if 1
-  fprintf(stderr, "[HH:fileswapper@p%d] filename is [%s]\n",
+  fprintf(stderr, "[HH_makeSFileName@p%d] filename is [%s]\n",
 	  HH_MYID, sfname);
 #endif
 
   return 0;
 }
 
-int fileswapper::openSFile()
+int HH_openSFile(char sfname[256])
 {
+  int sfd;
   sfd = open(sfname, O_CREAT | O_RDWR | O_DIRECT, 0700);
   if (sfd == -1) {
     fprintf(stderr, "[HH:fileswapper::openSFile@p%d] ERROR in open(%s)\n",
@@ -526,7 +502,7 @@ int fileswapper::openSFile()
   // descriptor  referring  to  it  is closed.
 
   unlink(sfname);
-  return 0;
+  return sfd;
 }
 
 // file open is delayed
@@ -534,7 +510,18 @@ int fileswapper::openSFileIfNotYet()
 {
   if (sfd != -1) return 0;
 
-  return openSFile();
+  /* setup filename from configuration */
+  if (HHL->curfsdirid < 0) {
+    // fileswap directory not available 
+    fprintf(stderr, "[HH_openSFile@p%d] ERROR: swap directory not specified\n",
+	    HH_MYID);
+    exit(1);
+  }
+
+  HH_makeSFileName(userid, sfname);
+  sfd = HH_openSFile(sfname);
+
+  return 0;
 }
 
 int fileswapper::init(int id)
@@ -545,20 +532,8 @@ int fileswapper::init(int id)
   swapper::init(id);
   align = 512;
 
-  /* setup filename from configuration */
-  if (HHL->curfsdirid >= 0) {
-    makeSFileName(id);
-  }
-  else {
-    // fileswap directory not available 
-    return -1;
-  }
-
-#if 1
-  sfd = -1; // open file later
-#else
-  openSFile();
-#endif
+  userid = id;
+  sfd = -1; // open swapfile later
 
   copyunit = 64L*1024*1024;
   /* prepare copybuf */

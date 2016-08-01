@@ -521,48 +521,77 @@ int hostheap::init(size_t heapsize0)
   memkind = HHM_HOST;
 
   strcpy(name, "hostheap");
+
+#ifdef USE_MMAPSWAP
+  {
+    char sfname[256];
+    int userid = 90;
+    if (HHL->curfsdirid < 0) {
+      // fileswap directory not available 
+      fprintf(stderr, "[HH:hostheap::init%d] ERROR: swap directory not specified\n",
+	      HH_MYID);
+      exit(1);
+    }
+
+    HH_makeSFileName(userid, sfname);
+    sfd = HH_openSFile(sfname);
+  }
+#endif
+  return 0;
+}
+
+int hostheap::allocCapacity(size_t offset, size_t size)
+{
+  void *mapp = piadd(HOSTHEAP_PTR, offset);
+  void *resp;
+
+  if (size == 0) {
+    return 0;
+  }
+
+  resp = mmap(mapp, size, 
+	      PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
+	      -1, (off_t)0);
+  if (resp == MAP_FAILED) {
+    fprintf(stderr, "[HH:%s::mapHeap@p%d] ERROR: mmap(0x%lx, 0x%lx) failed\n",
+	    name, HH_MYID, mapp, size);
+    exit(1);
+  }
+
+  if (resp != mapp) {
+    fprintf(stderr, "[HH:%s::expandHeap@p%d] ERROR: unexpted pointer %p -> %p\n",
+	    name, HH_MYID, mapp, resp);
+    exit(1);
+  }
+
   return 0;
 }
 
 int hostheap::expandHeap(size_t reqsize)
 {
   size_t addsize;
+  void *p;
+  void *mapp;
   if (reqsize > HOSTHEAP_STEP) {
     addsize = roundup(reqsize, HOSTHEAP_STEP);
   }
   else {
     addsize = HOSTHEAP_STEP;
   }
-  {
-    void *p;
-    void *mapp = piadd(HOSTHEAP_PTR, heapsize);
-    p = mmap(mapp, addsize, 
-	     PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
-	     -1, (off_t)0);
-    if (p == MAP_FAILED) {
-      fprintf(stderr, "[HH:%s::expandHeap@p%d] ERROR: mmap(NULL, %ld) failed\n",
-	      name, HH_MYID, addsize);
-      exit(1);
-    }
 
-    if (p != mapp) {
-      fprintf(stderr, "[HH:%s::expandHeap@p%d] ERROR: unexpted pointer %p -> %p\n",
-	      name, HH_MYID, mapp, p);
-      exit(1);
-    }
-
-    /* expand succeeded */
-    /* make a single large free area */
-    membuf *mbp = new membuf(heapsize, addsize, 0L, HHMADV_FREED);
-    membufs.push_back(mbp);
-
-    fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
-	    name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
-
-    heapsize += addsize;
-    HH_addHostMemStat(HHST_HOSTHEAP, addsize);
-
-  }
+  allocCapacity(heapsize, addsize);
+  
+  /* expand succeeded */
+  /* make a single large free area */
+  membuf *mbp = new membuf(heapsize, addsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
+  
+  fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
+	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
+  
+  heapsize += addsize;
+  HH_addHostMemStat(HHST_HOSTHEAP, addsize);
+  
   return 0;
 }
 
@@ -576,14 +605,6 @@ int hostheap::releaseHeap()
 	  name, HH_MYID, heapptr, piadd(heapptr,heapsize));
 #endif
 
-#if 0
-  crc = cudaHostUnregister(heapptr);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[%s::releaseHeap@p%d] cudaHostUnregister(%p) failed (rc=%d)\n",
-	    name, HH_MYID, heapptr, crc);
-    exit(1);
-  }
-#endif
   /* Free memory! */
   rc = munmap(heapptr, heapsize);
   if (rc != 0) {
@@ -599,34 +620,29 @@ int hostheap::releaseHeap()
 int hostheap::allocHeap()
 {
   void *p;
-  cudaError_t crc;
   assert(heapptr == NULL);
 
+  heapptr = HOSTHEAP_PTR;
   if (heapsize == 0) { /* mmap(size=0) fails */
-    heapptr = HOSTHEAP_PTR;
     return 0;
   }
 
+#if 1 // debugging
+  allocCapacity((size_t)0, heapsize);
+#else
   /* first allocate */
   p = mmap(HOSTHEAP_PTR, heapsize, 
 	   PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
 	   -1, (off_t)0);
   if (p == MAP_FAILED) {
-    fprintf(stderr, "[HH:%s::restoreHeap@p%d] mmap(NULL, %ld) failed\n",
+    fprintf(stderr, "[HH:%s::allocHeap@p%d] mmap(NULL, %ld) failed\n",
 	    name, HH_MYID, heapsize);
     exit(1);
   }
   heapptr = p;
-  HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
-
-#if 0
-  crc = cudaHostRegister(p, heapsize, cudaHostRegisterPortable);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:%s::restoreHeap@p%d] cudaHostRegister(%p, 0x%lx) failed (rc=%d)\n",
-	    name, HH_MYID, p, heapsize, crc);
-    exit(1);
-  }
 #endif
+
+  HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
 
   return 0;
 }
@@ -636,35 +652,15 @@ int hostheap::restoreHeap()
 {
   int rc;
   void *p;
-  cudaError_t crc;
   assert(heapptr != NULL);
 
   if (heapsize == 0) {
     return 0;
   }
 
-  p = mmap(heapptr, heapsize, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS/*|MAP_FIXED*/,
-	   -1, (off_t)0);
-  if (p == MAP_FAILED) {
-    fprintf(stderr, "[HH:%s::restoreHeap@p%d] mmap(%p, %ld) failed\n",
-	    name, HH_MYID, heapptr, heapsize);
-    exit(1);
-  }
-  HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
+  allocCapacity((size_t)0, heapsize);
 
-  if (heapptr != p) {
-    fprintf(stderr, "[HH:%s::restoreHeap@p%d] mmap(%p, %ld) --> address cannot restored!! (rc=%p)\n",
-	    name, HH_MYID, heapptr, heapsize, p);
-    exit(1);
-  }
-#if 0
-  crc = cudaHostRegister(p, heapsize, cudaHostRegisterPortable);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:%s::restoreHeap@p%d] cudaHostRegister(%p, 0x%lx) failed (rc=%d)\n",
-	    name, HH_MYID, p, heapsize, crc);
-    exit(1);
-  }
-#endif
+  HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
 #if 0
   fprintf(stderr, "[HH:%s::restoreHeap@p%d] sucessfully heap [%p,%p) is recoverd\n",
 	  name, HH_MYID, heapptr, piadd(heapptr,heapsize));

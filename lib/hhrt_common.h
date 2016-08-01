@@ -17,6 +17,8 @@ extern "C" {
 /* configure */
 #define USE_SWAPHOST
 
+#define USE_MMAPSWAP // test
+
 #define HHRT_VERSION 300
 
 #  define HH(X) HH##X

@@ -224,8 +224,10 @@ class fileswapper: public swapper {
   virtual int init(int id);
   virtual int finalize();
 
+#if 0
   int makeSFileName(int id);
   int openSFile();
+#endif
   int openSFileIfNotYet();
 
   int write_small(ssize_t offs, void *buf, int bufkind, size_t size);
@@ -242,6 +244,7 @@ class fileswapper: public swapper {
   size_t copyunit;
   void *copybufs[2];
   cudaStream_t copystreams[2];
+  int userid;
   char sfname[256];
   int sfd;
 };
@@ -306,6 +309,12 @@ class hostheap: public heap {
   virtual int allocHeap();
   virtual int releaseHeap();
   virtual int restoreHeap();
+
+  int allocCapacity(size_t offset, size_t size);
+
+#ifdef USE_MMAPSWAP
+  int sfd;
+#endif
 };
 
 #define HHRF_SEND (1 << 0)
@@ -420,6 +429,9 @@ int HH_default_devid(int lrank);
 dev *HH_curdev();
 fsdir *HH_curfsdir();
 int HH_mutex_init(pthread_mutex_t *ml);
+
+int HH_makeSFileName(int id, char sfname[256]);
+int HH_openSFile(char sfname[256]);
 
 /****************************************/
 /* hhmem.cc: memory management */
