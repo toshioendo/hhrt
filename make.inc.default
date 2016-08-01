@@ -1,0 +1,8 @@
+CC = mpicc
+CXX = mpicxx
+MPIDIR=/usr/local/mvapich2
+CUDADIR = /usr/local/cuda
+LD = mpicxx
+CFLAGS = -O -g -I$(CUDADIR)/include -I$(MPIDIR)/include
+NVFLAGS = $(CFLAGS) -arch sm_35
+LDFLAGS = -lpthread -lm -L$(CUDADIR)/lib64 -lcudart 
