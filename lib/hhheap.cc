@@ -525,7 +525,7 @@ int hostheap::init(size_t heapsize0)
 #ifdef USE_MMAPSWAP
   {
     char sfname[256];
-    int userid = 90;
+    int userid = 99; // check conflict with hhswaper.cc
     if (HHL->curfsdirid < 0) {
       // fileswap directory not available 
       fprintf(stderr, "[HH:hostheap::init%d] ERROR: swap directory not specified\n",
@@ -534,8 +534,14 @@ int hostheap::init(size_t heapsize0)
     }
 
     HH_makeSFileName(userid, sfname);
-    sfd = HH_openSFile(sfname);
+    swapfd = HH_openSFile(sfname);
+
+    fprintf(stderr, "[HH:hostheap::init%d] USE_MMAPSWAP: file %s is used\n",
+	    HH_MYID, sfname);
+
   }
+#else
+  swapfd = -1; // anonymous mmap
 #endif
   return 0;
 }
@@ -544,25 +550,47 @@ int hostheap::allocCapacity(size_t offset, size_t size)
 {
   void *mapp = piadd(HOSTHEAP_PTR, offset);
   void *resp;
+  int flags;
 
   if (size == 0) {
     return 0;
   }
 
+#ifdef USE_MMAPSWAP
+  {
+    int rc;
+    assert(swapfd != -1);
+    rc = ftruncate(swapfd, offset+size);
+    if (rc != 0) {
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: ftruncate failed!\n",
+	      name, HH_MYID);
+      exit(1);
+    }
+  }
+
+  flags = MAP_SHARED; // data on memory is written to a file
+#else
+  flags = MAP_PRIVATE|MAP_ANONYMOUS;
+#endif  
+
   resp = mmap(mapp, size, 
-	      PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
-	      -1, (off_t)0);
+	      PROT_READ|PROT_WRITE, flags,
+	      swapfd, offset /* (off_t)0 */);
   if (resp == MAP_FAILED) {
-    fprintf(stderr, "[HH:%s::mapHeap@p%d] ERROR: mmap(0x%lx, 0x%lx) failed\n",
+    fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: mmap(0x%lx, 0x%lx) failed\n",
 	    name, HH_MYID, mapp, size);
     exit(1);
   }
 
   if (resp != mapp) {
-    fprintf(stderr, "[HH:%s::expandHeap@p%d] ERROR: unexpted pointer %p -> %p\n",
+    fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: unexpted pointer %p -> %p\n",
 	    name, HH_MYID, mapp, resp);
     exit(1);
   }
+
+#ifdef USE_MMAPSWAP
+  madvise(resp, size, MADV_DONTNEED);
+#endif
 
   return 0;
 }
@@ -585,10 +613,11 @@ int hostheap::expandHeap(size_t reqsize)
   /* make a single large free area */
   membuf *mbp = new membuf(heapsize, addsize, 0L, HHMADV_FREED);
   membufs.push_back(mbp);
-  
+
+#if 1  
   fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
 	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
-  
+#endif
   heapsize += addsize;
   HH_addHostMemStat(HHST_HOSTHEAP, addsize);
   
@@ -598,7 +627,6 @@ int hostheap::expandHeap(size_t reqsize)
 int hostheap::releaseHeap()
 {
   int rc;
-  cudaError_t crc;
 
 #if 0
   fprintf(stderr, "[%s::releaseHeap@p%d] try to release heap [%p,%p)\n",
@@ -653,6 +681,12 @@ int hostheap::restoreHeap()
   int rc;
   void *p;
   assert(heapptr != NULL);
+
+#ifdef USE_MMAPSWAP
+  fprintf(stderr, "[HH:%s::restoreHeap] ERROR: restore is incompatible with USE_MMAPSWAP. This seems a bug of library.\n",
+	  name);
+  exit(1);
+#endif
 
   if (heapsize == 0) {
     return 0;

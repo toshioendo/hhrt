@@ -17,10 +17,11 @@ For example, many stencil applications on GPU clusters have these characteristic
 
 ## Basic usage
 
-* `cp make.inc.default make.inc` to create make.inc. Then edit make.inc for your environment. You can find some examples in make.inc.\*.
+* Do `cp make.inc.default make.inc` . Then edit make.inc for your environment. You can find some examples in make.inc.\*.
 * `make` makes lib/libhhrt.a, which is the HHRT library.
   Also a sample program 7p2dd (7-point stencil with 2d division) is made.
-* Edit application code by adding
+  If you try this sample, go to the next section.
+* Edit your application code by adding
   `#include <hhrt.h>`
 * Application should be compiled and linked with
   `-I[HHRT_ROOT]/lib -L[HHRT_ROOT]/lib`

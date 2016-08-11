@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <malloc.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -64,7 +65,7 @@ int hostswapper::finalize()
   return 0;
 }
 
-#if !defined USE_SHARED_HSC
+#if !defined USE_SHARED_HSC && !defined USE_MMAPSWAP
 // process local HSC
 int HH_hsc_init_node()
 {
@@ -81,7 +82,7 @@ int HH_hsc_fin_node()
   return 0;
 }
 
-void *HH_hsc_alloc()
+void *HH_hsc_alloc(int id)
 {
   void *p = valloc(HSC_SIZE);
   HH_addHostMemStat(HHST_HOSTSWAPPER, HSC_SIZE);
@@ -95,6 +96,78 @@ int HH_hsc_free(void *p)
   return 0;
 }
 
+#elif !defined USE_SHARED_HSC && defined USE_MMAPSWAP
+  
+// process local HSC, mmaped
+int HH_hsc_init_node()
+{
+  return 0;
+}
+
+int HH_hsc_init_proc()
+{
+  char sfname[256];
+  int userid = 98; // check conflict with hhswaper.cc
+  if (HHL->curfsdirid < 0) {
+    // fileswap directory not available 
+    fprintf(stderr, "[HH_hsc_init_proc@p%d] ERROR: swap directory not specified\n",
+	    HH_MYID);
+    exit(1);
+  }
+  
+  HH_makeSFileName(userid, sfname);
+  HHL2->hswfd = HH_openSFile(sfname);
+  
+  fprintf(stderr, "[HH_hsc_init_proc@p%d] USE_MMAPSWAP: file %s is used\n",
+	  HH_MYID, sfname);
+
+  return 0;
+}
+
+int HH_hsc_fin_node()
+{
+  return 0;
+}
+
+void *HH_hsc_alloc(int id)
+{
+  {
+    int rc;
+    rc = ftruncate(HHL2->hswfd, HSC_SIZE*(id+1));
+    if (rc != 0) {
+      fprintf(stderr, "[HH_hsc_alloc@p%d] ERROR: ftruncate failed!\n",
+	      HH_MYID);
+      exit(1);
+    }
+  }
+
+  void *p = mmap(NULL, HSC_SIZE,
+		 PROT_READ|PROT_WRITE, MAP_SHARED,
+		 HHL2->hswfd, HSC_SIZE*id);
+  if (p == MAP_FAILED) {
+    fprintf(stderr, "[HH_hsc_alloc@p%d] ERROR: mmap(0x%lx) failed!\n",
+	    HH_MYID, HSC_SIZE);
+    exit(1);
+  }
+
+  madvise(p, HSC_SIZE, MADV_DONTNEED);
+
+  HH_addHostMemStat(HHST_HOSTSWAPPER, HSC_SIZE);
+  return p;
+}
+
+int HH_hsc_free(void *p)
+{
+  int rc;
+  rc = munmap(p, HSC_SIZE);
+  if (rc != 0) {
+    fprintf(stderr, "[HH_hsc_free@p%d] munmap failed!\n",
+	    HH_MYID);
+    exit(1);
+  }
+  HH_addHostMemStat(HHST_HOSTSWAPPER, -HSC_SIZE);
+  return 0;
+}
 #endif
 
 /* */
@@ -166,7 +239,7 @@ int hostswapper::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   if (hscid == hscs.size()) {
     // new chunk for append write
     assert(loffs == 0);
-    chunk = HH_hsc_alloc();
+    chunk = HH_hsc_alloc(hscid);
     hscs.push_back(chunk);
   }
 
@@ -420,7 +493,7 @@ int hostswapper::swapIn(int initing)
   ssize_t hscid;
   for (hscid = 0; hscid < nhsc; hscid++) {
     void *chunk;
-    chunk = HH_hsc_alloc();
+    chunk = HH_hsc_alloc(hscid);
     hscs.push_back(chunk);
 
     ssize_t lsize = HSC_SIZE;
@@ -495,6 +568,7 @@ int HH_openSFile(char sfname[256])
 	  HH_MYID, HHL->lrank, sfname);
 #endif
 
+#if 01
   /* This unlink is for automatic cleanup of the file. */
   // from "man 2 unlink"
   // If the name was the last link to a file but any processes still have 
@@ -502,6 +576,14 @@ int HH_openSFile(char sfname[256])
   // descriptor  referring  to  it  is closed.
 
   unlink(sfname);
+#else
+
+#ifdef HHLOG_SWAP
+  fprintf(stderr, "[HH:fileswapper::openSFile@p%d(L%d)] the file %s will be REMAINED. BE CAREFUL.\n",
+	  HH_MYID, HHL->lrank, sfname);
+#endif
+
+#endif
   return sfd;
 }
 

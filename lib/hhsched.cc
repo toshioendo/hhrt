@@ -123,6 +123,9 @@ int HH_swapOutIfBetter()
     return 0;
   }
   else if (HHL->dmode == HHD_ON_HOST) {
+#ifdef USE_MMAPSWAP
+    return 0; // do nothing
+#else
     if (!HH_checkH2F()) {
       return 0;
     }
@@ -147,6 +150,7 @@ int HH_swapOutIfBetter()
 #endif
     pthread_mutex_unlock(&HHS->sched_ml);
     return 1;
+#endif // !USE_MMAPSWAP
   }
   else if (HHL->dmode == HHD_ON_DEV) {
     if (d->np_out > 0) {

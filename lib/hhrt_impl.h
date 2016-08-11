@@ -312,9 +312,7 @@ class hostheap: public heap {
 
   int allocCapacity(size_t offset, size_t size);
 
-#ifdef USE_MMAPSWAP
-  int sfd;
-#endif
+  int swapfd;
 };
 
 #define HHRF_SEND (1 << 0)
@@ -390,6 +388,8 @@ struct proc2 {
   char api_str[64];
 #ifdef USE_SHARED_HSC
   void *shsc_ptrs[MAX_SHSC];
+#elif defined USE_MMAPSWAP
+  int hswfd; // mmap fd for host swapper buffer
 #endif
 };
 
@@ -468,7 +468,7 @@ int HH_swapOutForcibly();
 int HH_hsc_init_node();
 int HH_hsc_init_proc();
 int HH_hsc_fin_node();
-void *HH_hsc_alloc();
+void *HH_hsc_alloc(int id);
 int HH_hsc_free(void *p);
 
 

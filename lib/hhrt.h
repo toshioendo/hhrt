@@ -68,6 +68,10 @@ int HHmain(int argc, char *argv[]);
 
 #endif
 
+#ifdef USE_MMAPSWAP
+#warning USER_MMAPSWAP
+#endif
+
 #ifdef __cplusplus
 }
 #endif

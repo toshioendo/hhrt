@@ -105,7 +105,7 @@ static void *hsc_get_ptr(int i, int isnew)
 }
 
 // HH_sched_ml should be locked by caller
-void *HH_hsc_alloc()
+void *HH_hsc_alloc(int id /* not used */)
 {
   int i;
   int me = HH_MYID;
