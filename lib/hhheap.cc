@@ -190,8 +190,7 @@ int heap::swapOut(swapper *curswapper0)
 
   t0 = Wtime();
   assert(curswapper == NULL);
-
-  if (curswapper0 == NULL) {
+  if (swapped == 1) {
     /* do not nothing */
     return 0;
   }
@@ -199,6 +198,7 @@ int heap::swapOut(swapper *curswapper0)
   curswapper = curswapper0;
   curswapper->allocBuf();
   curswapper->beginSeqWrite();
+  swapped = 1;
 
 #if 1
   fprintf(stderr, "[HH:%s::swapOut@p%d] [%.2lf] start. heap region is [%p,%p)\n",
@@ -269,7 +269,7 @@ int heap::swapIn()
     return 0;
   }
 
-  if ( curswapper == NULL) {
+  if ( curswapper == NULL || swapped == 0) {
     return 0;
   }
   
@@ -312,6 +312,7 @@ int heap::swapIn()
 
   curswapper->releaseBuf();
   curswapper = NULL;
+  swapped = 0;
 
   return 0;
 }

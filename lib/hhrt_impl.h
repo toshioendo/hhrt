@@ -162,9 +162,24 @@ struct membuf {
   ssize_t soffs; /* offset of swapepd out buffer */
 };
 
-/*** under construction: memory hierarchy class */
-/* this will replace swapper */
-class swapper {
+class swapper;
+
+// parent of swapper and heap
+class mempool {
+ public:
+  mempool() {curswapper = NULL; swapped = 0;};
+
+  virtual int swapOut(swapper *swapper) {};
+  virtual int swapIn() {};
+  virtual int setSwapper(swapper *swapper0) {curswapper = swapper0;};
+
+  swapper *curswapper;
+  int swapped;
+
+};
+
+// swapper class. This is created per heap per memory hierarchy
+class swapper: public mempool {
  public:
   swapper() {
   }
@@ -187,7 +202,7 @@ class swapper {
   virtual int beginSeqWrite();
   virtual size_t allocSeq(size_t size);
 
-  swapper *curswapper; /* if !=NULL, my data have been swapped out there (host swapper only)*/
+  //swapper *curswapper; /* if !=NULL, my data have been swapped out there (host swapper only)*/
 };
 
 class hostswapper: public swapper {
@@ -252,7 +267,7 @@ class fileswapper: public swapper {
 };
 
 /*************/
-class heap {
+class heap: public mempool {
  public:
   heap() {};
   virtual int init(size_t size0);
@@ -282,7 +297,7 @@ class heap {
   size_t align;
   int expandable;
   int memkind; // HHM_*
-  swapper *curswapper; /* if !=NULL, heap data have been swapped out there */
+  //swapper *curswapper;
 
   char name[16]; /* for debug */
 };
