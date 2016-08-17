@@ -23,22 +23,18 @@ heap *devheapCreate(dev *d)
 
   h = new devheap();
   h->init(heapsize);
-
-  int usefile = 1; //(HHL->lrank >= HHL2->conf.nlphost);
-
-  HHL2->devheap_hostswapper = (swapper*)(new hostswapper());
-  HHL2->devheap_hostswapper->init(0);
-
-  HHL2->devheap_fileswapper = NULL;
-  if (usefile) {
-    HHL2->devheap_fileswapper = (swapper*)(new fileswapper());
-    HHL2->devheap_fileswapper->init(0);
-  }
-
   /* make memory hierarchy for devheap */
-  h->setSwapper(HHL2->devheap_hostswapper);
-  if (usefile) {
-    HHL2->devheap_hostswapper->setSwapper(HHL2->devheap_fileswapper);
+
+  swapper *s1;
+  s1 = (swapper*)(new hostswapper());
+  s1->init(0);
+  h->setSwapper(s1);
+
+  swapper *s2 = NULL;
+  {
+    s2 = (swapper*)(new fileswapper());
+    s2->init(0);
+    s1->setSwapper(s2);
   }
   return h;
 }
@@ -50,18 +46,13 @@ heap *hostheapCreate()
 
   h = new hostheap();
   h->init(0L);
-
-  int usefile = 1;
-
-  HHL2->hostheap_fileswapper = NULL;
-  if (usefile) {
-    HHL2->hostheap_fileswapper = new fileswapper();
-    HHL2->hostheap_fileswapper->init(1);
-  }
-
   /* make memory hierarchy for hostheap */
-  if (usefile) {
-    h->setSwapper(HHL2->hostheap_fileswapper);
+
+  swapper *s2 = NULL;
+  {
+    s2 = new fileswapper();
+    s2->init(1);
+    h->setSwapper(s2);
   }
 
   return h;

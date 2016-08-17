@@ -402,11 +402,8 @@ struct proc2 {
   hhconf conf;
 
   heap *devheap;
-  swapper *devheap_hostswapper;
-  swapper *devheap_fileswapper;
 #ifdef USE_SWAPHOST
   heap *hostheap;
-  swapper *hostheap_fileswapper;
 #endif
 
 #ifdef USE_FILESWAP_THREAD
