@@ -258,14 +258,13 @@ int heap::restoreHeap()
 }
 
 
-int heap::swapIn(int initing)
+int heap::swapIn()
 {
   double t0, t1;
   int nmoved = 0, nskipped = 0;
   size_t smoved = 0, sskipped = 0;
 
-  if (initing) { // firstswapin
-    assert(heapptr == NULL);
+  if (heapptr == NULL) { // firstswapin
     allocHeap();
     return 0;
   }

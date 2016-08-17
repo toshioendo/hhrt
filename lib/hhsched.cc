@@ -27,7 +27,7 @@ int HH_checkF2H()
   return 1;
 }
     
-int HH_swapInIfOk(int initing)
+int HH_swapInIfOk()
 {
   dev *d = HH_curdev();
 
@@ -55,13 +55,13 @@ int HH_swapInIfOk(int initing)
     d->hp_user[HHL->hpid] = HH_MYID;
     d->hp_nextuser[HHL->hpid] = -1;
 
-    HH_swapInH2D(initing);
+    HH_swapInH2D();
 
     assert(HHL->dmode == HHD_ON_DEV);
     pthread_mutex_unlock(&HHS->sched_ml);
     return 1;
   }
-  else if (HHL->dmode == HHD_ON_FILE) {
+  else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
     if (!HH_checkF2H()) {
       return 0;
     }
@@ -78,10 +78,10 @@ int HH_swapInIfOk(int initing)
 #endif
 
 #ifdef USE_FILESWAP_THREAD
-    HH_startSwapInF2H(initing);
+    HH_startSwapInF2H();
     assert(HHL->dmode == HHD_SI_F2H);
 #else
-    HH_swapInF2H(initing);
+    HH_swapInF2H();
     assert(HHL->dmode == HHD_ON_HOST);
 #endif
 
@@ -118,7 +118,7 @@ int HH_checkH2F()
 int HH_swapOutIfBetter()
 {
   dev *d = HH_curdev();
-  if (HHL->dmode == HHD_ON_FILE) {
+  if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
     // do nothing
     return 0;
   }
@@ -198,7 +198,7 @@ int HH_swapOutIfOver()
 }
 
 /* called by blocking functions periodically. */
-int HH_progressSched(int initing)
+int HH_progressSched()
 {
   int rc;
 #ifdef USE_FILESWAP_THREAD
@@ -220,7 +220,7 @@ int HH_progressSched(int initing)
     rc = HH_swapOutIfBetter();
   }
   else if (HHL->pmode == HHP_RUNNABLE) {
-    rc = HH_swapInIfOk(initing);
+    rc = HH_swapInIfOk();
   }
 
   return rc; /* progress */
@@ -228,7 +228,7 @@ int HH_progressSched(int initing)
 
 /* swapIn may be called in this function */
 /* This function may be blocked */
-int HH_sleepForMemory(int initing)
+int HH_sleepForMemory()
 {
   if (HHL->dmode == HHD_ON_DEV ||
       HHL->devmode == HHDEV_NOTUSED) {
@@ -248,7 +248,7 @@ int HH_sleepForMemory(int initing)
 #endif
 
   do {
-    HH_progressSched(initing);
+    HH_progressSched();
     if (HHL->dmode == HHD_ON_DEV) {
       break;
     }
@@ -291,7 +291,7 @@ int HH_exitAPI()
   HHL->in_api--;
   if (HHL->in_api == 0) {
     assert(HHL->pmode == HHP_BLOCKED);
-    HH_sleepForMemory(0);
+    HH_sleepForMemory();
     /* now I'm awake */
     HHL->pmode = HHP_RUNNING;
 #ifdef HHLOG_API
@@ -331,7 +331,7 @@ int HH_exitGComm()
   HHL->in_api--;
   if (HHL->in_api == 0) {
     assert(HHL->pmode == HHP_BLOCKED);
-    HH_sleepForMemory(0);
+    HH_sleepForMemory();
     /* now I'm awake */
     HHL->pmode = HHP_RUNNING;
 #ifdef HHLOG_API
@@ -356,7 +356,7 @@ int HH_yield()
   HH_swapOutIfBetter();
 
   HHL->pmode = HHP_RUNNABLE;
-  HH_sleepForMemory(0);
+  HH_sleepForMemory();
 
   HHL->pmode = HHP_RUNNING;
 

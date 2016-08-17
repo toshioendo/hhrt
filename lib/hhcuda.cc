@@ -228,7 +228,7 @@ int HH_devSetMode(int mode)
     fprintf(stderr, "[HH_devSetMode@p%d] calling sleepForMemory...\n",
 	    HH_MYID);
 #endif
-    HH_sleepForMemory(0);
+    HH_sleepForMemory();
     HHL->pmode = HHP_RUNNING;
   }
 

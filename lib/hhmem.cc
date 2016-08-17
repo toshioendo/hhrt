@@ -49,8 +49,8 @@ int HH_initHeap_inner()
 #endif
 
   HHL->pmode = HHP_RUNNABLE;
-  HHL->dmode = HHD_ON_FILE;
-  HH_sleepForMemory(1);
+  HHL->dmode = HHD_NONE;
+  HH_sleepForMemory();
   HHL->pmode = HHP_RUNNING;
 
   return 0;
@@ -82,7 +82,7 @@ int HH_finalizeHeap()
 
   HHS->nhostusers[HHL->hpid]--;
 
-  HHL->dmode = HHD_ON_FILE;
+  HHL->dmode = HHD_NONE;
   HHL->pmode = HHP_RUNNABLE;
 
   pthread_mutex_unlock(&HHS->sched_ml);
@@ -262,7 +262,7 @@ int HH_swapOutH2F()
 
 // H2D
 // This function assumes sched_ml is locked
-int HH_swapInH2D(int initing)
+int HH_swapInH2D()
 {
   dev *d;
   assert(HHL->dmode == HHD_ON_HOST);
@@ -274,7 +274,7 @@ int HH_swapInH2D(int initing)
   pthread_mutex_unlock(&HHS->sched_ml);
 #endif
   /* H -> D */
-  HHL2->devheap->swapIn(initing);
+  HHL2->devheap->swapIn();
 
 #ifndef DEBUG_SEQ_SWAP
   lock_log(&HHS->sched_ml);
@@ -288,31 +288,30 @@ int HH_swapInH2D(int initing)
 #ifdef USE_FILESWAP_THREAD
 static void *swapInF2Hthread(void *arg)
 {
-  int initing = (int)((long)arg);
 #ifdef USE_SWAPHOST
   /* Host Heap */
-  HHL2->hostheap->swapIn(initing);
+  HHL2->hostheap->swapIn();
 #endif
 
   /* Device Heap */
   if (HHL2->devheap_fileswapper) {
     /* F -> H */
-    HHL2->devheap_hostswapper->swapIn(initing);
+    HHL2->devheap_hostswapper->swapIn();
   }
 
   return NULL;
 }
 
 // This function assumes sched_ml is locked
-int HH_startSwapInF2H(int initing)
+int HH_startSwapInF2H()
 {
-  assert(HHL->dmode == HHD_ON_FILE);
+  assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
   fsdir *fsd = HH_curfsdir();
   fsd->np_filein++;
 
   HHS->nhostusers[HHL->hpid]++;
-  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, (void*)((long)initing));
+  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, NULL);
   HHL->dmode = HHD_SI_F2H;
 
   return 0;
@@ -343,9 +342,9 @@ int HH_tryfinSwapInF2H()
 #else // !USE_FILESWAP_THREAD
 // F2H
 // This function assumes sched_ml is locked
-int HH_swapInF2H(int initing)
+int HH_swapInF2H()
 {
-  assert(HHL->dmode == HHD_ON_FILE);
+  assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
   fsdir *fsd = HH_curfsdir();
   fsd->np_filein++;
@@ -356,13 +355,13 @@ int HH_swapInF2H(int initing)
 
 #ifdef USE_SWAPHOST
   /* Host Heap */
-  HHL2->hostheap->swapIn(initing);
+  HHL2->hostheap->swapIn();
 #endif
 
   /* Device Heap */
   if (HHL2->devheap_fileswapper) {
     /* F -> H */
-    HHL2->devheap_hostswapper->swapIn(initing);
+    HHL2->devheap_hostswapper->swapIn();
   }
 
   lock_log(&HHS->sched_ml);

@@ -37,6 +37,7 @@ int hostswapper::init(int id)
 
   align = 1;
   copyunit = 32L*1024*1024;
+  initing = 1;
 
   int i;
   for (i = 0; i < 2; i++) {
@@ -463,7 +464,7 @@ int hostswapper::swapOut(swapper *curswapper0)
 }
 
 // Swaps in data FROM another swapper (curswapper) TO myself
-int hostswapper::swapIn(int initing)
+int hostswapper::swapIn()
 {
   double t0, t1;
 
@@ -473,6 +474,7 @@ int hostswapper::swapIn(int initing)
     fprintf(stderr, "[HH:hostswapper::swapIn@p%d] do nothing\n",
 	    HH_MYID);
 #endif
+    initing = 0;
     return 0;
   }
 
@@ -840,7 +842,7 @@ int fileswapper::swapOut(swapper *curswapper0)
   return -1;
 }
 
-int fileswapper::swapIn(int initing)
+int fileswapper::swapIn()
 {
   fprintf(stderr, "[HH:fileswapper::swapIn@p%d] ERROR: This should not be called\n",
 	  HH_MYID);

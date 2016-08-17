@@ -269,7 +269,7 @@ int HHMPI_Waitall_i(int n, MPI_Request *reqs, MPI_Status *stats)
       break;
     }
 
-    HH_progressSched(0);
+    HH_progressSched();
     usleep(1);
   } while (1);
 

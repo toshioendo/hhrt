@@ -78,7 +78,8 @@ static const char *hhp_names[] = {
 };
 
 enum {
-  HHD_ON_DEV = 0,
+  HHD_NONE = 0,
+  HHD_ON_DEV,
   HHD_ON_HOST,
   HHD_ON_FILE,
 
@@ -178,7 +179,7 @@ class swapper {
   virtual int releaseBuf() {};
 
   virtual int swapOut(swapper *swapper) {};
-  virtual int swapIn(int initing) {};
+  virtual int swapIn() {};
 
   /* sequential writer */
   size_t swcur;
@@ -206,11 +207,12 @@ class hostswapper: public swapper {
   virtual int releaseBuf();
 
   virtual int swapOut(swapper *swapper);
-  virtual int swapIn(int initing);
+  virtual int swapIn();
 
   size_t copyunit;
   void *copybufs[2];
   cudaStream_t copystream;
+  int initing;
 
   // host swapper chunks
   list <void *> hscs;
@@ -239,7 +241,7 @@ class fileswapper: public swapper {
   virtual int releaseBuf() {};
 
   virtual int swapOut(swapper *swapper);
-  virtual int swapIn(int initing);
+  virtual int swapIn();
 
   size_t copyunit;
   void *copybufs[2];
@@ -268,7 +270,7 @@ class heap {
   virtual int restoreHeap();
 
   virtual int swapOut(swapper *swapper);
-  virtual int swapIn(int initing);
+  virtual int swapIn();
 
   virtual int madvise(void *p, size_t size, int kind);
 
@@ -440,9 +442,9 @@ size_t HH_countDevMemSize();
 size_t HH_countPinnedMemSize();
 int HH_afterDevSwapOut();
 int HH_afterHostSwapOut();
-int HH_swapInH2D(int initing);
-int HH_swapInF2H(int initing);
-int HH_startSwapInF2H(int initing);
+int HH_swapInH2D();
+int HH_swapInF2H();
+int HH_startSwapInF2H();
 int HH_tryfinSwapInF2H();
 int HH_swapOutD2H();
 int HH_swapOutH2F();
@@ -453,15 +455,15 @@ int HH_addHostMemStat(int kind, ssize_t incr);
 
 /****************************************/
 /* hhsched.cc: scheduling */
-int HH_progressSched(int initing);
+int HH_progressSched();
 int HH_enterAPI(const char *str);
 int HH_exitAPI();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();
 
 int HH_countSwappedRunnable();
-int HH_sleepForMemory(int initing);
-int HH_swapInIfOk(int initing);
+int HH_sleepForMemory();
+int HH_swapInIfOk();
 int HH_swapOutIfBetter();
 int HH_swapOutForcibly();
 

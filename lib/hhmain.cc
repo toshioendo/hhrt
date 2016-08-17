@@ -327,7 +327,7 @@ int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL->pid = getpid();
   /* default mode */
   HHL->pmode = HHP_RUNNABLE;
-  HHL->dmode = HHD_ON_FILE;
+  HHL->dmode = HHD_NONE;
   HHL->devmode = HHDEV_NORMAL;
   HHL->in_api = 0;
 
