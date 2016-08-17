@@ -162,11 +162,6 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
   }
   
   /* determine device heap size */
-#if 0
-  d->nheaps = confp->maxrp;
-  if (d->nheaps > lsize) d->nheaps = lsize;
-#endif
-  
   size_t avail = d->memsize - d->memsize/64L;
 #ifdef USE_CUDA_MPS
   avail -= DEVMEM_USED_BY_PROC * 1;
@@ -317,6 +312,7 @@ int init_node(int lsize, int size, hhconf *confp)
   return 0;
 }
 
+/* This may cause waiting */
 int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
 {
   assert(lsize <= MAX_LSIZE);
@@ -357,6 +353,17 @@ int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   // see also HH_canSwapIn()
   HHL->hpid = lrank % HHS->nheaps;
 
+  // setup heap structures
+  // moved from hhmem.c
+#ifdef USE_SWAPHOST
+  HHL2->hostheap = HH_hostheapCreate();
+#endif
+  dev *d = HH_curdev();
+  HHL2->devheap = HH_devheapCreate(d);
+
+  // blocked until heaps are accessible
+  HH_sleepForMemory();
+  HHL->pmode = HHP_RUNNING;
 
   return 0;
 }
@@ -550,15 +557,13 @@ int main(int argc, char *argv[])
     }
   }
 
-  /* initialize process info */
-  init_proc(lrank, lsize, rank, size, &conf);
-
   MPI_Barrier(MPI_COMM_WORLD);
 #ifdef EAGER_ICS_DESTROY
   ipsm_destroy(); /* key is retained until processes finish */
 #endif
 
-  HH_initHeap_inner(); /* This must be after (raw) MPI_Barrier */
+  /* initialize process info */
+  init_proc(lrank, lsize, rank, size, &conf);
 
   /* calls user's main */
   HHmain(argc, argv);

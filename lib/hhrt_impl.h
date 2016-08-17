@@ -462,9 +462,11 @@ int HH_openSFile(char sfname[256]);
 
 /****************************************/
 /* hhmem.cc: memory management */
+heap *HH_devheapCreate(dev *d);
+#ifdef USE_SWAPHOST
+heap *HH_hostheapCreate();
+#endif
 int HH_initHeap_inner();
-size_t HH_countDevMemSize();
-size_t HH_countPinnedMemSize();
 int HH_afterDevSwapOut();
 int HH_afterHostSwapOut();
 int HH_swapInH2D();

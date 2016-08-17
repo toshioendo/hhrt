@@ -8,15 +8,7 @@
 #include <errno.h>
 #include "hhrt_impl.h"
 
-int HH_initHeap(size_t heapsize)
-{
-  /* OBSOLETE */
-  fprintf(stderr, "[HH_initHeap@p%d] OBSOLETE: The call is ignored\n",
-	  HH_MYID);
-  return 0;
-}
-
-heap *devheapCreate(dev *d)
+heap *HH_devheapCreate(dev *d)
 {
   heap *h;
   size_t heapsize = d->default_heapsize;
@@ -40,7 +32,7 @@ heap *devheapCreate(dev *d)
 }
 
 #ifdef USE_SWAPHOST
-heap *hostheapCreate()
+heap *HH_hostheapCreate()
 {
   heap *h;
 
@@ -58,24 +50,6 @@ heap *hostheapCreate()
   return h;
 }
 #endif
-
-/* This may cause waiting */
-int HH_initHeap_inner()
-{
-  dev *d = HH_curdev();
-  HHL2->devheap = devheapCreate(d);
-
-#ifdef USE_SWAPHOST
-  HHL2->hostheap = hostheapCreate();
-#endif
-
-  HHL->pmode = HHP_RUNNABLE;
-  HHL->dmode = HHD_NONE;
-  HH_sleepForMemory();
-  HHL->pmode = HHP_RUNNING;
-
-  return 0;
-}
 
 int HH_finalizeHeap()
 {
