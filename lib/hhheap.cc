@@ -182,20 +182,19 @@ int heap::releaseHeap()
   exit(1);
 }
 
-int heap::swapOut(swapper *curswapper0)
+int heap::swapOut()
 {
   double t0, t1, t2;
   int nmoved = 0, nskipped = 0;
   size_t smoved = 0, sskipped = 0;
 
   t0 = Wtime();
-  assert(curswapper == NULL);
   if (swapped == 1) {
     /* do not nothing */
     return 0;
   }
 
-  curswapper = curswapper0;
+  assert(curswapper != NULL);
   curswapper->allocBuf();
   curswapper->beginSeqWrite();
   swapped = 1;
@@ -311,7 +310,6 @@ int heap::swapIn()
 #endif
 
   curswapper->releaseBuf();
-  curswapper = NULL;
   swapped = 0;
 
   return 0;

@@ -169,9 +169,9 @@ class mempool {
  public:
   mempool() {curswapper = NULL; swapped = 0;};
 
-  virtual int swapOut(swapper *swapper) {};
+  virtual int swapOut() {};
   virtual int swapIn() {};
-  virtual int setSwapper(swapper *swapper0) {curswapper = swapper0;};
+  virtual int setSwapper(swapper *swapper0);
 
   swapper *curswapper;
   int swapped;
@@ -193,7 +193,7 @@ class swapper: public mempool {
   virtual int allocBuf() {};
   virtual int releaseBuf() {};
 
-  virtual int swapOut(swapper *swapper) {};
+  virtual int swapOut() {};
   virtual int swapIn() {};
 
   /* sequential writer */
@@ -221,7 +221,7 @@ class hostswapper: public swapper {
   virtual int allocBuf();
   virtual int releaseBuf();
 
-  virtual int swapOut(swapper *swapper);
+  virtual int swapOut();
   virtual int swapIn();
 
   size_t copyunit;
@@ -255,7 +255,7 @@ class fileswapper: public swapper {
   virtual int allocBuf() {};
   virtual int releaseBuf() {};
 
-  virtual int swapOut(swapper *swapper);
+  virtual int swapOut();
   virtual int swapIn();
 
   size_t copyunit;
@@ -284,7 +284,7 @@ class heap: public mempool {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int swapOut(swapper *swapper);
+  virtual int swapOut();
   virtual int swapIn();
 
   virtual int madvise(void *p, size_t size, int kind);

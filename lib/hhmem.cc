@@ -37,6 +37,12 @@ int HH_initHeap_inner()
     HHL2->devheap_fileswapper->init(0);
   }
 
+  /* make memory hierarchy for devheap */
+  HHL2->devheap->setSwapper(HHL2->devheap_hostswapper);
+  if (usefile) {
+    HHL2->devheap_hostswapper->setSwapper(HHL2->devheap_fileswapper);
+  }
+
 #ifdef USE_SWAPHOST
   HHL2->hostheap = new hostheap();
   HHL2->hostheap->init(0L);
@@ -46,6 +52,12 @@ int HH_initHeap_inner()
     HHL2->hostheap_fileswapper = new fileswapper();
     HHL2->hostheap_fileswapper->init(1);
   }
+
+  /* make memory hierarchy for hostheap */
+  if (usefile) {
+    HHL2->hostheap->setSwapper(HHL2->hostheap_fileswapper);
+  }
+
 #endif
 
   HHL->pmode = HHP_RUNNABLE;
@@ -124,7 +136,7 @@ int HH_swapOutD2H()
 #endif
 
   /* D -> H */
-  HHL2->devheap->swapOut(HHL2->devheap_hostswapper);
+  HHL2->devheap->swapOut();
 
 #ifndef DEBUG_SEQ_SWAP
   lock_log(&HHS->sched_ml);
@@ -149,13 +161,13 @@ static void *swapOutH2Fthread(void *arg)
   /* Host Heap */
   /* H -> F */
   if (HHL2->hostheap_fileswapper) {
-    HHL2->hostheap->swapOut(HHL2->hostheap_fileswapper);
+    HHL2->hostheap->swapOut();
   }
 #endif
 
   if (HHL2->devheap_fileswapper) {
     /* H -> F */
-    HHL2->devheap_hostswapper->swapOut(HHL2->devheap_fileswapper);
+    HHL2->devheap_hostswapper->swapOut();
   }
 
   return NULL;
@@ -231,14 +243,14 @@ int HH_swapOutH2F()
 
   if (HHL2->devheap_fileswapper) {
     /* H -> F */
-    HHL2->devheap_hostswapper->swapOut(HHL2->devheap_fileswapper);
+    HHL2->devheap_hostswapper->swapOut();
   }
 
 #ifdef USE_SWAPHOST
   /* Host Heap */
   /* H -> F */
   if (HHL2->hostheap_fileswapper) {
-    HHL2->hostheap->swapOut(HHL2->hostheap_fileswapper);
+    HHL2->hostheap->swapOut();
   }
 #endif
 

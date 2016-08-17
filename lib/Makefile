@@ -1,6 +1,6 @@
 include ../make.inc
 
-ARCOBJS = hhmain.o hhsched.o hhmem.o hhswapper.o hhheap.o hhmpi.o hhcuda.o hhshm.o hhaux.o ipsm.o
+ARCOBJS = hhmain.o hhsched.o hhmem.o hhswapper.o hhheap.o hhmempool.o hhmpi.o hhcuda.o hhshm.o hhaux.o ipsm.o
 ARC = libhhrt.a
 HDRS = hhrt.h hhrt_impl.h hhrt_common.h
 

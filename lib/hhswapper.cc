@@ -406,19 +406,18 @@ int hostswapper::read1(ssize_t offs, void *buf, int bufkind, size_t size)
 }
 
 // Swaps out data FROM myself TO another swapper
-int hostswapper::swapOut(swapper *curswapper0)
+int hostswapper::swapOut()
 {
   double t0, t1;
 
   t0 = Wtime();
-  assert(curswapper == NULL);
 
-  if (curswapper0 == NULL) {
+  if (swapped == 1) {
     /* do not nothing */
     return 0;
   }
 
-  curswapper = curswapper0;
+  assert(curswapper != NULL);
   curswapper->allocBuf();
   curswapper->beginSeqWrite();
 
@@ -523,7 +522,7 @@ int hostswapper::swapIn()
 #endif
 
   curswapper->releaseBuf();
-  curswapper = NULL;
+  swapped = 0;
 
   return 0;
 }
@@ -834,7 +833,7 @@ int fileswapper::read1(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
-int fileswapper::swapOut(swapper *curswapper0)
+int fileswapper::swapOut()
 {
   fprintf(stderr, "[HH:fileswapper::swapOut@p%d] ERROR: This should not be called\n",
 	  HH_MYID);
