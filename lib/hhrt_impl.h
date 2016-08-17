@@ -172,6 +172,8 @@ class mempool {
   virtual int swapOut() {};
   virtual int swapIn() {};
   virtual int setSwapper(swapper *swapper0);
+  virtual int finalize() {};
+  virtual int finalizeRec(); // recursive finalize
 
   swapper *curswapper;
   int swapped;

@@ -16,15 +16,13 @@ int HH_initHeap(size_t heapsize)
   return 0;
 }
 
-/* This may cause waiting */
-int HH_initHeap_inner()
+heap *devheapCreate(dev *d)
 {
-  cudaError_t crc;
-  dev *d = HH_curdev();
+  heap *h;
   size_t heapsize = d->default_heapsize;
 
-  HHL2->devheap = new devheap();
-  HHL2->devheap->init(heapsize);
+  h = new devheap();
+  h->init(heapsize);
 
   int usefile = 1; //(HHL->lrank >= HHL2->conf.nlphost);
 
@@ -38,14 +36,22 @@ int HH_initHeap_inner()
   }
 
   /* make memory hierarchy for devheap */
-  HHL2->devheap->setSwapper(HHL2->devheap_hostswapper);
+  h->setSwapper(HHL2->devheap_hostswapper);
   if (usefile) {
     HHL2->devheap_hostswapper->setSwapper(HHL2->devheap_fileswapper);
   }
+  return h;
+}
 
 #ifdef USE_SWAPHOST
-  HHL2->hostheap = new hostheap();
-  HHL2->hostheap->init(0L);
+heap *hostheapCreate()
+{
+  heap *h;
+
+  h = new hostheap();
+  h->init(0L);
+
+  int usefile = 1;
 
   HHL2->hostheap_fileswapper = NULL;
   if (usefile) {
@@ -55,9 +61,21 @@ int HH_initHeap_inner()
 
   /* make memory hierarchy for hostheap */
   if (usefile) {
-    HHL2->hostheap->setSwapper(HHL2->hostheap_fileswapper);
+    h->setSwapper(HHL2->hostheap_fileswapper);
   }
 
+  return h;
+}
+#endif
+
+/* This may cause waiting */
+int HH_initHeap_inner()
+{
+  dev *d = HH_curdev();
+  HHL2->devheap = devheapCreate(d);
+
+#ifdef USE_SWAPHOST
+  HHL2->hostheap = hostheapCreate();
 #endif
 
   HHL->pmode = HHP_RUNNABLE;
@@ -72,19 +90,10 @@ int HH_finalizeHeap()
 {
   assert(HHL->dmode == HHD_ON_DEV);
 #ifdef USE_SWAPHOST
-  if (HHL2->hostheap_fileswapper) {
-    HHL2->hostheap_fileswapper->finalize();
-  }
-  HHL2->hostheap->finalize();
+  HHL2->hostheap->finalizeRec();
 #endif
 
-  if (HHL2->devheap_fileswapper) {
-    HHL2->devheap_fileswapper->finalize();
-  }
-  if (HHL2->devheap_hostswapper) {
-    HHL2->devheap_hostswapper->finalize();
-  }
-  HHL2->devheap->finalize();
+  HHL2->devheap->finalizeRec();
 
   lock_log(&HHS->sched_ml);
 
