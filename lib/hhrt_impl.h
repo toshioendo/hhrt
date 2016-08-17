@@ -204,7 +204,6 @@ class swapper: public mempool {
   virtual int beginSeqWrite();
   virtual size_t allocSeq(size_t size);
 
-  //swapper *curswapper; /* if !=NULL, my data have been swapped out there (host swapper only)*/
 };
 
 class hostswapper: public swapper {
@@ -243,10 +242,6 @@ class fileswapper: public swapper {
   virtual int init(int id);
   virtual int finalize();
 
-#if 0
-  int makeSFileName(int id);
-  int openSFile();
-#endif
   int openSFileIfNotYet();
 
   int write_small(ssize_t offs, void *buf, int bufkind, size_t size);
@@ -289,6 +284,12 @@ class heap: public mempool {
   virtual int swapOut();
   virtual int swapIn();
 
+  // TODO: make it cleaner
+  virtual int swapOutD2H() {};
+  virtual int swapOutH2F() {};
+  virtual int swapInF2H() {};
+  virtual int swapInH2D() {};
+
   virtual int madvise(void *p, size_t size, int kind);
 
   virtual int dump();
@@ -313,6 +314,11 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
+  virtual int swapOutD2H();
+  virtual int swapOutH2F();
+  virtual int swapInF2H();
+  virtual int swapInH2D();
+
   void *allocDevMem(size_t heapsize);
 
   void *hp_baseptr;
@@ -328,6 +334,11 @@ class hostheap: public heap {
   virtual int allocHeap();
   virtual int releaseHeap();
   virtual int restoreHeap();
+
+  virtual int swapOutD2H() {}; // do nothing
+  virtual int swapOutH2F();
+  virtual int swapInF2H();
+  virtual int swapInH2D() {}; // do nothing
 
   int allocCapacity(size_t offset, size_t size);
 
@@ -413,6 +424,7 @@ struct proc2 {
 };
 
 /* Info about this node */
+/* Initialized by leader (local rank=0) process */
 /* Shared by multiple processes, so this should have flat and relocatable structure */
 struct shdata {
   int nprocs;
@@ -431,7 +443,6 @@ struct shdata {
   char hostname[HOSTNAMELEN];
 
 #ifdef USE_SHARED_HSC
-  //pthread_mutex_t shsc_ml; // sched_ml should be used?
   int nshsc;
   int shsc_users[MAX_SHSC];
   pthread_mutex_t shsc_ml;

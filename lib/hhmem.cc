@@ -145,7 +145,10 @@ int HH_swapOutD2H()
 #endif
 
   /* D -> H */
-  HHL2->devheap->swapOut();
+  HHL2->devheap->swapOutD2H();
+#ifdef USE_SWAPHOST
+  HHL2->hostheap->swapOutD2H(); // do nothing
+#endif
 
 #ifndef DEBUG_SEQ_SWAP
   lock_log(&HHS->sched_ml);
@@ -169,15 +172,10 @@ static void *swapOutH2Fthread(void *arg)
 #ifdef USE_SWAPHOST
   /* Host Heap */
   /* H -> F */
-  if (HHL2->hostheap_fileswapper) {
-    HHL2->hostheap->swapOut();
-  }
+  HHL2->hostheap->swapOutH2F();
 #endif
 
-  if (HHL2->devheap_fileswapper) {
-    /* H -> F */
-    HHL2->devheap_hostswapper->swapOut();
-  }
+  HHL2->devheap->swapOutH2F();
 
   return NULL;
 }
@@ -250,17 +248,12 @@ int HH_swapOutH2F()
 
   pthread_mutex_unlock(&HHS->sched_ml);
 
-  if (HHL2->devheap_fileswapper) {
-    /* H -> F */
-    HHL2->devheap_hostswapper->swapOut();
-  }
+  HHL2->devheap->swapOutH2F();
 
 #ifdef USE_SWAPHOST
   /* Host Heap */
   /* H -> F */
-  if (HHL2->hostheap_fileswapper) {
-    HHL2->hostheap->swapOut();
-  }
+  HHL2->hostheap->swapOutH2F();
 #endif
 
   lock_log(&HHS->sched_ml);
@@ -295,7 +288,10 @@ int HH_swapInH2D()
   pthread_mutex_unlock(&HHS->sched_ml);
 #endif
   /* H -> D */
-  HHL2->devheap->swapIn();
+  HHL2->devheap->swapInH2D();
+#ifdef USE_SWAPHOST
+  HHL2->hostheap->swapInH2D();
+#endif
 
 #ifndef DEBUG_SEQ_SWAP
   lock_log(&HHS->sched_ml);
@@ -311,14 +307,11 @@ static void *swapInF2Hthread(void *arg)
 {
 #ifdef USE_SWAPHOST
   /* Host Heap */
-  HHL2->hostheap->swapIn();
+  HHL2->hostheap->swapInF2H();
 #endif
 
   /* Device Heap */
-  if (HHL2->devheap_fileswapper) {
-    /* F -> H */
-    HHL2->devheap_hostswapper->swapIn();
-  }
+  HHL2->devheap->swapInF2H();
 
   return NULL;
 }
@@ -376,14 +369,11 @@ int HH_swapInF2H()
 
 #ifdef USE_SWAPHOST
   /* Host Heap */
-  HHL2->hostheap->swapIn();
+  HHL2->hostheap->swapInF2H();
 #endif
 
   /* Device Heap */
-  if (HHL2->devheap_fileswapper) {
-    /* F -> H */
-    HHL2->devheap_hostswapper->swapIn();
-  }
+  HHL2->devheap->swapInF2H();
 
   lock_log(&HHS->sched_ml);
 

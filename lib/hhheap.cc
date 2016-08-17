@@ -507,6 +507,44 @@ int devheap::restoreHeap()
   return 0;
 }
 
+int devheap::swapOutD2H()
+{
+  return swapOut();
+}
+
+int devheap::swapOutH2F()
+{
+  if (curswapper == NULL) {
+    return 0;
+  }
+
+  if (curswapper->curswapper == NULL) {
+    return 0;
+  }
+
+  curswapper->swapOut();
+  return 0;
+}
+
+int devheap::swapInF2H()
+{
+  if (curswapper == NULL) {
+    return 0;
+  }
+
+  if (curswapper->curswapper == NULL) {
+    return 0;
+  }
+
+  curswapper->swapIn();
+  return 0;
+}
+
+int devheap::swapInH2D()
+{
+  return swapIn();
+}
+
 /*****************************************************************/
 // hostheap class (child class of heap)
 int hostheap::init(size_t heapsize0)
@@ -702,3 +740,22 @@ int hostheap::restoreHeap()
   return 0;
 }
 
+int hostheap::swapOutH2F()
+{
+  if (curswapper == NULL) {
+    return 0;
+  }
+
+  swapOut();
+  return 0;
+}
+
+int hostheap::swapInF2H()
+{
+  if (curswapper == NULL) {
+    return 0;
+  }
+
+  swapIn();
+  return 0;
+}
