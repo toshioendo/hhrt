@@ -136,8 +136,7 @@ struct dev {
   cudaIpcMemHandle_t hp_handle;
   void *hp_baseptr0; /* usable only for leader process. ugly */
 #endif
-  int hp_user[MAX_MAXRP];
-  int hp_nextuser[MAX_MAXRP];
+  int dhslot_users[MAX_MAXRP];
 };
 
 // info about fileswap dir */
@@ -427,7 +426,7 @@ struct shdata {
   int nprocs;
   int nlprocs;
   int ndevs; /* # of physical devs */
-  int nheaps; /* # of procs that may be runnable (static) */
+  int ndhslots; /* # of dev heap slots */
 
   // scheduling
   int nhostusers[MAX_MAXRP]; // # procs that use host-mem OR dev-mem

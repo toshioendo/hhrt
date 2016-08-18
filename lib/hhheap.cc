@@ -7,6 +7,74 @@
 #include <assert.h>
 #include "hhrt_impl.h"
 
+heap *HH_devheapCreate(dev *d)
+{
+  heap *h;
+  size_t heapsize = d->default_heapsize;
+
+  h = new devheap();
+  h->init(heapsize);
+  /* make memory hierarchy for devheap */
+
+  swapper *s1;
+  s1 = (swapper*)(new hostswapper());
+  s1->init(0);
+  h->setSwapper(s1);
+
+  swapper *s2 = NULL;
+  {
+    s2 = (swapper*)(new fileswapper());
+    s2->init(0);
+    s1->setSwapper(s2);
+  }
+  return h;
+}
+
+#ifdef USE_SWAPHOST
+heap *HH_hostheapCreate()
+{
+  heap *h;
+
+  h = new hostheap();
+  h->init(0L);
+  /* make memory hierarchy for hostheap */
+
+  swapper *s2 = NULL;
+  {
+    s2 = new fileswapper();
+    s2->init(1);
+    h->setSwapper(s2);
+  }
+
+  return h;
+}
+#endif
+
+int HH_finalizeHeap()
+{
+  assert(HHL->dmode == HHD_ON_DEV);
+#ifdef USE_SWAPHOST
+  HHL2->hostheap->finalizeRec();
+#endif
+
+  HHL2->devheap->finalizeRec();
+
+  lock_log(&HHS->sched_ml);
+
+  dev *d = HH_curdev();
+  assert(d->dhslot_users[HHL->hpid] == HH_MYID);
+  d->dhslot_users[HHL->hpid] = -1;
+
+  HHS->nhostusers[HHL->hpid]--;
+
+  HHL->dmode = HHD_NONE;
+  HHL->pmode = HHP_RUNNABLE;
+
+  pthread_mutex_unlock(&HHS->sched_ml);
+
+  return 0;
+}
+
 // heap class
 
 int heap::init(size_t heapsize0)
@@ -424,7 +492,7 @@ void *devheap::allocDevMem(size_t heapsize)
   cudaError_t crc;
   void *dp;
 #ifdef USE_CUDA_IPC
-  assert(HHL->hpid >= 0 && HHL->hpid < HHS->nheaps);
+  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
   if (hp_baseptr == NULL) {
     if (HHL->lrank == 0) {
       hp_baseptr = d->hp_baseptr0;

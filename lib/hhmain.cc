@@ -168,7 +168,7 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
 #else
   avail -= DEVMEM_USED_BY_PROC * lsize;
 #endif
-  d->default_heapsize = avail / HHS->nheaps;
+  d->default_heapsize = avail / HHS->ndhslots;
   d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
   
 #if 1
@@ -187,7 +187,7 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
   }
   
   size_t heapsize = d->default_heapsize;
-  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->nheaps);
+  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndhslots);
   if (crc != cudaSuccess) {
     fprintf(stderr, "[HH:init_dev@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
 	    HHS->hostname, i, heapsize>>20);
@@ -207,9 +207,8 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
 #endif
 
   /* setup heap regions on device */
-  for (ih = 0; ih < HHS->nheaps; ih++) {
-    d->hp_user[ih] = -1;
-    d->hp_nextuser[ih] = -1;
+  for (ih = 0; ih < HHS->ndhslots; ih++) {
+    d->dhslot_users[ih] = -1;
   }
   
   d->np_in = 0;
@@ -277,9 +276,9 @@ int init_node(int lsize, int size, hhconf *confp)
 	  HHS->hostname, ndevs);
 #endif
 
-  HHS->nheaps = confp->maxrp;
-  if (HHS->nheaps > lsize) HHS->nheaps = lsize;
-  for (i = 0; i < HHS->nheaps; i++) {
+  HHS->ndhslots = confp->maxrp;
+  if (HHS->ndhslots > lsize) HHS->ndhslots = lsize;
+  for (i = 0; i < HHS->ndhslots; i++) {
     HHS->nhostusers[i] = 0;
   }
 
@@ -351,7 +350,7 @@ int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HH_hsc_init_proc();
 
   // see also HH_canSwapIn()
-  HHL->hpid = lrank % HHS->nheaps;
+  HHL->hpid = lrank % HHS->ndhslots;
 
   // setup heap structures
   // moved from hhmem.c

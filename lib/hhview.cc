@@ -42,10 +42,10 @@ int main(int argc, char *argv[])
   int i, j;
 
   fprintf(out, "HHVIEW@%s [%.2lf]\n", hostname, Wtime_prt());
-  fprintf(out, "nps=%d, nlps=%d, ndevs=%d, nheaps=%d\n",
-	  HHS->nprocs, HHS->nlprocs, HHS->ndevs, HHS->nheaps);
+  fprintf(out, "nps=%d, nlps=%d, ndevs=%d, ndhslots=%d\n",
+	  HHS->nprocs, HHS->nlprocs, HHS->ndevs, HHS->ndhslots);
   fprintf(out, "nhostusers: ");
-  for (j = 0; j < HHS->nheaps; j++) {
+  for (j = 0; j < HHS->ndhslots; j++) {
     fprintf(out, "%d, ", HHS->nhostusers[j]);
   }
   fprintf(out, "\n");
@@ -89,9 +89,9 @@ int main(int argc, char *argv[])
     struct dev *d = &HHS->devs[i];
     fprintf(out, "DEVICE %d: memsize=%ldMiB, heapsize=%ldMiB, np_in=%d, np_out=%d \n",
 	    d->devid, d->memsize>>20, d->default_heapsize>>20, d->np_in, d->np_out);
-    fprintf(out, "    heap_user: ");
-    for (j = 0; j < HHS->nheaps; j++) {
-      fprintf(out, "%d, ", d->hp_user[j]);
+    fprintf(out, "    heapslot_user: ");
+    for (j = 0; j < HHS->ndhslots; j++) {
+      fprintf(out, "%d, ", d->dhslot_users[j]);
     }
     fprintf(out, "\n");
   }
