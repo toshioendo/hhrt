@@ -12,10 +12,6 @@ extern "C" {
 }
 #endif
 
-#define main HHmain
-
-int HHmain(int argc, char *argv[]);
-
 /* MPI Interface */
 
 /* Tricks in order to users' reduce programming costs */

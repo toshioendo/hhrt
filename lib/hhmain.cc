@@ -482,12 +482,13 @@ void HHsighandler(int sn, siginfo_t *si, void *sc)
   exit(1);
 }
 
-int main(int argc, char *argv[])
+
+int HHMPI_Init(int *argcp, char ***argvp)
 {
   int rank, size;
   int lrank, lsize;
 
-  MPI_Init(&argc, &argv);
+  MPI_Init(argcp, argvp);
 
 #if 1
   {
@@ -564,9 +565,13 @@ int main(int argc, char *argv[])
   /* initialize process info */
   init_proc(lrank, lsize, rank, size, &conf);
 
-  /* calls user's main */
-  HHmain(argc, argv);
+  return 0;
+}
 
+int HHMPI_Finalize()
+{
+  int rank = HHL->rank;
+  int lrank = HHL->lrank;
 #if 1
   if (rank == 0) {
     HH_printConf(stderr, &HHL2->conf);
@@ -595,3 +600,4 @@ int main(int argc, char *argv[])
 
   return 0;
 }
+

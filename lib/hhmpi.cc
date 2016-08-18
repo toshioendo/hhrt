@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include "hhrt_impl.h"
 
+#if 0
 int HHMPI_Init(int *argcp, char ***argvp)
 {
   /* do nothing */
@@ -13,9 +14,9 @@ int HHMPI_Init(int *argcp, char ***argvp)
 
 int HHMPI_Finalize()
 {
-  /* do nothing */
   return 0;
 }
+#endif
 
 #if defined USE_SWAPHOST
 
