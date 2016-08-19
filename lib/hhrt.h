@@ -65,7 +65,7 @@ extern "C" {
 #endif
 
 #ifdef USE_MMAPSWAP
-#warning USER_MMAPSWAP
+#warning USE_MMAPSWAP
 #endif
 
 #ifdef __cplusplus

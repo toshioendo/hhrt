@@ -230,8 +230,9 @@ int init_node(int lsize, int size, hhconf *confp)
 #if 1
   /* delete garbage shm */
   char comm[256];
-  sprintf(comm, "ipcrm -M 0x%x > /dev/null 2>&1 ", HH_IPSM_KEY);
+  key_t key = HH_IPSM_KEY;
   //sprintf(comm, "ipcrm -a > /dev/null 2>&1 ");
+  sprintf(comm, "ipcrm -M 0x%x > /dev/null 2>&1 ", key);
   system(comm);
 #endif
   /* initialize node level info (HHS) */

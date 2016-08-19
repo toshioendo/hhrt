@@ -7,6 +7,40 @@
 #include "hhrt_impl.h"
 
 
+/* statistics about host memory for debug */
+int HH_addHostMemStat(int kind, ssize_t incr)
+{
+  ssize_t s;
+  assert(kind >= 0 && kind < HHST_MAX);
+  HHL->hmstat.used[kind] += incr;
+  s = HHL->hmstat.used[kind];
+  if (s < 0 || s > (ssize_t)128 << 30) {
+    fprintf(stderr, "[HH_addHostMemStat@p%d] host mem usage (kind %s) %ldMB looks STRANGE.\n",
+	    HH_MYID, hhst_names[kind], s>>20L);
+  }
+  return 0;
+}
+
+/***/
+
+int HH_checkF2H()
+{
+
+  fsdir *fsd = HH_curfsdir();
+  if (fsd->np_filein > 0) {
+    return 0;
+  }
+  assert(fsd->np_filein == 0);
+
+  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
+  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
+    return 0;
+  }
+
+  /* I can start F2H */
+  return 1;
+}
+
 int HH_afterDevSwapOut()
 {
   dev *d = HH_curdev();
@@ -34,9 +68,6 @@ int HH_swapOutD2H()
 
   d = HH_curdev();
   d->np_out++;
-#ifndef DEBUG_SEQ_SWAP
-  pthread_mutex_unlock(&HHS->sched_ml);
-#endif
 
   /* D -> H */
   HHL2->devheap->swapOutD2H();
@@ -44,9 +75,6 @@ int HH_swapOutD2H()
   HHL2->hostheap->swapOutD2H(); // do nothing
 #endif
 
-#ifndef DEBUG_SEQ_SWAP
-  lock_log(&HHS->sched_ml);
-#endif
   HH_afterDevSwapOut();
   d->np_out--;
   if (d->np_out < 0) {
@@ -106,10 +134,11 @@ int HH_tryfinSwapOutH2F()
   fsdir *fsd = HH_curfsdir();
   fsd->np_fileout--;
 
-  HHL->dmode = HHD_ON_FILE;
   HHS->nhostusers[HHL->hpid]--;
   fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
 	  HH_MYID, Wtime_prt());
+
+  HHL->dmode = HHD_ON_FILE;
 
   return 1;
 }
@@ -155,9 +184,9 @@ int HH_swapOutH2F()
   fsdir *fsd = HH_curfsdir();
   fsd->np_fileout--;
 
+  HHS->nhostusers[HHL->hpid]--;
   HHL->dmode = HHD_ON_FILE;
 
-  HHS->nhostusers[HHL->hpid]--;
 #if 0
   fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
 	  HH_MYID, Wtime_prt());
@@ -178,18 +207,12 @@ int HH_swapInH2D()
   d = HH_curdev();
   d->np_in++;
 
-#ifndef DEBUG_SEQ_SWAP
-  pthread_mutex_unlock(&HHS->sched_ml);
-#endif
   /* H -> D */
   HHL2->devheap->swapInH2D();
 #ifdef USE_SWAPHOST
   HHL2->hostheap->swapInH2D();
 #endif
 
-#ifndef DEBUG_SEQ_SWAP
-  lock_log(&HHS->sched_ml);
-#endif
   HHL->dmode = HHD_ON_DEV;
   d->np_in--;
 
@@ -281,41 +304,7 @@ int HH_swapInF2H()
 
 #endif // !USE_FILESWAP_THREAD
 
-/************************************************/
-/* statistics about host memory for debug */
-int HH_addHostMemStat(int kind, ssize_t incr)
-{
-  ssize_t s;
-  assert(kind >= 0 && kind < HHST_MAX);
-  HHL->hmstat.used[kind] += incr;
-  s = HHL->hmstat.used[kind];
-  if (s < 0 || s > (ssize_t)128 << 30) {
-    fprintf(stderr, "[HH_addHostMemStat@p%d] host mem usage (kind %s) %ldMB looks STRANGE.\n",
-	    HH_MYID, hhst_names[kind], s>>20L);
-  }
-  return 0;
-}
-
-/***/
-
-int HH_checkF2H()
-{
-
-  fsdir *fsd = HH_curfsdir();
-  if (fsd->np_filein > 0) {
-    return 0;
-  }
-  assert(fsd->np_filein == 0);
-
-  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
-  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
-    return 0;
-  }
-
-  /* I can start F2H */
-  return 1;
-}
-    
+   
 int HH_swapInIfOk()
 {
   dev *d = HH_curdev();
@@ -485,7 +474,8 @@ int HH_swapOutIfOver()
   return 0;
 }
 
-/* called by blocking functions periodically. */
+/************************************************************/
+/* This function must be called by blocking functions periodically. */
 int HH_progressSched()
 {
   int rc;

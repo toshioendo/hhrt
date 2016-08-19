@@ -30,10 +30,10 @@ using namespace std;
 
 #define USE_FILESWAP_THREAD 1
 
-//#define USE_SHARED_HSC 1
+//#define USE_SHARED_HSC 1 // buggy
 
 // each process occupies this size even if it does nothing
-#define DEVMEM_USED_BY_PROC /*PROC_DEV_USED*/ (85L*1024*1024) // 74L
+#define DEVMEM_USED_BY_PROC (85L*1024*1024) // 74L
 
 #define HOSTHEAP_PTR ((void*)0x700000000000)
 #define HOSTHEAP_STEP (1L*1024*1024*1024)
@@ -90,6 +90,7 @@ enum {
 };
 
 static const char *hhd_names[] = {
+  "NONE",
   "ON_DEV",
   "ON_HOST",
   "ON_FILE",
