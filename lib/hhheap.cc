@@ -9,11 +9,14 @@
 
 heap *HH_devheapCreate(dev *d)
 {
+  devheap *dh;
   heap *h;
   size_t heapsize = d->default_heapsize;
 
-  h = new devheap();
-  h->init(heapsize);
+  dh = new devheap();
+  dh->init(heapsize);
+  dh->device = d;
+  h = (heap *)dh;
   /* make memory hierarchy for devheap */
 
   swapper *s1;
@@ -452,7 +455,8 @@ int devheap::init(size_t heapsize0)
   heapptr = NULL;
   align = 256L;
   memkind = HHM_DEV;
-  
+
+  device = NULL; // should be set later
 #if 0
   cudaError_t crc;
   crc = cudaStreamCreate(&swapstream);
@@ -610,7 +614,8 @@ int devheap::swapInF2H()
 
 int devheap::swapInH2D()
 {
-  return swapIn();
+  swapIn();
+  return 0;
 }
 
 /*****************************************************************/

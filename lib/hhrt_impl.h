@@ -320,8 +320,8 @@ class devheap: public heap {
   virtual int swapInH2D();
 
   void *allocDevMem(size_t heapsize);
-
   void *hp_baseptr;
+  dev *device;
 };
 
 class hostheap: public heap {

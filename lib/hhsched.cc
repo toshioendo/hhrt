@@ -68,6 +68,7 @@ int HH_swapOutD2H()
 
   d = HH_curdev();
   d->np_out++;
+  pthread_mutex_unlock(&HHS->sched_ml);
 
   /* D -> H */
   HHL2->devheap->swapOutD2H();
@@ -75,6 +76,7 @@ int HH_swapOutD2H()
   HHL2->hostheap->swapOutD2H(); // do nothing
 #endif
 
+  lock_log(&HHS->sched_ml);
   HH_afterDevSwapOut();
   d->np_out--;
   if (d->np_out < 0) {
@@ -206,6 +208,7 @@ int HH_swapInH2D()
   HHL->dmode = HHD_SI_H2D;
   d = HH_curdev();
   d->np_in++;
+  pthread_mutex_unlock(&HHS->sched_ml);
 
   /* H -> D */
   HHL2->devheap->swapInH2D();
@@ -213,6 +216,7 @@ int HH_swapInH2D()
   HHL2->hostheap->swapInH2D();
 #endif
 
+  lock_log(&HHS->sched_ml);
   HHL->dmode = HHD_ON_DEV;
   d->np_in--;
 
