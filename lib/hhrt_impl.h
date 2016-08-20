@@ -26,7 +26,7 @@ using namespace std;
 //#define USE_CUDA_MPS 1 // usually do not select this
 
 // If you use hhview for debug, disable this
-//#define EAGER_IPSM_DESTROY 1
+#define EAGER_IPSM_DESTROY 1
 
 #define USE_FILESWAP_THREAD 1
 
@@ -420,8 +420,8 @@ struct proc2 {
 #endif
 };
 
-/* Info about this node */
-/* Initialized by leader (local rank=0) process */
+/* Info about a node */
+/* Initialized by leader (local rank=0) process in init_node() */
 /* Shared by multiple processes, so this should have flat and relocatable structure */
 struct shdata {
   int nprocs;
@@ -460,15 +460,9 @@ int HH_mutex_init(pthread_mutex_t *ml);
 int HH_makeSFileName(int id, char sfname[256]);
 int HH_openSFile(char sfname[256]);
 
+
 /****************************************/
 /* hhmem.cc: memory management */
-heap *HH_devheapCreate(dev *d);
-#ifdef USE_SWAPHOST
-heap *HH_hostheapCreate();
-#endif
-int HH_initHeap_inner();
-int HH_afterDevSwapOut();
-int HH_afterHostSwapOut();
 int HH_swapInH2D();
 int HH_swapInF2H();
 int HH_startSwapInF2H();
@@ -479,6 +473,13 @@ int HH_startSwapOutH2F();
 int HH_tryfinSwapOutH2F();
 
 int HH_addHostMemStat(int kind, ssize_t incr);
+
+/****************************************/
+/* hhheap.cc: heap structures */
+heap *HH_devheapCreate(dev *d);
+#ifdef USE_SWAPHOST
+heap *HH_hostheapCreate();
+#endif
 
 /****************************************/
 /* hhsched.cc: scheduling */

@@ -216,7 +216,8 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
   return 0;
 }
 
-int init_node(int lsize, int size, hhconf *confp)
+/* Called only by leader (lrank=0) process */
+static int init_node(int lsize, int size, hhconf *confp)
 {
   int ndevs; // # of physical devices
   int i;
@@ -312,8 +313,44 @@ int init_node(int lsize, int size, hhconf *confp)
   return 0;
 }
 
+/* called by non-leader (lrank != 0) processes */
+static int join_proc(int lrank, int rank)
+{
+  int nretry = 0;
+  /* for debug print */
+  char hostname[HOSTNAMELEN];
+  memset(hostname, 0, HOSTNAMELEN);
+  gethostname(hostname, HOSTNAMELEN-1);
+  
+  MPI_Barrier(MPI_COMM_WORLD); // see MPI_Barrier in init_node()
+  
+ retry:
+  HHS = (struct shdata*)ipsm_join(HH_IPSM_KEY);
+  //HHS = (struct shdata*)ipsm_tryjoin(HH_IPSM_KEY, 100*1000, 300);
+  if (HHS == NULL) {
+    int rc;
+    rc = ipsm_getlasterror();
+    if (rc == IPSM_ENOTREADY) {
+      if (nretry > 5) {
+	fprintf(stderr, "[HHRT@p%d(%s:L%d)] ipsm_join retried for %d times. I abandon...\n", 
+		rank, hostname, lrank, nretry);
+	exit(1);
+      }
+      /* It's ok, and retry */
+      sleep(1);
+      nretry++;
+      goto retry;
+    }
+    fprintf(stderr, "[HHRT@p%d(%s:L%d)] ipsm_join failed!! lasterror=0x%x. abort..\n", 
+	    rank, hostname, lrank, rc);
+    exit(1);
+  }
+  return 0;
+}
+
+/* Called by every process */
 /* This may cause waiting */
-int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
+static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
 {
   assert(lsize <= MAX_LSIZE);
 
@@ -527,6 +564,8 @@ int HHMPI_Init(int *argcp, char ***argvp)
     init_node(lsize, size, &conf);
   }
   else {
+    join_proc(lrank, rank);
+#if 0
     int nretry = 0;
     /* for debug print */
     char hostname[HOSTNAMELEN];
@@ -556,6 +595,7 @@ int HHMPI_Init(int *argcp, char ***argvp)
 	      rank, hostname, lrank, rc);
       exit(1);
     }
+#endif
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
