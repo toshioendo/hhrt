@@ -62,7 +62,7 @@ int HH_finalizeHeap()
 
   HHL2->devheap->finalizeRec();
 
-  lock_log(&HHS->sched_ml);
+  HH_lockSched();
 
   dev *d = HH_curdev();
   assert(d->dhslot_users[HHL->hpid] == HH_MYID);
@@ -73,7 +73,7 @@ int HH_finalizeHeap()
   HHL->dmode = HHD_NONE;
   HHL->pmode = HHP_RUNNABLE;
 
-  pthread_mutex_unlock(&HHS->sched_ml);
+  HH_unlockSched();
 
   return 0;
 }
@@ -581,7 +581,20 @@ int devheap::restoreHeap()
 
 int devheap::swapOutD2H()
 {
-  return swapOut();
+  HH_lockSched();
+  device->np_out++;
+  HH_unlockSched();
+
+  swapOut();
+
+  HH_lockSched();
+  device->np_out--;
+  if (device->np_out < 0) {
+    fprintf(stderr, "[swapOutD2H@p%d] np_out = %d strange\n",
+	    HH_MYID, device->np_out);
+  }
+  HH_unlockSched();
+  return 0;
 }
 
 int devheap::swapOutH2F()
@@ -614,7 +627,15 @@ int devheap::swapInF2H()
 
 int devheap::swapInH2D()
 {
+  HH_lockSched();
+  device->np_in++;
+  HH_unlockSched();
+
   swapIn();
+
+  HH_lockSched();
+  device->np_in--;
+  HH_unlockSched();
   return 0;
 }
 

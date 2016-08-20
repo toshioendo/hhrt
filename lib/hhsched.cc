@@ -6,34 +6,29 @@
 #include <errno.h>
 #include "hhrt_impl.h"
 
-
-
-/***/
-
-int HH_checkF2H()
+int HH_lockSched()
 {
-
-  fsdir *fsd = HH_curfsdir();
-  if (fsd->np_filein > 0) {
-    return 0;
+  double st = Wtime(), et;
+  pthread_mutex_lock(&HHS->sched_ml);
+  et = Wtime();
+  if (et-st > 0.1) {
+    fprintf(stderr, "[HH_lockSched@p%d] [%.2lf-%.2lf] %s:%d LOCK TOOK LONG\n",
+	    HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), __FILE__, __LINE__);
   }
-  assert(fsd->np_filein == 0);
-
-  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
-  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
-    return 0;
-  }
-
-  /* I can start F2H */
-  return 1;
+  return 0;
 }
 
-int HH_checkH2D()
+int HH_unlockSched()
+{
+  pthread_mutex_unlock(&HHS->sched_ml);
+  return 0;
+}
+
+//------------------------------- D2H
+int HH_checkD2H()
 {
   dev *d = HH_curdev();
-  if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
-    return 0;
-  }
+  if (d->np_out > 0) return 0;
   return 1;
 }
 
@@ -46,18 +41,19 @@ static int afterSwapOutD2H()
   fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
 	  HH_MYID, Wtime_prt(), HHL->hpid);
 
+#if 0
   d->np_out--;
   if (d->np_out < 0) {
     fprintf(stderr, "[swapOut@p%d] np_out = %d strange\n",
 	    HH_MYID, d->np_out);
   }
+#endif
 
   HHL->dmode = HHD_ON_HOST;
 
   return 0;
 }
 
-// D2H
 // This function assumes sched_ml is locked
 int HH_swapOutD2H()
 {
@@ -70,9 +66,11 @@ int HH_swapOutD2H()
 	  HH_MYID);
 #endif
 
+#if 0
   d = HH_curdev();
   d->np_out++;
-  pthread_mutex_unlock(&HHS->sched_ml);
+#endif
+  HH_unlockSched();
 
   /* D -> H */
   HHL2->devheap->swapOutD2H();
@@ -80,13 +78,67 @@ int HH_swapOutD2H()
   HHL2->hostheap->swapOutD2H(); // do nothing
 #endif
 
-  lock_log(&HHS->sched_ml);
+  HH_lockSched();
   afterSwapOutD2H();
 
   return 0;
 }
 
-//////////////// H2F
+//------------------------------- H2D
+int HH_checkH2D()
+{
+  dev *d = HH_curdev();
+  if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
+    return 0;
+  }
+  return 1;
+}
+
+// This function assumes sched_ml is locked
+int HH_swapInH2D()
+{
+  dev *d;
+  assert(HHL->dmode == HHD_ON_HOST);
+  HHL->dmode = HHD_SI_H2D;
+#if 0
+  d = HH_curdev();
+  d->np_in++;
+#endif
+  HH_unlockSched();
+
+  /* H -> D */
+  HHL2->devheap->swapInH2D();
+#ifdef USE_SWAPHOST
+  HHL2->hostheap->swapInH2D();
+#endif
+
+  HH_lockSched();
+  HHL->dmode = HHD_ON_DEV;
+#if 0
+  d->np_in--;
+#endif
+
+  return 0;
+}
+
+
+
+//----------------------------- H2F
+int HH_checkH2F()
+{
+  if (HHL2->conf.nlphost >= HHS->nlprocs) {
+    // no need to use fileswapper
+    return 0;
+  }
+
+  fsdir *fsd = HH_curfsdir();
+  if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
+    return 0;
+  }
+
+  return 1;
+}
+
 // This function assumes sched_ml is locked
 static int beforeSwapOutH2F()
 {
@@ -164,9 +216,9 @@ int HH_swapOutH2F()
   while (1) {
     int rc = HH_tryfinSwapOutH2F();
     if (rc > 0) break;
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     usleep(100);
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
   }
 
   return 0;
@@ -179,40 +231,34 @@ int HH_swapOutH2F()
 int HH_swapOutH2F()
 {
   beforeSwapOutH2F();
-  pthread_mutex_unlock(&HHS->sched_ml);
+  HH_unlockSched();
   mainSwapOutH2F();
-  lock_log(&HHS->sched_ml);
+  HH_lockSched();
   afterSwapOutH2F();
   return 0;
 }
 
 #endif // !USE_FILESWAP_THREAD
 
-////////////////////// H2D
-// This function assumes sched_ml is locked
-int HH_swapInH2D()
+//----------------------------- F2H
+int HH_checkF2H()
 {
-  dev *d;
-  assert(HHL->dmode == HHD_ON_HOST);
-  HHL->dmode = HHD_SI_H2D;
-  d = HH_curdev();
-  d->np_in++;
-  pthread_mutex_unlock(&HHS->sched_ml);
 
-  /* H -> D */
-  HHL2->devheap->swapInH2D();
-#ifdef USE_SWAPHOST
-  HHL2->hostheap->swapInH2D();
-#endif
+  fsdir *fsd = HH_curfsdir();
+  if (fsd->np_filein > 0) {
+    return 0;
+  }
+  assert(fsd->np_filein == 0);
 
-  lock_log(&HHS->sched_ml);
-  HHL->dmode = HHD_ON_DEV;
-  d->np_in--;
+  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
+  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
+    return 0;
+  }
 
-  return 0;
+  /* I can start F2H */
+  return 1;
 }
 
-///////////// F2H
 static int beforeSwapInF2H()
 {
   assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
@@ -280,9 +326,9 @@ int HH_tryfinSwapInF2H()
 int HH_swapInF2H()
 {
   beforeSwapInF2H();
-  pthread_mutex_unlock(&HHS->sched_ml);
+  HH_unlockSched();
   mainSwapInF2H();
-  lock_log(&HHS->sched_ml);
+  HH_lockSched();
 
   fsdir *fsd = HH_curfsdir();
   fsd->np_filein--;
@@ -295,6 +341,7 @@ int HH_swapInF2H()
 #endif // !USE_FILESWAP_THREAD
 
    
+/************************************************************/
 int HH_swapInIfOk()
 {
   dev *d = HH_curdev();
@@ -309,10 +356,10 @@ int HH_swapInIfOk()
       return 0;
     }
 
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
     if (!HH_checkH2D()) {
       //if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
-      pthread_mutex_unlock(&HHS->sched_ml);
+      HH_unlockSched();
       return 0;
     }
 
@@ -327,7 +374,7 @@ int HH_swapInIfOk()
     HH_swapInH2D();
 
     assert(HHL->dmode == HHD_ON_DEV);
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     return 1;
   }
   else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
@@ -335,9 +382,9 @@ int HH_swapInIfOk()
       return 0;
     }
 
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
     if (!HH_checkF2H()) {
-      pthread_mutex_unlock(&HHS->sched_ml);
+      HH_unlockSched();
       return 0;
     }
 
@@ -354,7 +401,7 @@ int HH_swapInIfOk()
     assert(HHL->dmode == HHD_ON_HOST);
 #endif
 
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     return 1;
   }
   else {
@@ -364,30 +411,6 @@ int HH_swapInIfOk()
   }
   
   return 0;
-}
-
-/* */
-
-int HH_checkD2H()
-{
-  dev *d = HH_curdev();
-  if (d->np_out > 0) return 0;
-  return 1;
-}
-
-int HH_checkH2F()
-{
-  if (HHL2->conf.nlphost >= HHS->nlprocs) {
-    // no need to use fileswapper
-    return 0;
-  }
-
-  fsdir *fsd = HH_curfsdir();
-  if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
-    return 0;
-  }
-
-  return 1;
 }
 
 /* swapOut may be called in this function */
@@ -406,9 +429,9 @@ int HH_swapOutIfBetter()
       return 0;
     }
 
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
     if (!HH_checkH2F()) {
-      pthread_mutex_unlock(&HHS->sched_ml);
+      HH_unlockSched();
       return 0;
     }
 
@@ -424,7 +447,7 @@ int HH_swapOutIfBetter()
     HH_swapOutH2F();
     assert(HHL->dmode == HHD_ON_FILE);
 #endif
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     return 1;
 #endif // !USE_MMAPSWAP
   }
@@ -433,15 +456,15 @@ int HH_swapOutIfBetter()
       return 0;
     }
 
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
     if (!HH_checkD2H()) {
-      pthread_mutex_unlock(&HHS->sched_ml);
+      HH_unlockSched();
       return 0;
     }
 
     HH_swapOutD2H();
     assert(HHL->dmode == HHD_ON_HOST);
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     return 1;
   }
   else {
@@ -452,7 +475,7 @@ int HH_swapOutIfBetter()
 
 int HH_swapOutIfOver()
 {
-  lock_log(&HHS->sched_ml);
+  HH_lockSched();
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s before SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
   if (HHL->dmode == HHD_ON_DEV &&
@@ -468,27 +491,26 @@ int HH_swapOutIfOver()
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s after SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
 
-  pthread_mutex_unlock(&HHS->sched_ml);
+  HH_unlockSched();
 
   return 0;
 }
 
-/************************************************************/
 /* This function must be called by blocking functions periodically. */
 int HH_progressSched()
 {
   int rc;
 #ifdef USE_FILESWAP_THREAD
   if (HHL->dmode == HHD_SO_H2F) {
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
     rc = HH_tryfinSwapOutH2F();
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     return rc;
   }
   else if (HHL->dmode == HHD_SI_F2H) {
-    lock_log(&HHS->sched_ml);
+    HH_lockSched();
     rc = HH_tryfinSwapInF2H();
-    pthread_mutex_unlock(&HHS->sched_ml);
+    HH_unlockSched();
     return rc;
   }
 #endif

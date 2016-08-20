@@ -482,17 +482,18 @@ int HH_addHostMemStat(int kind, ssize_t incr);
 
 /****************************************/
 /* hhsched.cc: scheduling */
+int HH_lockSched();
+int HH_unlockSched();
+
 int HH_progressSched();
 int HH_enterAPI(const char *str);
 int HH_exitAPI();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();
 
-int HH_countSwappedRunnable();
 int HH_sleepForMemory();
 int HH_swapInIfOk();
 int HH_swapOutIfBetter();
-int HH_swapOutForcibly();
 
 int HH_hsc_init_node();
 int HH_hsc_init_proc();
