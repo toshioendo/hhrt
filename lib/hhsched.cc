@@ -41,6 +41,15 @@ int HH_checkF2H()
   return 1;
 }
 
+int HH_checkH2D()
+{
+  dev *d = HH_curdev();
+  if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
+    return 0;
+  }
+  return 1;
+}
+
 int HH_afterDevSwapOut()
 {
   dev *d = HH_curdev();
@@ -318,12 +327,14 @@ int HH_swapInIfOk()
     return 0;
   }
   else if (HHL->dmode == HHD_ON_HOST) {
-    if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
+    if (!HH_checkH2D()) {
+      //if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
       return 0;
     }
 
     lock_log(&HHS->sched_ml);
-    if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
+    if (!HH_checkH2D()) {
+      //if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
       pthread_mutex_unlock(&HHS->sched_ml);
       return 0;
     }
@@ -380,6 +391,15 @@ int HH_swapInIfOk()
 
 /* */
 
+int HH_checkD2H()
+{
+  dev *d = HH_curdev();
+  if (d->np_out > 0) {
+    return 0;
+  }
+  return 1;
+}
+
 int HH_checkH2F()
 {
   if (HHL2->conf.nlphost >= HHS->nlprocs) {
@@ -434,12 +454,14 @@ int HH_swapOutIfBetter()
 #endif // !USE_MMAPSWAP
   }
   else if (HHL->dmode == HHD_ON_DEV) {
-    if (d->np_out > 0) {
+    if (!HH_checkD2H()) {
+      //if (d->np_out > 0) {
       return 0;
     }
 
     lock_log(&HHS->sched_ml);
-    if (d->np_out > 0) {
+    if (!HH_checkD2H()) {
+      //if (d->np_out > 0) {
       pthread_mutex_unlock(&HHS->sched_ml);
       return 0;
     }
