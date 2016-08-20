@@ -22,7 +22,6 @@ using namespace std;
 
 #define HH_IPSM_KEY ((key_t)0x1234)
 
-#define USE_CUDA_IPC 1
 //#define USE_CUDA_MPS 1 // usually do not select this
 
 // If you use hhview for debug, disable this
@@ -133,10 +132,9 @@ struct dev {
   int np_in; /* # of procs that is being swapped in now */
   int np_out; /* # of procs that is being swapped out now */
 
-#ifdef USE_CUDA_IPC
   cudaIpcMemHandle_t hp_handle;
   void *hp_baseptr0; /* usable only for leader process. ugly */
-#endif
+
   int dhslot_users[MAX_MAXRP];
 };
 
@@ -236,7 +234,7 @@ class hostswapper: public swapper {
 
 class fileswapper: public swapper {
  public:
-  fileswapper(int id);
+  fileswapper(int id, fsdir *fsd0);
 
   virtual int finalize();
 
@@ -304,7 +302,8 @@ class heap: public mempool {
 
 class devheap: public heap {
  public:
-  devheap(size_t size0);
+  devheap(size_t size0, dev *device0);
+  virtual int finalize();
 
   virtual int releaseHeap();
   virtual int allocHeap();
@@ -322,7 +321,8 @@ class devheap: public heap {
 
 class hostheap: public heap {
  public:
-  hostheap(size_t size0);
+  hostheap();
+  virtual int finalize();
 
   virtual int expandHeap(size_t reqsize);
 
@@ -452,7 +452,7 @@ dev *HH_curdev();
 fsdir *HH_curfsdir();
 int HH_mutex_init(pthread_mutex_t *ml);
 
-int HH_makeSFileName(int id, char sfname[256]);
+int HH_makeSFileName(fsdir *fsd, int id, char sfname[256]);
 int HH_openSFile(char sfname[256]);
 
 

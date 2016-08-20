@@ -528,10 +528,9 @@ int hostswapper::swapIn()
 
 /*** fileswapper ******/
 
-int HH_makeSFileName(int id, char sfname[256])
+int HH_makeSFileName(fsdir *fsd, int id, char sfname[256])
 {
   char *op = sfname;
-  fsdir *fsd = HH_curfsdir();
 
   strcpy(op, fsd->dirname);
   op += strlen(op);
@@ -567,7 +566,7 @@ int HH_openSFile(char sfname[256])
 	  HH_MYID, HHL->lrank, sfname);
 #endif
 
-#if 01
+#if 1
   /* This unlink is for automatic cleanup of the file. */
   // from "man 2 unlink"
   // If the name was the last link to a file but any processes still have 
@@ -599,13 +598,13 @@ int fileswapper::openSFileIfNotYet()
     exit(1);
   }
 
-  HH_makeSFileName(userid, sfname);
+  HH_makeSFileName(fsd, userid, sfname);
   sfd = HH_openSFile(sfname);
 
   return 0;
 }
 
-fileswapper::fileswapper(int id) : swapper()
+fileswapper::fileswapper(int id, fsdir *fsd0) : swapper()
 {
   int rc;
   cudaError_t crc;
@@ -614,6 +613,7 @@ fileswapper::fileswapper(int id) : swapper()
 
   userid = id;
   sfd = -1; // open swapfile later
+  fsd = fsd0; // file swap directory structure
 
   copyunit = 64L*1024*1024;
   /* prepare copybuf */

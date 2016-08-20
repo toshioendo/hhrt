@@ -13,8 +13,8 @@ heap *HH_devheapCreate(dev *d)
   heap *h;
   size_t heapsize = d->default_heapsize;
 
-  dh = new devheap(heapsize);
-  dh->device = d;
+  dh = new devheap(heapsize, d);
+  //dh->device = d;
   h = (heap *)dh;
   /* make memory hierarchy for devheap */
 
@@ -24,7 +24,7 @@ heap *HH_devheapCreate(dev *d)
 
   swapper *s2 = NULL;
   {
-    s2 = (swapper*)(new fileswapper(0));
+    s2 = new fileswapper(0, HH_curfsdir());
     s1->setSwapper(s2);
   }
   return h;
@@ -35,12 +35,12 @@ heap *HH_hostheapCreate()
 {
   heap *h;
 
-  h = new hostheap(0);
+  h = new hostheap();
   /* make memory hierarchy for hostheap */
 
   swapper *s2 = NULL;
   {
-    s2 = new fileswapper(1);
+    s2 = new fileswapper(1, HH_curfsdir());
     h->setSwapper(s2);
   }
 
@@ -58,12 +58,6 @@ int HH_finalizeHeap()
   HHL2->devheap->finalizeRec();
 
   HH_lockSched();
-
-  dev *d = HH_curdev();
-  assert(d->dhslot_users[HHL->hpid] == HH_MYID);
-  d->dhslot_users[HHL->hpid] = -1;
-
-  HHS->nhostusers[HHL->hpid]--;
 
   HHL->dmode = HHD_NONE;
   HHL->pmode = HHP_RUNNABLE;
@@ -93,13 +87,13 @@ heap::heap(size_t heapsize0) : mempool()
 
 int heap::finalize()
 {
-#if 1
   if (heapptr != NULL) {
     releaseHeap();
   }
-#endif
+
   heapptr = NULL;
   heapsize = 0;
+
   return 0;
 }
 
@@ -442,7 +436,7 @@ int heap::dump()
 
 /*****************************************************************/
 // devheap class (child class of heap)
-devheap::devheap(size_t heapsize0) : heap(heapsize0)
+devheap::devheap(size_t heapsize0, dev *device0) : heap(heapsize0)
 {
   expandable = 0;
 
@@ -450,7 +444,7 @@ devheap::devheap(size_t heapsize0) : heap(heapsize0)
   align = 256L;
   memkind = HHM_DEV;
 
-  device = NULL; // should be set later
+  device = device0;
 #if 0
   cudaError_t crc;
   crc = cudaStreamCreate(&swapstream);
@@ -461,35 +455,33 @@ devheap::devheap(size_t heapsize0) : heap(heapsize0)
   return;
 }
 
+int devheap::finalize()
+{
+  heap::finalize();
+
+  HH_lockSched();
+  if (device->dhslot_users[HHL->hpid] == HH_MYID) {
+    device->dhslot_users[HHL->hpid] = -1;
+  }
+  HH_unlockSched();
+
+  return 0;
+}
+
 int devheap::releaseHeap()
 {
-  cudaError_t crc;
-  dev *d = HH_curdev();
-
-#ifdef USE_CUDA_IPC
   assert(heapptr != NULL);
   // do nothing
-#else
-  pthread_mutex_lock(&d->ml);
-  /* Free device memory! */
-  crc = cudaFree(heapptr);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:devheap::releaseHeap@p%d] cudaFree failed!\n",
-	    HH_MYID);
-    exit(1);
-  }
-  pthread_mutex_unlock(&d->ml);
-#endif // USE_CUDA_IPC
 
   return 0;
 }
 
 void *devheap::allocDevMem(size_t heapsize)
 {
-  dev *d = HH_curdev();
+  dev *d = device;
   cudaError_t crc;
   void *dp;
-#ifdef USE_CUDA_IPC
+
   assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
   if (hp_baseptr == NULL) {
     if (HHL->lrank == 0) {
@@ -506,34 +498,11 @@ void *devheap::allocDevMem(size_t heapsize)
   }
 
   dp = piadd(hp_baseptr, d->default_heapsize*HHL->hpid);
-
-#else
-  int nretries = 0;
-  pthread_mutex_lock(&d->ml);
- retry:
-  crc = cudaMalloc(&dp, heapsize);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:%s::allocDevMem@p%d] cudaMalloc(0x%lx) failed (rc=%d, dev memsize=%ld)\n",
-	    name, HH_MYID, heapsize, crc, d->memsize);
-    nretries++;
-    if (nretries < 5) {
-      sleep(1);
-      fprintf(stderr, "[HH:%s::allocDevMem@p%d] retry cudaMalloc...\n",
-	      name, HH_MYID);
-      goto retry;
-    }
-    fprintf(stderr, "[%s::allocDevMem@p%d] ERROR: too many retry of cudaMalloc...\n",
-	    name, HH_MYID);
-    exit(1);
-  }
-  pthread_mutex_unlock(&d->ml);
-#endif
   return dp;
 }
 
 int devheap::allocHeap()
 {
-  dev *d = HH_curdev();
   void *dp;
 
   assert(heapptr == NULL);
@@ -555,7 +524,7 @@ int devheap::allocHeap()
 /* allocate device heap for swapIn */
 int devheap::restoreHeap()
 {
-  dev *d = HH_curdev();
+  //dev *d = HH_curdev();
   void *dp;
 
   assert(heapptr != NULL);
@@ -627,7 +596,7 @@ int devheap::swapInH2D()
 
 /*****************************************************************/
 // hostheap class (child class of heap)
-hostheap::hostheap(size_t heapsize0) : heap(heapsize0)
+hostheap::hostheap() : heap(0L)
 {
   expandable = 1;
 
@@ -659,6 +628,16 @@ hostheap::hostheap(size_t heapsize0) : heap(heapsize0)
   swapfd = -1; // anonymous mmap
 #endif
   return;
+}
+
+int hostheap::finalize()
+{
+  heap::finalize();
+  
+  HH_lockSched();
+  HHS->nhostusers[HHL->hpid]--;
+  HH_unlockSched();
+  return 0;
 }
 
 int hostheap::allocCapacity(size_t offset, size_t size)

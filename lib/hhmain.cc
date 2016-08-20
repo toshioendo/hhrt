@@ -140,6 +140,38 @@ long getLP(char *p)
   return lv;
 }
 
+static int initSharedDevmem(dev *d)
+{
+  cudaError_t crc;
+  int devid = d->devid;
+  crc = cudaSetDevice(devid);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaSetDevice for heap failed!\n",
+	    HHS->hostname, devid);
+    exit(1);
+  }
+  
+  size_t heapsize = d->default_heapsize;
+  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndhslots);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
+	    HHS->hostname, devid, heapsize>>20);
+    exit(1);
+  }
+
+  crc = cudaIpcGetMemHandle(&d->hp_handle, d->hp_baseptr0);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaIpcGetMemhandle for heap failed!\n",
+	    HHS->hostname, devid);
+    exit(1);
+  }
+#if 1
+  fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] exporting pointer %p\n",
+	  HHS->hostname, devid, d->hp_baseptr0);
+#endif
+  return 0;
+}
+
 int init_dev(int i, int lsize, int size, hhconf *confp)
 {
   cudaError_t crc;
@@ -175,38 +207,11 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
   fprintf(stderr, "[HH:init_dev@%s:dev%d] memsize=%ld -> default_heapsize=%ld\n",
 	  HHS->hostname, i, d->memsize, d->default_heapsize);
 #endif
-  
-#ifdef USE_CUDA_IPC
+
+  initSharedDevmem(d);
+
   int ih;
-  
-  crc = cudaSetDevice(i);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:init_dev@%s:dev%d] cudaSetDevice for heap failed!\n",
-	    HHS->hostname, i);
-    exit(1);
-  }
-  
-  size_t heapsize = d->default_heapsize;
-  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndhslots);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:init_dev@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
-	    HHS->hostname, i, heapsize>>20);
-    exit(1);
-  }
-
-  crc = cudaIpcGetMemHandle(&d->hp_handle, d->hp_baseptr0);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:init_dev@%s:dev%d] cudaIpcGetMemhandle for heap failed!\n",
-	    HHS->hostname, i);
-    exit(1);
-  }
-#if 1
-  fprintf(stderr, "[HH:init_dev@%s:dev%d] exporting pointer %p\n",
-	  HHS->hostname, i, d->hp_baseptr0);
-#endif
-#endif
-
-  /* setup heap regions on device */
+  /* setup heap slots on device */
   for (ih = 0; ih < HHS->ndhslots; ih++) {
     d->dhslot_users[ih] = -1;
   }
@@ -253,8 +258,6 @@ static int init_node(int lsize, int size, hhconf *confp)
 
   HH_mutex_init(&HHS->sched_ml);
 
-  //MPI_Barrier(MPI_COMM_WORLD);
-
 #ifdef USE_CUDA_MPS
   // start MPS server
   // this must be done before any CUDA API calls
@@ -284,11 +287,11 @@ static int init_node(int lsize, int size, hhconf *confp)
     HHS->nhostusers[i] = 0;
   }
 
+  /* init device structures */
   {
     int mydevid;
     crc = cudaGetDevice(&mydevid);
     
-    /* init device structures */
     for (i = 0; i < ndevs; i++) {
       init_dev(i, lsize, size, confp);
     }
@@ -296,6 +299,7 @@ static int init_node(int lsize, int size, hhconf *confp)
     crc = cudaSetDevice(mydevid); // restore
   }
 
+  /* init swap directories */
   {
     for (i = 0; i < confp->n_fileswap_dirs; i++) {
       fsdir *fsd = &HHS->fsdirs[i];
@@ -314,6 +318,7 @@ static int init_node(int lsize, int size, hhconf *confp)
 }
 
 /* called by non-leader (lrank != 0) processes */
+/* after this function, the process can read/write HHS */
 static int join_proc(int lrank, int rank)
 {
   int nretry = 0;
@@ -565,37 +570,6 @@ int HHMPI_Init(int *argcp, char ***argvp)
   }
   else {
     join_proc(lrank, rank);
-#if 0
-    int nretry = 0;
-    /* for debug print */
-    char hostname[HOSTNAMELEN];
-    memset(hostname, 0, HOSTNAMELEN);
-    gethostname(hostname, HOSTNAMELEN-1);
-
-    MPI_Barrier(MPI_COMM_WORLD); // see MPI_Barrier in init_node()
-
-  retry:
-    HHS = (struct shdata*)ipsm_join(HH_IPSM_KEY);
-    //HHS = (struct shdata*)ipsm_tryjoin(HH_IPSM_KEY, 100*1000, 300);
-    if (HHS == NULL) {
-      int rc;
-      rc = ipsm_getlasterror();
-      if (rc == IPSM_ENOTREADY) {
-	if (nretry > 5) {
-	  fprintf(stderr, "[HHRT@p%d(%s:L%d)] ipsm_join retried for %d times. I abandon...\n", 
-		  rank, hostname, lrank, nretry);
-	  exit(1);
-	}
-	/* It's ok, and retry */
-	sleep(1);
-	nretry++;
-	goto retry;
-      }
-      fprintf(stderr, "[HHRT@p%d(%s:L%d)] ipsm_join failed!! lasterror=0x%x. abort..\n", 
-	      rank, hostname, lrank, rc);
-      exit(1);
-    }
-#endif
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
