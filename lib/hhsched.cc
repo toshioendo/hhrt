@@ -81,6 +81,7 @@ int HH_swapOutD2H()
 }
 
 //------------------------------- H2D
+// check whether resource is available for swapIn
 int HH_checkH2D()
 {
   dev *d = HH_curdev();
@@ -90,10 +91,18 @@ int HH_checkH2D()
   return 1;
 }
 
+// reserve resource for swapIn. called soon after HH_checkH2D
+// (before scheduling lock is released)
+int HH_reserveResH2D()
+{
+  dev *d = HH_curdev();
+  d->dhslot_users[HHL->hpid] = HH_MYID;
+  return 0;
+}
+
 // This function assumes sched_ml is locked
 int HH_swapInH2D()
 {
-  dev *d;
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SI_H2D;
   HH_unlockSched();
@@ -339,13 +348,11 @@ int HH_swapInIfOk()
   }
   else if (HHL->dmode == HHD_ON_HOST) {
     if (!HH_checkH2D()) {
-      //if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
       return 0;
     }
 
     HH_lockSched();
     if (!HH_checkH2D()) {
-      //if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
       HH_unlockSched();
       return 0;
     }
@@ -356,8 +363,7 @@ int HH_swapInIfOk()
 #endif
 
     // now I can proceed!
-    dev *d = HH_curdev();
-    d->dhslot_users[HHL->hpid] = HH_MYID;
+    HH_reserveResH2D();
 
     HH_swapInH2D();
 

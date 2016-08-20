@@ -13,21 +13,18 @@ heap *HH_devheapCreate(dev *d)
   heap *h;
   size_t heapsize = d->default_heapsize;
 
-  dh = new devheap();
-  dh->init(heapsize);
+  dh = new devheap(heapsize);
   dh->device = d;
   h = (heap *)dh;
   /* make memory hierarchy for devheap */
 
   swapper *s1;
   s1 = (swapper*)(new hostswapper());
-  s1->init(0);
   h->setSwapper(s1);
 
   swapper *s2 = NULL;
   {
-    s2 = (swapper*)(new fileswapper());
-    s2->init(0);
+    s2 = (swapper*)(new fileswapper(0));
     s1->setSwapper(s2);
   }
   return h;
@@ -38,14 +35,12 @@ heap *HH_hostheapCreate()
 {
   heap *h;
 
-  h = new hostheap();
-  h->init(0L);
+  h = new hostheap(0);
   /* make memory hierarchy for hostheap */
 
   swapper *s2 = NULL;
   {
-    s2 = new fileswapper();
-    s2->init(1);
+    s2 = new fileswapper(1);
     h->setSwapper(s2);
   }
 
@@ -80,7 +75,7 @@ int HH_finalizeHeap()
 
 // heap class
 
-int heap::init(size_t heapsize0)
+heap::heap(size_t heapsize0) : mempool()
 {
   heapsize = roundup(heapsize0, HEAP_ALIGN); /* heap size */
 
@@ -93,7 +88,7 @@ int heap::init(size_t heapsize0)
   curswapper = NULL;
   strcpy(name, "(HEAP)");
 
-  return 0;
+  return;
 }
 
 int heap::finalize()
@@ -447,10 +442,9 @@ int heap::dump()
 
 /*****************************************************************/
 // devheap class (child class of heap)
-int devheap::init(size_t heapsize0)
+devheap::devheap(size_t heapsize0) : heap(heapsize0)
 {
   expandable = 0;
-  heap::init(heapsize0);
 
   heapptr = NULL;
   align = 256L;
@@ -464,7 +458,7 @@ int devheap::init(size_t heapsize0)
   strcpy(name, "devheap");
   hp_baseptr = NULL;
 
-  return 0;
+  return;
 }
 
 int devheap::releaseHeap()
@@ -599,11 +593,7 @@ int devheap::swapOutD2H()
 
 int devheap::swapOutH2F()
 {
-  if (curswapper == NULL) {
-    return 0;
-  }
-
-  if (curswapper->curswapper == NULL) {
+  if (curswapper == NULL || curswapper->curswapper) {
     return 0;
   }
 
@@ -613,11 +603,7 @@ int devheap::swapOutH2F()
 
 int devheap::swapInF2H()
 {
-  if (curswapper == NULL) {
-    return 0;
-  }
-
-  if (curswapper->curswapper == NULL) {
+  if (curswapper == NULL || curswapper->curswapper) {
     return 0;
   }
 
@@ -641,10 +627,9 @@ int devheap::swapInH2D()
 
 /*****************************************************************/
 // hostheap class (child class of heap)
-int hostheap::init(size_t heapsize0)
+hostheap::hostheap(size_t heapsize0) : heap(heapsize0)
 {
   expandable = 1;
-  heap::init((size_t)0);
 
   heapptr = NULL;
   align = 512L;
@@ -673,7 +658,7 @@ int hostheap::init(size_t heapsize0)
 #else
   swapfd = -1; // anonymous mmap
 #endif
-  return 0;
+  return;
 }
 
 int hostheap::allocCapacity(size_t offset, size_t size)

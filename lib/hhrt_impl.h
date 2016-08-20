@@ -183,10 +183,10 @@ class mempool {
 // swapper class. This is created per heap per memory hierarchy
 class swapper: public mempool {
  public:
-  swapper() {
+ swapper(): mempool() {
+    align = 1; curswapper = NULL;
   }
 
-  virtual int init(int id) {align = 1; curswapper = NULL;};
   virtual int finalize() {};
 
   virtual int write1(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -208,9 +208,8 @@ class swapper: public mempool {
 
 class hostswapper: public swapper {
  public:
-  hostswapper() {};
+  hostswapper();
 
-  virtual int init(int id);
   virtual int finalize();
 
   void *getNthChunk(int n);
@@ -237,9 +236,8 @@ class hostswapper: public swapper {
 
 class fileswapper: public swapper {
  public:
-  fileswapper() {};
+  fileswapper(int id);
 
-  virtual int init(int id);
   virtual int finalize();
 
   int openSFileIfNotYet();
@@ -261,13 +259,13 @@ class fileswapper: public swapper {
   int userid;
   char sfname[256];
   int sfd;
+  fsdir *fsd;
 };
 
 /*************/
 class heap: public mempool {
  public:
-  heap() {};
-  virtual int init(size_t size0);
+  heap(size_t size0);
   virtual int finalize();
 
   virtual void* alloc(size_t size);
@@ -300,15 +298,13 @@ class heap: public mempool {
   size_t align;
   int expandable;
   int memkind; // HHM_*
-  //swapper *curswapper;
 
   char name[16]; /* for debug */
 };
 
 class devheap: public heap {
  public:
-  devheap() {};
-  virtual int init(size_t size0);
+  devheap(size_t size0);
 
   virtual int releaseHeap();
   virtual int allocHeap();
@@ -326,8 +322,7 @@ class devheap: public heap {
 
 class hostheap: public heap {
  public:
-  hostheap() {};
-  virtual int init(size_t size0);
+  hostheap(size_t size0);
 
   virtual int expandHeap(size_t reqsize);
 

@@ -28,12 +28,10 @@ size_t swapper::allocSeq(size_t size)
 }
 
 /******/
-int hostswapper::init(int id)
+hostswapper::hostswapper() : swapper()
 {
   /* set up host buffer */
   cudaError_t crc;
-
-  swapper::init(id);
 
   align = 1;
   copyunit = 32L*1024*1024;
@@ -56,7 +54,7 @@ int hostswapper::init(int id)
     exit(1);
   }
 
-  return 0;
+  return;
 }
 
 int hostswapper::finalize()
@@ -607,12 +605,11 @@ int fileswapper::openSFileIfNotYet()
   return 0;
 }
 
-int fileswapper::init(int id)
+fileswapper::fileswapper(int id) : swapper()
 {
   int rc;
   cudaError_t crc;
 
-  swapper::init(id);
   align = 512;
 
   userid = id;
@@ -638,7 +635,7 @@ int fileswapper::init(int id)
     }
   }
 
-  return 0;
+  return;
 }
 
 int fileswapper::finalize()
