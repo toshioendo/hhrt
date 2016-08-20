@@ -8,6 +8,19 @@
 #include <errno.h>
 #include "hhrt_impl.h"
 
+/* statistics about host memory for debug */
+int HH_addHostMemStat(int kind, ssize_t incr)
+{
+  ssize_t s;
+  assert(kind >= 0 && kind < HHST_MAX);
+  HHL->hmstat.used[kind] += incr;
+  s = HHL->hmstat.used[kind];
+  if (s < 0 || s > (ssize_t)128 << 30) {
+    fprintf(stderr, "[HH_addHostMemStat@p%d] host mem usage (kind %s) %ldMB looks STRANGE.\n",
+	    HH_MYID, hhst_names[kind], s>>20L);
+  }
+  return 0;
+}
 
 /************************************************/
 

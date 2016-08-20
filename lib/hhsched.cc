@@ -7,19 +7,6 @@
 #include "hhrt_impl.h"
 
 
-/* statistics about host memory for debug */
-int HH_addHostMemStat(int kind, ssize_t incr)
-{
-  ssize_t s;
-  assert(kind >= 0 && kind < HHST_MAX);
-  HHL->hmstat.used[kind] += incr;
-  s = HHL->hmstat.used[kind];
-  if (s < 0 || s > (ssize_t)128 << 30) {
-    fprintf(stderr, "[HH_addHostMemStat@p%d] host mem usage (kind %s) %ldMB looks STRANGE.\n",
-	    HH_MYID, hhst_names[kind], s>>20L);
-  }
-  return 0;
-}
 
 /***/
 
@@ -50,7 +37,7 @@ int HH_checkH2D()
   return 1;
 }
 
-int HH_afterDevSwapOut()
+static int afterSwapOutD2H()
 {
   dev *d = HH_curdev();
   assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
@@ -58,6 +45,14 @@ int HH_afterDevSwapOut()
   d->dhslot_users[HHL->hpid] = -1;
   fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
 	  HH_MYID, Wtime_prt(), HHL->hpid);
+
+  d->np_out--;
+  if (d->np_out < 0) {
+    fprintf(stderr, "[swapOut@p%d] np_out = %d strange\n",
+	    HH_MYID, d->np_out);
+  }
+
+  HHL->dmode = HHD_ON_HOST;
 
   return 0;
 }
@@ -86,14 +81,7 @@ int HH_swapOutD2H()
 #endif
 
   lock_log(&HHS->sched_ml);
-  HH_afterDevSwapOut();
-  d->np_out--;
-  if (d->np_out < 0) {
-    fprintf(stderr, "[swapOut@p%d] np_out = %d strange\n",
-	    HH_MYID, d->np_out);
-  }
-
-  HHL->dmode = HHD_ON_HOST;
+  afterSwapOutD2H();
 
   return 0;
 }
