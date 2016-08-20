@@ -66,10 +66,6 @@ int HH_swapOutD2H()
 	  HH_MYID);
 #endif
 
-#if 0
-  d = HH_curdev();
-  d->np_out++;
-#endif
   HH_unlockSched();
 
   /* D -> H */
@@ -100,10 +96,6 @@ int HH_swapInH2D()
   dev *d;
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SI_H2D;
-#if 0
-  d = HH_curdev();
-  d->np_in++;
-#endif
   HH_unlockSched();
 
   /* H -> D */
@@ -114,9 +106,6 @@ int HH_swapInH2D()
 
   HH_lockSched();
   HHL->dmode = HHD_ON_DEV;
-#if 0
-  d->np_in--;
-#endif
 
   return 0;
 }
@@ -344,8 +333,6 @@ int HH_swapInF2H()
 /************************************************************/
 int HH_swapInIfOk()
 {
-  dev *d = HH_curdev();
-
   if (HHL->dmode == HHD_ON_DEV) {
     // do nothing 
     return 0;
@@ -369,6 +356,7 @@ int HH_swapInIfOk()
 #endif
 
     // now I can proceed!
+    dev *d = HH_curdev();
     d->dhslot_users[HHL->hpid] = HH_MYID;
 
     HH_swapInH2D();
@@ -416,7 +404,6 @@ int HH_swapInIfOk()
 /* swapOut may be called in this function */
 int HH_swapOutIfBetter()
 {
-  dev *d = HH_curdev();
   if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
     // do nothing
     return 0;
@@ -611,7 +598,6 @@ int HH_enterGComm(const char *str)
 	    HH_MYID, HHL2->api_str);
 #endif
     assert(HHL->pmode == HHP_RUNNING);
-    dev *d = HH_curdev();
 
     /* When device is oversubscribed, I sleep eagerly */
     HH_swapOutIfOver();
