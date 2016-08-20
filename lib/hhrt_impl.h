@@ -335,9 +335,18 @@ class hostheap: public heap {
   virtual int swapInF2H();
   virtual int swapInH2D() {}; // do nothing
 
-  int allocCapacity(size_t offset, size_t size);
-
+  virtual void *allocCapacity(size_t offset, size_t size);
   int swapfd;
+  int mmapflags;
+};
+
+class hostmmapheap: public hostheap {
+ public:
+  hostmmapheap(fsdir *fsd0);
+  virtual void *allocCapacity(size_t offset, size_t size);
+  virtual int restoreHeap();
+
+  fsdir *fsd;
 };
 
 #define HHRF_SEND (1 << 0)

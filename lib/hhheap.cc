@@ -606,27 +606,9 @@ hostheap::hostheap() : heap(0L)
 
   strcpy(name, "hostheap");
 
-#ifdef USE_MMAPSWAP
-  {
-    char sfname[256];
-    int userid = 99; // check conflict with hhswaper.cc
-    if (HHL->curfsdirid < 0) {
-      // fileswap directory not available 
-      fprintf(stderr, "[HH:hostheap::init%d] ERROR: swap directory not specified\n",
-	      HH_MYID);
-      exit(1);
-    }
-
-    HH_makeSFileName(userid, sfname);
-    swapfd = HH_openSFile(sfname);
-
-    fprintf(stderr, "[HH:hostheap::init%d] USE_MMAPSWAP: file %s is used\n",
-	    HH_MYID, sfname);
-
-  }
-#else
   swapfd = -1; // anonymous mmap
-#endif
+  mmapflags = MAP_PRIVATE|MAP_ANONYMOUS;
+
   return;
 }
 
@@ -640,35 +622,17 @@ int hostheap::finalize()
   return 0;
 }
 
-int hostheap::allocCapacity(size_t offset, size_t size)
+void *hostheap::allocCapacity(size_t offset, size_t size)
 {
   void *mapp = piadd(HOSTHEAP_PTR, offset);
   void *resp;
-  int flags;
 
   if (size == 0) {
-    return 0;
+    return NULL;
   }
-
-#ifdef USE_MMAPSWAP
-  {
-    int rc;
-    assert(swapfd != -1);
-    rc = ftruncate(swapfd, offset+size);
-    if (rc != 0) {
-      fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: ftruncate failed!\n",
-	      name, HH_MYID);
-      exit(1);
-    }
-  }
-
-  flags = MAP_SHARED; // data on memory is written to a file
-#else
-  flags = MAP_PRIVATE|MAP_ANONYMOUS;
-#endif  
 
   resp = mmap(mapp, size, 
-	      PROT_READ|PROT_WRITE, flags,
+	      PROT_READ|PROT_WRITE, mmapflags,
 	      swapfd, offset /* (off_t)0 */);
   if (resp == MAP_FAILED) {
     fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: mmap(0x%lx, 0x%lx) failed\n",
@@ -682,11 +646,7 @@ int hostheap::allocCapacity(size_t offset, size_t size)
     exit(1);
   }
 
-#ifdef USE_MMAPSWAP
-  madvise(resp, size, MADV_DONTNEED);
-#endif
-
-  return 0;
+  return resp;
 }
 
 int hostheap::expandHeap(size_t reqsize)
@@ -749,20 +709,7 @@ int hostheap::allocHeap()
     return 0;
   }
 
-#if 1 // debugging
   allocCapacity((size_t)0, heapsize);
-#else
-  /* first allocate */
-  p = mmap(HOSTHEAP_PTR, heapsize, 
-	   PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
-	   -1, (off_t)0);
-  if (p == MAP_FAILED) {
-    fprintf(stderr, "[HH:%s::allocHeap@p%d] mmap(NULL, %ld) failed\n",
-	    name, HH_MYID, heapsize);
-    exit(1);
-  }
-  heapptr = p;
-#endif
 
   HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
 
@@ -775,12 +722,6 @@ int hostheap::restoreHeap()
   int rc;
   void *p;
   assert(heapptr != NULL);
-
-#ifdef USE_MMAPSWAP
-  fprintf(stderr, "[HH:%s::restoreHeap] ERROR: restore is incompatible with USE_MMAPSWAP. This seems a bug of library.\n",
-	  name);
-  exit(1);
-#endif
 
   if (heapsize == 0) {
     return 0;
@@ -817,3 +758,56 @@ int hostheap::swapInF2H()
   swapIn();
   return 0;
 }
+
+/*****************************************************************/
+// hostmmapheap class (child class of hostheap)
+// Similar to host heap, but the entire heap is mmaped to a file
+// Swapping is done automatically by OS, so this does not have
+// a underlying swapper explicitly
+hostmmapheap::hostmmapheap(fsdir *fsd0) : hostheap()
+{
+  strcpy(name, "hostmmapheap");
+
+  fsd = fsd0;
+
+  char sfname[256];
+  int userid = 99; // check conflict with hhswaper.cc
+  
+  HH_makeSFileName(fsd, userid, sfname);
+  swapfd = HH_openSFile(sfname);
+  mmapflags = MAP_SHARED; // data on memory is written to a file
+  
+  fprintf(stderr, "[HH:%s::init%d] USE_MMAPSWAP: file %s is used\n",
+	  name, HH_MYID, sfname);
+}
+
+void *hostmmapheap::allocCapacity(size_t offset, size_t size)
+{
+  int rc;
+  void *resp;
+
+  if (size == 0) {
+    return NULL;
+  }
+
+  assert(swapfd != -1);
+  rc = ftruncate(swapfd, offset+size);
+  if (rc != 0) {
+    fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: ftruncate failed!\n",
+	    name, HH_MYID);
+    exit(1);
+  }
+
+  resp = hostheap::allocCapacity(offset, size);
+
+  madvise(resp, size, MADV_DONTNEED);
+  return resp;
+}
+
+int hostmmapheap::restoreHeap()
+{
+  fprintf(stderr, "[HH:%s::restoreHeap@p%d] ERROR: restore is incompatible with USE_MMAPSWAP. This seems a bug of library.\n",
+	  name, HH_MYID);
+  exit(1);
+}
+
