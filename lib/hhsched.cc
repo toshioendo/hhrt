@@ -98,9 +98,20 @@ int HH_swapOutD2H()
   return 0;
 }
 
-#ifdef USE_FILESWAP_THREAD
+//////////////// H2F
+// This function assumes sched_ml is locked
+static int beforeSwapOutH2F()
+{
+  assert(HHL->dmode == HHD_ON_HOST);
+  HHL->dmode = HHD_SO_H2F;
 
-static void *swapOutH2Fthread(void *arg)
+  fsdir *fsd = HH_curfsdir();
+  fsd->np_fileout++;
+
+  return 0;
+}
+
+static int mainSwapOutH2F()
 {
 #ifdef USE_SWAPHOST
   /* Host Heap */
@@ -109,22 +120,28 @@ static void *swapOutH2Fthread(void *arg)
 #endif
 
   HHL2->devheap->swapOutH2F();
-
-  return NULL;
+  return 0;
 }
 
-// This function assumes sched_ml is locked
-int HH_startSwapOutH2F()
+static int afterSwapOutH2F()
 {
-  assert(HHL->dmode == HHD_ON_HOST);
-  HHL->dmode = HHD_SO_H2F;
-
   fsdir *fsd = HH_curfsdir();
-  fsd->np_fileout++;
+  fsd->np_fileout--;
 
-  pthread_create(&HHL2->fileswap_tid, NULL, swapOutH2Fthread, NULL);
+  HHS->nhostusers[HHL->hpid]--;
+  fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
+	  HH_MYID, Wtime_prt());
 
+  HHL->dmode = HHD_ON_FILE;
   return 0;
+}
+
+#ifdef USE_FILESWAP_THREAD
+
+static void *swapOutH2Fthread(void *arg)
+{
+  mainSwapOutH2F();
+  return NULL;
 }
 
 // This function assumes sched_ml is locked
@@ -135,29 +152,27 @@ int HH_tryfinSwapOutH2F()
   assert(HHL->dmode == HHD_SO_H2F);
 
   rc= pthread_tryjoin_np(HHL2->fileswap_tid, &retval);
-  if (rc == EBUSY) {
-    // thread has not yet terminated
-    return 0;
-  }
+  if (rc == EBUSY) return 0;
 
   // thread has terminated
-
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_fileout--;
-
-  HHS->nhostusers[HHL->hpid]--;
-  fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
-	  HH_MYID, Wtime_prt());
-
-  HHL->dmode = HHD_ON_FILE;
+  afterSwapOutH2F();
 
   return 1;
+}
+
+int HH_startSwapOutH2F()
+{
+  beforeSwapOutH2F();
+  pthread_create(&HHL2->fileswap_tid, NULL, swapOutH2Fthread, NULL);
+  return 0;
 }
 
 // This function assumes sched_ml is locked
 int HH_swapOutH2F()
 {
-  HH_startSwapOutH2F();
+  beforeSwapOutH2F();
+  pthread_create(&HHL2->fileswap_tid, NULL, swapOutH2Fthread, NULL);
+
   while (1) {
     int rc = HH_tryfinSwapOutH2F();
     if (rc > 0) break;
@@ -165,6 +180,7 @@ int HH_swapOutH2F()
     usleep(100);
     lock_log(&HHS->sched_ml);
   }
+
   return 0;
 }
 
@@ -174,41 +190,17 @@ int HH_swapOutH2F()
 // This function assumes sched_ml is locked
 int HH_swapOutH2F()
 {
-  assert(HHL->dmode == HHD_ON_HOST);
-  HHL->dmode = HHD_SO_H2F;
-
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_fileout++;
-
+  beforeSwapOutH2F();
   pthread_mutex_unlock(&HHS->sched_ml);
-
-  HHL2->devheap->swapOutH2F();
-
-#ifdef USE_SWAPHOST
-  /* Host Heap */
-  /* H -> F */
-  HHL2->hostheap->swapOutH2F();
-#endif
-
+  mainSwapOutH2F();
   lock_log(&HHS->sched_ml);
-
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_fileout--;
-
-  HHS->nhostusers[HHL->hpid]--;
-  HHL->dmode = HHD_ON_FILE;
-
-#if 0
-  fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
-	  HH_MYID, Wtime_prt());
-#endif
-
+  afterSwapOutH2F();
   return 0;
 }
 
 #endif // !USE_FILESWAP_THREAD
 
-// H2D
+////////////////////// H2D
 // This function assumes sched_ml is locked
 int HH_swapInH2D()
 {
@@ -232,22 +224,8 @@ int HH_swapInH2D()
   return 0;
 }
 
-#ifdef USE_FILESWAP_THREAD
-static void *swapInF2Hthread(void *arg)
-{
-#ifdef USE_SWAPHOST
-  /* Host Heap */
-  HHL2->hostheap->swapInF2H();
-#endif
-
-  /* Device Heap */
-  HHL2->devheap->swapInF2H();
-
-  return NULL;
-}
-
-// This function assumes sched_ml is locked
-int HH_startSwapInF2H()
+///////////// F2H
+static int beforeSwapInF2H()
 {
   assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
@@ -255,9 +233,41 @@ int HH_startSwapInF2H()
   fsd->np_filein++;
 
   HHS->nhostusers[HHL->hpid]++;
-  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, NULL);
   HHL->dmode = HHD_SI_F2H;
+  return 0;
+}
 
+static int mainSwapInF2H()
+{
+#ifdef USE_SWAPHOST
+  /* Host Heap */
+  HHL2->hostheap->swapInF2H();
+#endif
+  /* Device Heap */
+  HHL2->devheap->swapInF2H();
+  return 0;
+}
+
+static int afterSwapInF2H()
+{
+  fsdir *fsd = HH_curfsdir();
+  fsd->np_filein--;
+  HHL->dmode = HHD_ON_HOST;
+  return 0;
+}
+
+#ifdef USE_FILESWAP_THREAD
+static void *swapInF2Hthread(void *arg)
+{
+  mainSwapInF2H();
+  return NULL;
+}
+
+// This function assumes sched_ml is locked
+int HH_startSwapInF2H()
+{
+  beforeSwapInF2H();
+  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, NULL);
   return 0;
 }
 
@@ -269,17 +279,10 @@ int HH_tryfinSwapInF2H()
   assert(HHL->dmode == HHD_SI_F2H);
 
   rc= pthread_tryjoin_np(HHL2->fileswap_tid, &retval);
-  if (rc == EBUSY) {
-    // thread has not yet terminated
-    return 0;
-  }
+  if (rc == EBUSY) return 0;
 
   // thread has terminated
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_filein--;
-
-  HHL->dmode = HHD_ON_HOST;
-
+  afterSwapInF2H();
   return 1;
 }
 
@@ -288,23 +291,9 @@ int HH_tryfinSwapInF2H()
 // This function assumes sched_ml is locked
 int HH_swapInF2H()
 {
-  assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
-
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_filein++;
-
-  HHS->nhostusers[HHL->hpid]++;
-  HHL->dmode = HHD_SI_F2H;
+  beforeSwapInF2H();
   pthread_mutex_unlock(&HHS->sched_ml);
-
-#ifdef USE_SWAPHOST
-  /* Host Heap */
-  HHL2->hostheap->swapInF2H();
-#endif
-
-  /* Device Heap */
-  HHL2->devheap->swapInF2H();
-
+  mainSwapInF2H();
   lock_log(&HHS->sched_ml);
 
   fsdir *fsd = HH_curfsdir();
@@ -394,9 +383,7 @@ int HH_swapInIfOk()
 int HH_checkD2H()
 {
   dev *d = HH_curdev();
-  if (d->np_out > 0) {
-    return 0;
-  }
+  if (d->np_out > 0) return 0;
   return 1;
 }
 
@@ -426,7 +413,7 @@ int HH_swapOutIfBetter()
   else if (HHL->dmode == HHD_ON_HOST) {
 #ifdef USE_MMAPSWAP
     return 0; // do nothing
-#else
+#else // !USE_MMAPSWAP
     if (!HH_checkH2F()) {
       return 0;
     }
@@ -455,13 +442,11 @@ int HH_swapOutIfBetter()
   }
   else if (HHL->dmode == HHD_ON_DEV) {
     if (!HH_checkD2H()) {
-      //if (d->np_out > 0) {
       return 0;
     }
 
     lock_log(&HHS->sched_ml);
     if (!HH_checkD2H()) {
-      //if (d->np_out > 0) {
       pthread_mutex_unlock(&HHS->sched_ml);
       return 0;
     }
