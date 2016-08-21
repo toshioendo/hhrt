@@ -27,10 +27,9 @@ int HH_unlockSched()
 //------------------------------- D2H
 int HH_checkResD2H()
 {
-  if (!HHL2->devheap->checkResD2H()) return 0;
-#ifdef USE_SWAPHOST
-  if (!HHL2->hostheap->checkResD2H()) return 0;
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    if (!HHL2->heaps[ih]->checkResD2H()) return 0;
+  }
   return 1;
 }
 
@@ -47,10 +46,9 @@ int HH_swapOutD2H()
   HH_unlockSched();
 
   /* D -> H */
-  HHL2->devheap->swapOutD2H();
-#ifdef USE_SWAPHOST
-  HHL2->hostheap->swapOutD2H(); // do nothing
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->swapOutD2H();
+  }
 
   HH_lockSched();
   HHL->dmode = HHD_ON_HOST;
@@ -62,10 +60,9 @@ int HH_swapOutD2H()
 // check whether resource is available for swapIn
 int HH_checkResH2D()
 {
-  if (!HHL2->devheap->checkResH2D()) return 0;
-#ifdef USE_SWAPHOST
-  if (!HHL2->hostheap->checkResH2D()) return 0;
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    if (!HHL2->heaps[ih]->checkResH2D()) return 0;
+  }
   return 1;
 }
 
@@ -73,10 +70,9 @@ int HH_checkResH2D()
 // (before scheduling lock is released)
 int reserveResH2D()
 {
-  HHL2->devheap->reserveResH2D();
-#ifdef USE_SWAPHOST
-  HHL2->hostheap->reserveResH2D();
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->reserveResH2D();
+  }
   return 0;
 }
 
@@ -91,10 +87,9 @@ int HH_swapInH2D()
   HH_unlockSched();
 
   /* H -> D */
-  HHL2->devheap->swapInH2D();
-#ifdef USE_SWAPHOST
-  HHL2->hostheap->swapInH2D();
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->swapInH2D();
+  }
 
   HH_lockSched();
   HHL->dmode = HHD_ON_DEV;
@@ -107,10 +102,9 @@ int HH_swapInH2D()
 //----------------------------- H2F
 int HH_checkResH2F()
 {
-  if (!HHL2->devheap->checkResH2F()) return 0;
-#ifdef USE_SWAPHOST
-  if (!HHL2->hostheap->checkResH2F()) return 0;
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    if (!HHL2->heaps[ih]->checkResH2F()) return 0;
+  }
   return 1;
 }
 
@@ -125,13 +119,10 @@ static int beforeSwapOutH2F()
 
 static int mainSwapOutH2F()
 {
-#ifdef USE_SWAPHOST
-  /* Host Heap */
   /* H -> F */
-  HHL2->hostheap->swapOutH2F();
-#endif
-
-  HHL2->devheap->swapOutH2F();
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->swapOutH2F();
+  }
   return 0;
 }
 
@@ -208,10 +199,9 @@ int HH_swapOutH2F()
 //----------------------------- F2H
 int HH_checkResF2H()
 {
-  if (!HHL2->devheap->checkResF2H()) return 0;
-#ifdef USE_SWAPHOST
-  if (!HHL2->hostheap->checkResF2H()) return 0;
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    if (!HHL2->heaps[ih]->checkResF2H()) return 0;
+  }
 
   /* I can start F2H */
   return 1;
@@ -221,10 +211,9 @@ int HH_checkResF2H()
 // (before scheduling lock is released)
 int reserveResF2H()
 {
-  HHL2->devheap->reserveResF2H();
-#ifdef USE_SWAPHOST
-  HHL2->hostheap->reserveResF2H();
-#endif
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->reserveResF2H();
+  }
 
   return 0;
 }
@@ -240,12 +229,9 @@ static int beforeSwapInF2H()
 
 static int mainSwapInF2H()
 {
-#ifdef USE_SWAPHOST
-  /* Host Heap */
-  HHL2->hostheap->swapInF2H();
-#endif
-  /* Device Heap */
-  HHL2->devheap->swapInF2H();
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->swapInF2H();
+  }
   return 0;
 }
 
@@ -377,9 +363,6 @@ int HH_swapOutIfBetter()
     return 0;
   }
   else if (HHL->dmode == HHD_ON_HOST) {
-#ifdef USE_MMAPSWAP
-    return 0; // do nothing
-#else // !USE_MMAPSWAP
     if (!HH_checkResH2F()) {
       return 0;
     }
@@ -404,7 +387,6 @@ int HH_swapOutIfBetter()
 #endif
     HH_unlockSched();
     return 1;
-#endif // !USE_MMAPSWAP
   }
   else if (HHL->dmode == HHD_ON_DEV) {
     if (!HH_checkResD2H()) {

@@ -14,6 +14,7 @@ using namespace std;
 
 #define MAX_LDEVS 16  /* max #GPUs per node */
 #define MAX_LSIZE 256 /* max #procs per node */
+#define MAX_HEAPS (MAX_LDEVS+1) /* max # of heaps per proc */
 #define MAX_MAXRP 8 /* HH_MAXRP (env var) cannot exceed this */
 #define HOSTNAMELEN 64
 #define CONFSTRLEN 128
@@ -433,6 +434,9 @@ struct proc {
 /* Process information, Private structure */
 struct proc2 {
   hhconf conf;
+
+  int nheaps;
+  heap *heaps[MAX_HEAPS];
 
   heap *devheap;
 #ifdef USE_SWAPHOST

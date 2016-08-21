@@ -396,12 +396,15 @@ static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL->hpid = lrank % HHS->ndhslots;
 
   // setup heap structures
-  // moved from hhmem.c
+  heap *h;
 #ifdef USE_SWAPHOST
-  HHL2->hostheap = HH_hostheapCreate();
+  h = HH_hostheapCreate();
+  HHL2->heaps[HHL2->nheaps++] = h;
+  HHL2->hostheap = h;
 #endif
-  dev *d = HH_curdev();
-  HHL2->devheap = HH_devheapCreate(d);
+  h = HH_devheapCreate(HH_curdev());
+  HHL2->heaps[HHL2->nheaps++] = h;
+  HHL2->devheap = h;
 
   // blocked until heaps are accessible
   HH_sleepForMemory();

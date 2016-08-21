@@ -837,7 +837,7 @@ int fileswapper::startContWrite()
   HH_lockSched();
   fsd->np_fileout++;
   if (fsd->np_fileout >= 2) {
-    fprintf(stderr, "[HH:fileswapper@p%d] np_fileout = %d strange\n",
+    fprintf(stderr, "[HH:fileswapper@p%d] np_fileout = %d strange (usually harmless)\n",
 	    HH_MYID, fsd->np_fileout);
   }
   HH_unlockSched();
