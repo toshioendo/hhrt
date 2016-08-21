@@ -22,7 +22,6 @@ int swapper::beginSeqWrite()
 size_t swapper::allocSeq(size_t size)
 {
   size_t cur = swcur;
-  //swcur += ((size+align-1)/align)*align;
   swcur += roundup(size, align);
   return cur;
 }
@@ -418,6 +417,7 @@ int hostswapper::swapOut()
   assert(curswapper != NULL);
   curswapper->allocBuf();
   curswapper->beginSeqWrite();
+  curswapper->startContWrite();
 
   /* write the entire swapbuf */
   /* data size is given by swcur (see allocSeq()) */
@@ -455,6 +455,7 @@ int hostswapper::swapOut()
   }
 #endif
 
+  curswapper->endContWrite();
   releaseBuf();
 
   return 0;
@@ -483,6 +484,7 @@ int hostswapper::swapIn()
 
   allocBuf();
   t0 = Wtime();
+  curswapper->startContRead();
 
   /* read the entire swapbuf */
   /* data size is given by swcur (see allocSeq()) set by previous swapOut */
@@ -519,6 +521,7 @@ int hostswapper::swapIn()
   }
 #endif
 
+  curswapper->endContRead();
   curswapper->releaseBuf();
   swapped = 0;
 
@@ -725,8 +728,6 @@ int fileswapper::write1(ssize_t offs, void *buf, int bufkind, size_t size)
   for (cur = 0; cur < size; cur += copyunit) {
     {
       // Refrain writing if someone is reading
-
-      fsdir *fsd = HH_curfsdir();
       while (fsd->np_filein > 0) {
 	usleep(1000);
       }
@@ -830,6 +831,56 @@ int fileswapper::read1(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
+/* */
+int fileswapper::startContWrite()
+{
+  HH_lockSched();
+  fsd->np_fileout++;
+  if (fsd->np_fileout >= 2) {
+    fprintf(stderr, "[HH:fileswapper@p%d] np_fileout = %d strange\n",
+	    HH_MYID, fsd->np_fileout);
+  }
+  HH_unlockSched();
+  return 0;
+}
+
+int fileswapper::endContWrite()
+{
+  HH_lockSched();
+  fsd->np_fileout--;
+  if (fsd->np_fileout < 0) {
+    fprintf(stderr, "[HH:fileswapper@p%d] np_fileout = %d strange\n",
+	    HH_MYID, fsd->np_fileout);
+  }
+  HH_unlockSched();
+  return 0;
+}
+
+int fileswapper::startContRead()
+{
+  HH_lockSched();
+  fsd->np_filein++;
+  if (fsd->np_filein >= 2) {
+    fprintf(stderr, "[HH:fileswapper@p%d] np_filein = %d strange\n",
+	    HH_MYID, fsd->np_filein);
+  }
+  HH_unlockSched();
+  return 0;
+}
+
+int fileswapper::endContRead()
+{
+  HH_lockSched();
+  fsd->np_filein--;
+  if (fsd->np_filein < 0) {
+    fprintf(stderr, "[HH:fileswapper@p%d] np_filein = %d strange\n",
+	    HH_MYID, fsd->np_filein);
+  }
+  HH_unlockSched();
+  return 0;
+}
+
+/* */
 int fileswapper::swapOut()
 {
   fprintf(stderr, "[HH:fileswapper::swapOut@p%d] ERROR: This should not be called\n",

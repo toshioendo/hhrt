@@ -57,7 +57,7 @@ static int afterSwapOutD2H()
 // This function assumes sched_ml is locked
 int HH_swapOutD2H()
 {
-  dev *d;
+  //dev *d;
 
   assert (HHL->dmode == HHD_ON_DEV);
   HHL->dmode = HHD_SO_D2H;
@@ -143,8 +143,10 @@ static int beforeSwapOutH2F()
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SO_H2F;
 
+#if 0
   fsdir *fsd = HH_curfsdir();
   fsd->np_fileout++;
+#endif
 
   return 0;
 }
@@ -163,8 +165,10 @@ static int mainSwapOutH2F()
 
 static int afterSwapOutH2F()
 {
+#if 0
   fsdir *fsd = HH_curfsdir();
   fsd->np_fileout--;
+#endif
 
   HHS->nhostusers[HHL->hpid]--;
   fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
@@ -261,8 +265,10 @@ static int beforeSwapInF2H()
 {
   assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
+#if 0
   fsdir *fsd = HH_curfsdir();
   fsd->np_filein++;
+#endif
 
   HHS->nhostusers[HHL->hpid]++;
   HHL->dmode = HHD_SI_F2H;
@@ -283,7 +289,9 @@ static int mainSwapInF2H()
 static int afterSwapInF2H()
 {
   fsdir *fsd = HH_curfsdir();
+#if 0
   fsd->np_filein--;
+#endif
   HHL->dmode = HHD_ON_HOST;
   return 0;
 }
@@ -329,7 +337,9 @@ int HH_swapInF2H()
   HH_lockSched();
 
   fsdir *fsd = HH_curfsdir();
+#if 0
   fsd->np_filein--;
+#endif
 
   HHL->dmode = HHD_ON_HOST;
 

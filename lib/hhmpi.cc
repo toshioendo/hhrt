@@ -312,8 +312,10 @@ int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
     }
     t1 = Wtime();
 #if 1
-    fprintf(stderr, "[HHMPI_Waitall@p%d] req fin took %.1lf msec\n",
-	    HH_MYID, (t1-t0)*1000.0);
+    if (t1-t0 > 0.1) {
+      fprintf(stderr, "[HHMPI_Waitall@p%d] req fin took %.1lf msec\n",
+	      HH_MYID, (t1-t0)*1000.0);
+    }
 #endif
   }
   free(bakstats);

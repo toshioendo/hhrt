@@ -257,6 +257,7 @@ int heap::swapOut()
   assert(curswapper != NULL);
   curswapper->allocBuf();
   curswapper->beginSeqWrite();
+  curswapper->startContWrite();
   swapped = 1;
 
 #if 1
@@ -300,6 +301,7 @@ int heap::swapOut()
 #endif
 
   releaseHeap();
+  curswapper->endContWrite();
 
   return 0;
 }
@@ -334,6 +336,7 @@ int heap::swapIn()
   
   assert(heapptr != NULL);
   restoreHeap();
+  curswapper->startContRead();
 
   t0 = Wtime();
   /* for all membufs */
@@ -369,6 +372,7 @@ int heap::swapIn()
   }
 #endif
 
+  curswapper->endContRead();
   curswapper->releaseBuf();
   swapped = 0;
 
@@ -775,6 +779,7 @@ hostmmapheap::hostmmapheap(fsdir *fsd0) : hostheap()
   
   HH_makeSFileName(fsd, userid, sfname);
   swapfd = HH_openSFile(sfname);
+
   mmapflags = MAP_SHARED; // data on memory is written to a file
   
   fprintf(stderr, "[HH:%s::init%d] USE_MMAPSWAP: file %s is used\n",
