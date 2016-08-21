@@ -32,25 +32,9 @@ int HH_checkD2H()
   return 1;
 }
 
-static int afterSwapOutD2H()
-{
-  dev *d = HH_curdev();
-  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
-
-  d->dhslot_users[HHL->hpid] = -1;
-  fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
-	  HH_MYID, Wtime_prt(), HHL->hpid);
-
-  HHL->dmode = HHD_ON_HOST;
-
-  return 0;
-}
-
 // This function assumes sched_ml is locked
 int HH_swapOutD2H()
 {
-  //dev *d;
-
   assert (HHL->dmode == HHD_ON_DEV);
   HHL->dmode = HHD_SO_D2H;
 #if 0
@@ -67,7 +51,7 @@ int HH_swapOutD2H()
 #endif
 
   HH_lockSched();
-  afterSwapOutD2H();
+  HHL->dmode = HHD_ON_HOST;
 
   return 0;
 }
@@ -272,7 +256,6 @@ static int mainSwapInF2H()
 
 static int afterSwapInF2H()
 {
-  fsdir *fsd = HH_curfsdir();
   HHL->dmode = HHD_ON_HOST;
   return 0;
 }

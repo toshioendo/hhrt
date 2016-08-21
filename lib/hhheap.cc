@@ -554,12 +554,21 @@ int devheap::swapOutD2H()
 
   swapOut();
 
+  // release resource information on device
   HH_lockSched();
   device->np_out--;
   if (device->np_out < 0) {
     fprintf(stderr, "[swapOutD2H@p%d] np_out = %d strange\n",
 	    HH_MYID, device->np_out);
   }
+#if 1
+  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
+  assert(device->dhslot_users[HHL->hpid] == HH_MYID);
+  device->dhslot_users[HHL->hpid] = -1;
+  fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
+	  HH_MYID, Wtime_prt(), HHL->hpid);
+#endif
+
   HH_unlockSched();
   return 0;
 }
