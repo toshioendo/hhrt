@@ -295,12 +295,8 @@ class heap: public mempool {
   virtual int swapOutH2F() {};
   virtual int swapInF2H() {};
 
-  virtual int checkResD2H() {};
-  virtual int checkResH2D() {};
-  virtual int checkResH2F() {};
-  virtual int checkResF2H() {};
-  virtual int reserveResH2D() {};
-  virtual int reserveResF2H() {};
+  virtual int checkRes(int kind) {};
+  virtual int reserveRes(int kind) {};
 
   virtual int madvise(void *p, size_t size, int kind);
 
@@ -330,12 +326,8 @@ class devheap: public heap {
   virtual int swapOutH2F();
   virtual int swapInF2H();
 
-  virtual int checkResD2H();
-  virtual int checkResH2D();
-  virtual int checkResH2F();
-  virtual int checkResF2H();
-  virtual int reserveResH2D();
-  virtual int reserveResF2H();
+  virtual int checkRes(int kind);
+  virtual int reserveRes(int kind);
 
   void *allocDevMem(size_t heapsize);
   void *hp_baseptr;
@@ -358,12 +350,8 @@ class hostheap: public heap {
   virtual int swapOutH2F();
   virtual int swapInF2H();
 
-  virtual int checkResD2H() {return 1;}; // do nothing
-  virtual int checkResH2D() {return 1;}; // do nothing
-  virtual int checkResH2F();
-  virtual int checkResF2H();
-  virtual int reserveResH2D();
-  virtual int reserveResF2H();
+  virtual int checkRes(int kind);
+  virtual int reserveRes(int kind);
 
   virtual void *allocCapacity(size_t offset, size_t size);
   int swapfd;

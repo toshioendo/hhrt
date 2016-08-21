@@ -861,7 +861,7 @@ int fileswapper::startContRead()
   HH_lockSched();
   fsd->np_filein++;
   if (fsd->np_filein >= 2) {
-    fprintf(stderr, "[HH:fileswapper@p%d] np_filein = %d strange\n",
+    fprintf(stderr, "[HH:fileswapper@p%d] np_filein = %d strange (usually harmless)\n",
 	    HH_MYID, fsd->np_filein);
   }
   HH_unlockSched();

@@ -608,44 +608,45 @@ int devheap::swapInH2D()
 }
 
 // check resource availability before actual swapping
-int devheap::checkResD2H()
+int devheap::checkRes(int kind)
 {
-  if (device->np_out > 0) return 0;  // someone is doing swapD2H
-  return 1;
+  if (kind == HHD_SO_D2H) {
+    if (device->np_out > 0) return 0;  // someone is doing swapD2H
+    return 1;
+  }
+  else if (kind == HHD_SI_H2D) {
+    if (device->np_in > 0) return 0; // someone is doing swapH2D
+    if (device->dhslot_users[HHL->hpid] >= 0) return 0; // device heap slot is occupied
+    return 1;
+  }
+  else if (kind == HHD_SO_H2F || kind == HHD_SI_F2H) {
+    // check is done by hostheap. is it OK?
+    return 1;
+  }
+  else {
+    fprintf(stderr, "[HH:devheap::checkRes@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
 }
 
-int devheap::checkResH2D()
+int devheap::reserveRes(int kind)
 {
-  if (device->np_in > 0) return 0; // someone is doing swapH2D
-  if (device->dhslot_users[HHL->hpid] >= 0) return 0; // device heap slot is occupied
-  return 1;
-}
-
-int devheap::checkResH2F()
-{
-  // check is done by hostheap. is it OK?
-  return 1;
-}
-
-int devheap::checkResF2H()
-{
-  // check is done by hostheap. is it OK?
-  return 1;
-}
-
-int devheap::reserveResH2D()
-{
-  // reserve resource information on device
-  device->dhslot_users[HHL->hpid] = HH_MYID;
+  // Reserve resource information before swapping
+  // This must be called after last checkRes(), without releasing schedule lock
+  if (kind == HHD_SI_H2D) {
+    device->dhslot_users[HHL->hpid] = HH_MYID;
+  }
+  else if (kind == HHD_SI_F2H) {
+    // reserve is done by hostheap. is it OK?
+  }
+  else {
+    fprintf(stderr, "[HH:devheap::reserveRes@p%d] ERROR: kind %d invalid\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
   return 0;
 }
-
-int devheap::reserveResF2H()
-{
-  // reserve is done by hostheap. is it OK?
-  return 0;
-}
-
 
 /*****************************************************************/
 // hostheap class (child class of heap)
@@ -820,50 +821,67 @@ int hostheap::swapInF2H()
   return 0;
 }
 
-int hostheap::checkResH2F()
+int hostheap::checkRes(int kind)
 {
-  if (curswapper == NULL) return 0;
-
-  if (HHL2->conf.nlphost >= HHS->nlprocs) {
-    // no need to use fileswapper
-    return 0;
+  if (kind == HHD_SO_D2H) {
+    return 1;
   }
-
-  fsdir *fsd = ((fileswapper*)curswapper)->fsd;
-  if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
-    // someone is doing swapF2H or swapH2F
-    return 0;
+  else if (kind == HHD_SI_H2D) {
+    return 1;
   }
-
-  return 1;
+  else if (kind == HHD_SO_H2F) {
+    if (curswapper == NULL) return 0;
+    
+    if (HHL2->conf.nlphost >= HHS->nlprocs) {
+      // no need to use fileswapper
+      return 0;
+    }
+    
+    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
+      // someone is doing swapF2H or swapH2F
+      return 0;
+    }
+    
+    return 1;
+  }
+  else if (kind == HHD_SI_F2H) {
+    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    if (fsd->np_filein > 0) {
+      return 0;
+    }
+    assert(fsd->np_filein == 0);
+    
+    int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
+    if (HHS->nhostusers[HHL->hpid] >= limperslot) {
+      return 0;
+    }
+    
+    /* I can start swapF2H */
+    return 1;
+  }
+  else {
+    fprintf(stderr, "[HH:devheap@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
 }
 
-int hostheap::checkResF2H()
+int hostheap::reserveRes(int kind)
 {
-  fsdir *fsd = ((fileswapper*)curswapper)->fsd;
-  if (fsd->np_filein > 0) {
-    return 0;
+  // Reserve resource information before swapping
+  // This must be called after last checkRes(), without releasing schedule lock
+  if (kind == HHD_SI_H2D) {
+    // do nothing
   }
-  assert(fsd->np_filein == 0);
-
-  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
-  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
-    return 0;
+  else if (kind == HHD_SI_F2H) {
+    HHS->nhostusers[HHL->hpid]++;
   }
-
-  /* I can start swapF2H */
-  return 1;
-}
-
-int hostheap::reserveResH2D()
-{
-  return 0;
-}
-
-int hostheap::reserveResF2H()
-{
-  // reserve resource information
-  HHS->nhostusers[HHL->hpid]++;
+  else {
+    fprintf(stderr, "[HH:hostheap::reserveRes@p%d] ERROR: kind %d invalid\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
   return 0;
 }
 

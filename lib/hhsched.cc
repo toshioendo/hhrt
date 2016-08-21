@@ -24,15 +24,27 @@ int HH_unlockSched()
   return 0;
 }
 
-//------------------------------- D2H
-int HH_checkResD2H()
+// check resouce availability before swapping
+int HH_checkRes(int kind)
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    if (!HHL2->heaps[ih]->checkResD2H()) return 0;
+    if (!HHL2->heaps[ih]->checkRes(kind)) return 0;
   }
   return 1;
 }
 
+// reserve resource for swapIn. called soon after HH_checkResH2D
+// (before scheduling lock is released)
+int reserveRes(int kind)
+{
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->reserveRes(kind);
+  }
+  return 0;
+}
+
+
+//------------------------------- D2H
 // This function assumes sched_ml is locked
 int HH_swapOutD2H()
 {
@@ -57,32 +69,14 @@ int HH_swapOutD2H()
 }
 
 //------------------------------- H2D
-// check whether resource is available for swapIn
-int HH_checkResH2D()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    if (!HHL2->heaps[ih]->checkResH2D()) return 0;
-  }
-  return 1;
-}
-
-// reserve resource for swapIn. called soon after HH_checkResH2D
-// (before scheduling lock is released)
-int reserveResH2D()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->reserveResH2D();
-  }
-  return 0;
-}
-
 // This function assumes sched_ml is locked
 int HH_swapInH2D()
 {
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SI_H2D;
 
-  reserveResH2D();
+  //reserveResH2D();
+  reserveRes(HHD_SI_H2D);
 
   HH_unlockSched();
 
@@ -97,17 +91,7 @@ int HH_swapInH2D()
   return 0;
 }
 
-
-
 //----------------------------- H2F
-int HH_checkResH2F()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    if (!HHL2->heaps[ih]->checkResH2F()) return 0;
-  }
-  return 1;
-}
-
 // This function assumes sched_ml is locked
 static int beforeSwapOutH2F()
 {
@@ -197,32 +181,12 @@ int HH_swapOutH2F()
 #endif // !USE_FILESWAP_THREAD
 
 //----------------------------- F2H
-int HH_checkResF2H()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    if (!HHL2->heaps[ih]->checkResF2H()) return 0;
-  }
-
-  /* I can start F2H */
-  return 1;
-}
-
-// reserve resource for swapIn. called soon after HH_checkResF2H
-// (before scheduling lock is released)
-int reserveResF2H()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->reserveResF2H();
-  }
-
-  return 0;
-}
-
 static int beforeSwapInF2H()
 {
   assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
-  reserveResF2H();
+  //reserveResF2H();
+  reserveRes(HHD_SI_F2H);
   HHL->dmode = HHD_SI_F2H;
   return 0;
 }
@@ -297,12 +261,14 @@ int HH_swapInIfOk()
     return 0;
   }
   else if (HHL->dmode == HHD_ON_HOST) {
-    if (!HH_checkResH2D()) {
+    if (!HH_checkRes(HHD_SI_H2D)) {
+      //if (!HH_checkResH2D()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkResH2D()) {
+    if (!HH_checkRes(HHD_SI_H2D)) {
+      //if (!HH_checkResH2D()) {
       HH_unlockSched();
       return 0;
     }
@@ -320,12 +286,14 @@ int HH_swapInIfOk()
     return 1;
   }
   else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
-    if (!HH_checkResF2H()) {
+    if (!HH_checkRes(HHD_SI_F2H)) {
+      //if (!HH_checkResF2H()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkResF2H()) {
+    if (!HH_checkRes(HHD_SI_F2H)) {
+      //if (!HH_checkResF2H()) {
       HH_unlockSched();
       return 0;
     }
@@ -363,12 +331,14 @@ int HH_swapOutIfBetter()
     return 0;
   }
   else if (HHL->dmode == HHD_ON_HOST) {
-    if (!HH_checkResH2F()) {
+    if (!HH_checkRes(HHD_SO_H2F)) {
+      //if (!HH_checkResH2F()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkResH2F()) {
+    if (!HH_checkRes(HHD_SO_H2F)) {
+      //if (!HH_checkResH2F()) {
       HH_unlockSched();
       return 0;
     }
@@ -389,12 +359,14 @@ int HH_swapOutIfBetter()
     return 1;
   }
   else if (HHL->dmode == HHD_ON_DEV) {
-    if (!HH_checkResD2H()) {
+    if (!HH_checkRes(HHD_SO_D2H)) {
+      //if (!HH_checkResD2H()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkResD2H()) {
+    if (!HH_checkRes(HHD_SO_D2H)) {
+      //if (!HH_checkResD2H()) {
       HH_unlockSched();
       return 0;
     }
