@@ -35,7 +35,7 @@ int HH_checkRes(int kind)
 
 // reserve resource for swapIn. called soon after HH_checkResH2D
 // (before scheduling lock is released)
-int reserveRes(int kind)
+int HH_reserveRes(int kind)
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->reserveRes(kind);
@@ -75,8 +75,7 @@ int HH_swapInH2D()
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SI_H2D;
 
-  //reserveResH2D();
-  reserveRes(HHD_SI_H2D);
+  HH_reserveRes(HHD_SI_H2D);
 
   HH_unlockSched();
 
@@ -185,8 +184,7 @@ static int beforeSwapInF2H()
 {
   assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
-  //reserveResF2H();
-  reserveRes(HHD_SI_F2H);
+  HH_reserveRes(HHD_SI_F2H);
   HHL->dmode = HHD_SI_F2H;
   return 0;
 }
@@ -262,13 +260,11 @@ int HH_swapInIfOk()
   }
   else if (HHL->dmode == HHD_ON_HOST) {
     if (!HH_checkRes(HHD_SI_H2D)) {
-      //if (!HH_checkResH2D()) {
       return 0;
     }
 
     HH_lockSched();
     if (!HH_checkRes(HHD_SI_H2D)) {
-      //if (!HH_checkResH2D()) {
       HH_unlockSched();
       return 0;
     }
@@ -287,13 +283,11 @@ int HH_swapInIfOk()
   }
   else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
     if (!HH_checkRes(HHD_SI_F2H)) {
-      //if (!HH_checkResF2H()) {
       return 0;
     }
 
     HH_lockSched();
     if (!HH_checkRes(HHD_SI_F2H)) {
-      //if (!HH_checkResF2H()) {
       HH_unlockSched();
       return 0;
     }
@@ -332,13 +326,11 @@ int HH_swapOutIfBetter()
   }
   else if (HHL->dmode == HHD_ON_HOST) {
     if (!HH_checkRes(HHD_SO_H2F)) {
-      //if (!HH_checkResH2F()) {
       return 0;
     }
 
     HH_lockSched();
     if (!HH_checkRes(HHD_SO_H2F)) {
-      //if (!HH_checkResH2F()) {
       HH_unlockSched();
       return 0;
     }
@@ -360,13 +352,11 @@ int HH_swapOutIfBetter()
   }
   else if (HHL->dmode == HHD_ON_DEV) {
     if (!HH_checkRes(HHD_SO_D2H)) {
-      //if (!HH_checkResD2H()) {
       return 0;
     }
 
     HH_lockSched();
     if (!HH_checkRes(HHD_SO_D2H)) {
-      //if (!HH_checkResD2H()) {
       HH_unlockSched();
       return 0;
     }
