@@ -73,8 +73,10 @@ int HH_checkResH2D()
 // (before scheduling lock is released)
 int reserveResH2D()
 {
-  dev *d = HH_curdev();
-  d->dhslot_users[HHL->hpid] = HH_MYID;
+  HHL2->devheap->reserveResH2D();
+#ifdef USE_SWAPHOST
+  HHL2->hostheap->reserveResH2D();
+#endif
   return 0;
 }
 
@@ -219,7 +221,11 @@ int HH_checkResF2H()
 // (before scheduling lock is released)
 int reserveResF2H()
 {
-  HHS->nhostusers[HHL->hpid]++;
+  HHL2->devheap->reserveResF2H();
+#ifdef USE_SWAPHOST
+  HHL2->hostheap->reserveResF2H();
+#endif
+
   return 0;
 }
 

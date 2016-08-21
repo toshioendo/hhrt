@@ -298,6 +298,8 @@ class heap: public mempool {
   virtual int checkResH2D() {};
   virtual int checkResH2F() {};
   virtual int checkResF2H() {};
+  virtual int reserveResH2D() {};
+  virtual int reserveResF2H() {};
 
   virtual int madvise(void *p, size_t size, int kind);
 
@@ -331,6 +333,8 @@ class devheap: public heap {
   virtual int checkResH2D();
   virtual int checkResH2F();
   virtual int checkResF2H();
+  virtual int reserveResH2D();
+  virtual int reserveResF2H();
 
   void *allocDevMem(size_t heapsize);
   void *hp_baseptr;
@@ -357,6 +361,8 @@ class hostheap: public heap {
   virtual int checkResH2D() {return 1;}; // do nothing
   virtual int checkResH2F();
   virtual int checkResF2H();
+  virtual int reserveResH2D();
+  virtual int reserveResF2H();
 
   virtual void *allocCapacity(size_t offset, size_t size);
   int swapfd;

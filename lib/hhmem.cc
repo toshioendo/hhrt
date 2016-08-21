@@ -102,7 +102,8 @@ cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags)
 {
   void *p;
   if (HH_MYID == 0) {
-    fprintf(stderr, "[HHcudaHostAlloc] WARNING: normal malloc is used now\n");
+    fprintf(stderr, "[HHcudaHostAlloc@p%d] WARNING: normal malloc is used now\n",
+	    HH_MYID);
   }
   p = HHL2->hostheap->alloc(size);
   *pp = p;

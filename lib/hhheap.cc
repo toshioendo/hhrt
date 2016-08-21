@@ -633,6 +633,19 @@ int devheap::checkResF2H()
   return 1;
 }
 
+int devheap::reserveResH2D()
+{
+  // reserve resource information on device
+  device->dhslot_users[HHL->hpid] = HH_MYID;
+  return 0;
+}
+
+int devheap::reserveResF2H()
+{
+  // reserve is done by hostheap. is it OK?
+  return 0;
+}
+
 
 /*****************************************************************/
 // hostheap class (child class of heap)
@@ -786,13 +799,14 @@ int hostheap::swapOutH2F()
   }
 
   swapOut();
-#if 1
+
+  // release resource information
   HH_lockSched();
   HHS->nhostusers[HHL->hpid]--;
   fprintf(stderr, "[HH:%s::swapOutH2F@p%d] [%.2f] I release host capacity\n",
 	  name, HH_MYID, Wtime_prt());
   HH_unlockSched();
-#endif
+
   return 0;
 }
 
@@ -839,6 +853,18 @@ int hostheap::checkResF2H()
 
   /* I can start swapF2H */
   return 1;
+}
+
+int hostheap::reserveResH2D()
+{
+  return 0;
+}
+
+int hostheap::reserveResF2H()
+{
+  // reserve resource information
+  HHS->nhostusers[HHL->hpid]++;
+  return 0;
 }
 
 
