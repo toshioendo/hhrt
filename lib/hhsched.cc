@@ -41,14 +41,6 @@ static int afterSwapOutD2H()
   fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
 	  HH_MYID, Wtime_prt(), HHL->hpid);
 
-#if 0
-  d->np_out--;
-  if (d->np_out < 0) {
-    fprintf(stderr, "[swapOut@p%d] np_out = %d strange\n",
-	    HH_MYID, d->np_out);
-  }
-#endif
-
   HHL->dmode = HHD_ON_HOST;
 
   return 0;
@@ -93,7 +85,7 @@ int HH_checkH2D()
 
 // reserve resource for swapIn. called soon after HH_checkH2D
 // (before scheduling lock is released)
-int HH_reserveResH2D()
+int reserveResH2D()
 {
   dev *d = HH_curdev();
   d->dhslot_users[HHL->hpid] = HH_MYID;
@@ -105,6 +97,9 @@ int HH_swapInH2D()
 {
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SI_H2D;
+
+  reserveResH2D();
+
   HH_unlockSched();
 
   /* H -> D */
@@ -143,11 +138,6 @@ static int beforeSwapOutH2F()
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SO_H2F;
 
-#if 0
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_fileout++;
-#endif
-
   return 0;
 }
 
@@ -165,15 +155,6 @@ static int mainSwapOutH2F()
 
 static int afterSwapOutH2F()
 {
-#if 0
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_fileout--;
-#endif
-
-  HHS->nhostusers[HHL->hpid]--;
-  fprintf(stderr, "[HH_swapOutH2F@p%d] [%.2f] I release host capacity\n",
-	  HH_MYID, Wtime_prt());
-
   HHL->dmode = HHD_ON_FILE;
   return 0;
 }
@@ -261,16 +242,19 @@ int HH_checkF2H()
   return 1;
 }
 
+// reserve resource for swapIn. called soon after HH_checkF2H
+// (before scheduling lock is released)
+int reserveResF2H()
+{
+  HHS->nhostusers[HHL->hpid]++;
+  return 0;
+}
+
 static int beforeSwapInF2H()
 {
   assert(HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE);
 
-#if 0
-  fsdir *fsd = HH_curfsdir();
-  fsd->np_filein++;
-#endif
-
-  HHS->nhostusers[HHL->hpid]++;
+  reserveResF2H();
   HHL->dmode = HHD_SI_F2H;
   return 0;
 }
@@ -289,9 +273,6 @@ static int mainSwapInF2H()
 static int afterSwapInF2H()
 {
   fsdir *fsd = HH_curfsdir();
-#if 0
-  fsd->np_filein--;
-#endif
   HHL->dmode = HHD_ON_HOST;
   return 0;
 }
@@ -336,11 +317,6 @@ int HH_swapInF2H()
   mainSwapInF2H();
   HH_lockSched();
 
-  fsdir *fsd = HH_curfsdir();
-#if 0
-  fsd->np_filein--;
-#endif
-
   HHL->dmode = HHD_ON_HOST;
 
   return 0;
@@ -373,8 +349,6 @@ int HH_swapInIfOk()
 #endif
 
     // now I can proceed!
-    HH_reserveResH2D();
-
     HH_swapInH2D();
 
     assert(HHL->dmode == HHD_ON_DEV);

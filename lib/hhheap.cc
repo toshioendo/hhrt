@@ -750,6 +750,13 @@ int hostheap::swapOutH2F()
   }
 
   swapOut();
+#if 1
+  HH_lockSched();
+  HHS->nhostusers[HHL->hpid]--;
+  fprintf(stderr, "[HH:%s::swapOutH2F@p%d] [%.2f] I release host capacity\n",
+	  name, HH_MYID, Wtime_prt());
+  HH_unlockSched();
+#endif
   return 0;
 }
 
