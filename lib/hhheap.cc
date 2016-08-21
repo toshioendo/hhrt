@@ -551,9 +551,9 @@ int devheap::swapOutD2H()
   HH_lockSched();
   device->np_out++;
   HH_unlockSched();
-
+  
   swapOut();
-
+  
   // release resource information on device
   HH_lockSched();
   device->np_out--;
@@ -566,9 +566,9 @@ int devheap::swapOutD2H()
   assert(device->dhslot_users[HHL->hpid] == HH_MYID);
   device->dhslot_users[HHL->hpid] = -1;
   fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
-	  HH_MYID, Wtime_prt(), HHL->hpid);
+    HH_MYID, Wtime_prt(), HHL->hpid);
 #endif
-
+  
   HH_unlockSched();
   return 0;
 }
@@ -576,7 +576,7 @@ int devheap::swapOutD2H()
 int devheap::swapOutH2F()
 {
   if (curswapper == NULL || curswapper->curswapper) {
-    return 0;
+  return 0;
   }
 
   curswapper->swapOut();
@@ -606,6 +606,33 @@ int devheap::swapInH2D()
   HH_unlockSched();
   return 0;
 }
+
+// check resource availability before actual swapping
+int devheap::checkResD2H()
+{
+  if (device->np_out > 0) return 0;  // someone is doing swapD2H
+  return 1;
+}
+
+int devheap::checkResH2D()
+{
+  if (device->np_in > 0) return 0; // someone is doing swapH2D
+  if (device->dhslot_users[HHL->hpid] >= 0) return 0; // device heap slot is occupied
+  return 1;
+}
+
+int devheap::checkResH2F()
+{
+  // check is done by hostheap. is it OK?
+  return 1;
+}
+
+int devheap::checkResF2H()
+{
+  // check is done by hostheap. is it OK?
+  return 1;
+}
+
 
 /*****************************************************************/
 // hostheap class (child class of heap)
@@ -778,6 +805,42 @@ int hostheap::swapInF2H()
   swapIn();
   return 0;
 }
+
+int hostheap::checkResH2F()
+{
+  if (curswapper == NULL) return 0;
+
+  if (HHL2->conf.nlphost >= HHS->nlprocs) {
+    // no need to use fileswapper
+    return 0;
+  }
+
+  fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+  if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
+    // someone is doing swapF2H or swapH2F
+    return 0;
+  }
+
+  return 1;
+}
+
+int hostheap::checkResF2H()
+{
+  fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+  if (fsd->np_filein > 0) {
+    return 0;
+  }
+  assert(fsd->np_filein == 0);
+
+  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
+  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
+    return 0;
+  }
+
+  /* I can start swapF2H */
+  return 1;
+}
+
 
 /*****************************************************************/
 // hostmmapheap class (child class of hostheap)

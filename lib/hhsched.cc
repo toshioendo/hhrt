@@ -25,10 +25,12 @@ int HH_unlockSched()
 }
 
 //------------------------------- D2H
-int HH_checkD2H()
+int HH_checkResD2H()
 {
-  dev *d = HH_curdev();
-  if (d->np_out > 0) return 0;
+  if (!HHL2->devheap->checkResD2H()) return 0;
+#ifdef USE_SWAPHOST
+  if (!HHL2->hostheap->checkResD2H()) return 0;
+#endif
   return 1;
 }
 
@@ -58,16 +60,16 @@ int HH_swapOutD2H()
 
 //------------------------------- H2D
 // check whether resource is available for swapIn
-int HH_checkH2D()
+int HH_checkResH2D()
 {
-  dev *d = HH_curdev();
-  if (d->np_in > 0 || d->dhslot_users[HHL->hpid] >= 0) {
-    return 0;
-  }
+  if (!HHL2->devheap->checkResH2D()) return 0;
+#ifdef USE_SWAPHOST
+  if (!HHL2->hostheap->checkResH2D()) return 0;
+#endif
   return 1;
 }
 
-// reserve resource for swapIn. called soon after HH_checkH2D
+// reserve resource for swapIn. called soon after HH_checkResH2D
 // (before scheduling lock is released)
 int reserveResH2D()
 {
@@ -101,18 +103,12 @@ int HH_swapInH2D()
 
 
 //----------------------------- H2F
-int HH_checkH2F()
+int HH_checkResH2F()
 {
-  if (HHL2->conf.nlphost >= HHS->nlprocs) {
-    // no need to use fileswapper
-    return 0;
-  }
-
-  fsdir *fsd = HH_curfsdir();
-  if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
-    return 0;
-  }
-
+  if (!HHL2->devheap->checkResH2F()) return 0;
+#ifdef USE_SWAPHOST
+  if (!HHL2->hostheap->checkResH2F()) return 0;
+#endif
   return 1;
 }
 
@@ -208,25 +204,18 @@ int HH_swapOutH2F()
 #endif // !USE_FILESWAP_THREAD
 
 //----------------------------- F2H
-int HH_checkF2H()
+int HH_checkResF2H()
 {
-
-  fsdir *fsd = HH_curfsdir();
-  if (fsd->np_filein > 0) {
-    return 0;
-  }
-  assert(fsd->np_filein == 0);
-
-  int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
-  if (HHS->nhostusers[HHL->hpid] >= limperslot) {
-    return 0;
-  }
+  if (!HHL2->devheap->checkResF2H()) return 0;
+#ifdef USE_SWAPHOST
+  if (!HHL2->hostheap->checkResF2H()) return 0;
+#endif
 
   /* I can start F2H */
   return 1;
 }
 
-// reserve resource for swapIn. called soon after HH_checkF2H
+// reserve resource for swapIn. called soon after HH_checkResF2H
 // (before scheduling lock is released)
 int reserveResF2H()
 {
@@ -316,12 +305,12 @@ int HH_swapInIfOk()
     return 0;
   }
   else if (HHL->dmode == HHD_ON_HOST) {
-    if (!HH_checkH2D()) {
+    if (!HH_checkResH2D()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkH2D()) {
+    if (!HH_checkResH2D()) {
       HH_unlockSched();
       return 0;
     }
@@ -339,12 +328,12 @@ int HH_swapInIfOk()
     return 1;
   }
   else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
-    if (!HH_checkF2H()) {
+    if (!HH_checkResF2H()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkF2H()) {
+    if (!HH_checkResF2H()) {
       HH_unlockSched();
       return 0;
     }
@@ -385,12 +374,12 @@ int HH_swapOutIfBetter()
 #ifdef USE_MMAPSWAP
     return 0; // do nothing
 #else // !USE_MMAPSWAP
-    if (!HH_checkH2F()) {
+    if (!HH_checkResH2F()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkH2F()) {
+    if (!HH_checkResH2F()) {
       HH_unlockSched();
       return 0;
     }
@@ -412,12 +401,12 @@ int HH_swapOutIfBetter()
 #endif // !USE_MMAPSWAP
   }
   else if (HHL->dmode == HHD_ON_DEV) {
-    if (!HH_checkD2H()) {
+    if (!HH_checkResD2H()) {
       return 0;
     }
 
     HH_lockSched();
-    if (!HH_checkD2H()) {
+    if (!HH_checkResD2H()) {
       HH_unlockSched();
       return 0;
     }
