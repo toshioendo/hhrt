@@ -33,7 +33,7 @@ cudaError_t HHcudaMalloc(void **pp, size_t size)
     assert(HHL->dmode == HHD_ON_DEV);
   }
 
-  p = HHL2->devheap->alloc(size);
+  p = HH_curdevheap()->alloc(size);
   *pp = p;
   return cudaSuccess;
 }
@@ -43,7 +43,7 @@ cudaError_t HHcudaFree(void *p)
   if (p == NULL) return cudaSuccess;
 
   int rc;
-  rc = HHL2->devheap->free(p);
+  rc = HH_curdevheap()->free(p);
   if (rc != 0) {
     return cudaErrorInvalidDevicePointer;
   }
@@ -53,7 +53,7 @@ cudaError_t HHcudaFree(void *p)
 int HH_madvise(void *p, size_t size, int kind)
 {
   int rc;
-  rc = HHL2->devheap->madvise(p, size, kind);
+  rc = HH_curdevheap()->madvise(p, size, kind);
   if (rc == 0) return 0;
 
 #ifdef USE_SWAPHOST

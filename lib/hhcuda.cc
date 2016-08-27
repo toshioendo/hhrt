@@ -12,7 +12,7 @@
 
 membuf *HH_findMembuf(void *p)
 {
-  return HHL2->devheap->findMembuf(p);
+  return HH_curdevheap()->findMembuf(p);
 }
 
 static ssize_t convDevptr2Offs(void *dp, swapper *swapper)
@@ -33,7 +33,7 @@ static ssize_t convDevptr2Offs(void *dp, swapper *swapper)
     assert(0);
     exit(1);
   }
-  poffs = ppsub(dp, HHL2->devheap->heapptr) - mbp->doffs;
+  poffs = ppsub(dp, HH_curdevheap()->heapptr) - mbp->doffs;
   assert(poffs >= 0 && poffs < mbp->size);
 
   ssize_t soffs = mbp->soffs + poffs;

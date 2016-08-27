@@ -51,11 +51,10 @@ heap *HH_hostheapCreate()
 int HH_finalizeHeap()
 {
   assert(HHL->dmode == HHD_ON_DEV);
-#ifdef USE_SWAPHOST
-  HHL2->hostheap->finalizeRec();
-#endif
-
-  HHL2->devheap->finalizeRec();
+  int ih;
+  for (ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->finalizeRec();
+  }
 
   HH_lockSched();
 

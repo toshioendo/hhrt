@@ -426,7 +426,7 @@ struct proc2 {
   int nheaps;
   heap *heaps[MAX_HEAPS];
 
-  heap *devheap;
+  heap *devheaps[MAX_LDEVS];
 #ifdef USE_SWAPHOST
   heap *hostheap;
 #endif
@@ -479,6 +479,7 @@ extern struct shdata *HHS;
 /* internal functions */
 int HH_default_devid(int lrank);
 dev *HH_curdev();
+heap *HH_curdevheap();
 fsdir *HH_curfsdir();
 int HH_mutex_init(pthread_mutex_t *ml);
 

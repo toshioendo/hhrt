@@ -34,6 +34,24 @@ dev *HH_curdev()
   return &HHS->devs[HHL->curdevid];
 }
 
+heap *HH_curdevheap()
+{
+  if (HHL->curdevid < 0) {
+    fprintf(stderr, 
+	    "[HH_curdevheap@p%d] ERROR: curdevid is not set\n",
+	    HH_MYID);
+    exit(1);
+  }
+  heap *h = HHL2->devheaps[HHL->curdevid];
+  if (h == NULL) {
+    fprintf(stderr, 
+	    "[HH_curdevheap@p%d] ERROR: devid %d is not initialized\n",
+	    HH_MYID, HHL->curdevid);
+    exit(1);
+  }
+  return h;
+}
+
 fsdir *HH_curfsdir()
 {
   if (HHL->curfsdirid < 0) {
@@ -379,8 +397,12 @@ static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   {
     // default device id
     // TODO: this should be lazy
-    HHL->curdevid = HH_default_devid(lrank);
-    cudaSetDevice(HHL->curdevid);
+    cudaError_t crc;
+    crc = cudaGetDevice(&HHL->curdevid);
+    if (crc != cudaSuccess) {
+      fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
+      HHL->curdevid = 0;
+    }
   }
   // default fsdir id
   if (confp->n_fileswap_dirs == 0) {
@@ -404,7 +426,7 @@ static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
 #endif
   h = HH_devheapCreate(HH_curdev());
   HHL2->heaps[HHL2->nheaps++] = h;
-  HHL2->devheap = h;
+  HHL2->devheaps[HHL->curdevid] = h;
 
   // blocked until heaps are accessible
   HH_sleepForMemory();
