@@ -43,6 +43,8 @@ static double Wtime_prt()
 #define USE_MADVISE
 #define INIT_ON_GPU
 
+#define GPUS_PER_NODE 2
+
 #define BSX 32
 #define BSY 8
 
@@ -290,6 +292,12 @@ int init()
     fprintf(stderr, "usercode(): n-temporal-block=%d, %dx%dx%dx%d\n",
 	    bt, nx, ny, nz, nt);
   }
+
+#ifdef GPUS_PER_NODE
+  int devid = myid % GPUS_PER_NODE;
+  fprintf(stderr, "Process %d uses gpu %d\n", myid, devid);
+  cudaSetDevice(devid);
+#endif
 
   /* data region to be computed by this process */
   // modified 2014/11/26

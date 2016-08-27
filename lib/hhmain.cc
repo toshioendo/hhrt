@@ -190,7 +190,7 @@ static int initSharedDevmem(dev *d)
   return 0;
 }
 
-int init_dev(int i, int lsize, int size, hhconf *confp)
+int initDev(int i, int lsize, int size, hhconf *confp)
 {
   cudaError_t crc;
   dev *d = &HHS->devs[i];
@@ -222,7 +222,7 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
   d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
   
 #if 1
-  fprintf(stderr, "[HH:init_dev@%s:dev%d] memsize=%ld -> default_heapsize=%ld\n",
+  fprintf(stderr, "[HH:initDev@%s:dev%d] memsize=%ld -> default_heapsize=%ld\n",
 	  HHS->hostname, i, d->memsize, d->default_heapsize);
 #endif
 
@@ -240,7 +240,7 @@ int init_dev(int i, int lsize, int size, hhconf *confp)
 }
 
 /* Called only by leader (lrank=0) process */
-static int init_node(int lsize, int size, hhconf *confp)
+static int initNode(int lsize, int size, hhconf *confp)
 {
   int ndevs; // # of physical devices
   int i;
@@ -263,7 +263,7 @@ static int init_node(int lsize, int size, hhconf *confp)
   HHS = (struct shdata*)ipsm_init(HH_IPSM_KEY, sizeof(struct shdata) );
   if (HHS == NULL) {
     int rc = ipsm_getlasterror();
-    fprintf(stderr, "[HH:init_node@%s] ipsm_init failed!! lasterror=0x%x. abort..\n", 
+    fprintf(stderr, "[HH:initNode@%s] ipsm_init failed!! lasterror=0x%x. abort..\n", 
 	    hostname, rc);
     exit(1);
   }
@@ -279,7 +279,7 @@ static int init_node(int lsize, int size, hhconf *confp)
 #ifdef USE_CUDA_MPS
   // start MPS server
   // this must be done before any CUDA API calls
-  fprintf(stderr, "[HH:init_node@%s] Starting MPS...\n", HHS->hostname);
+  fprintf(stderr, "[HH:initNode@%s] Starting MPS...\n", HHS->hostname);
   system("nvidia-cuda-mps-control -d 2>&1 > /dev/null");
   sleep(2);
 #endif
@@ -287,7 +287,7 @@ static int init_node(int lsize, int size, hhconf *confp)
   ndevs = -1;
   crc = cudaGetDeviceCount(&ndevs);
   if (crc != cudaSuccess || ndevs < 0 || ndevs > MAX_LDEVS) {
-    fprintf(stderr, "[HH:init_node@%s] cudaGetDeviceCount ERROR. rc=%d, ndevs=%d\n",
+    fprintf(stderr, "[HH:initNode@%s] cudaGetDeviceCount ERROR. rc=%d, ndevs=%d\n",
 	    HHS->hostname, crc, ndevs);
     exit(1);
   }
@@ -295,7 +295,7 @@ static int init_node(int lsize, int size, hhconf *confp)
   HHS->ndevs = ndevs;
 
 #if 1
-  fprintf(stderr, "[HH:init_node@%s] I have %d visible devices\n",
+  fprintf(stderr, "[HH:initNode@%s] I have %d visible devices\n",
 	  HHS->hostname, ndevs);
 #endif
 
@@ -311,7 +311,7 @@ static int init_node(int lsize, int size, hhconf *confp)
     crc = cudaGetDevice(&mydevid);
     
     for (i = 0; i < ndevs; i++) {
-      init_dev(i, lsize, size, confp);
+      initDev(i, lsize, size, confp);
     }
     
     crc = cudaSetDevice(mydevid); // restore
@@ -337,7 +337,7 @@ static int init_node(int lsize, int size, hhconf *confp)
 
 /* called by non-leader (lrank != 0) processes */
 /* after this function, the process can read/write HHS */
-static int join_proc(int lrank, int rank)
+static int joinProc(int lrank, int rank)
 {
   int nretry = 0;
   /* for debug print */
@@ -345,7 +345,7 @@ static int join_proc(int lrank, int rank)
   memset(hostname, 0, HOSTNAMELEN);
   gethostname(hostname, HOSTNAMELEN-1);
   
-  MPI_Barrier(MPI_COMM_WORLD); // see MPI_Barrier in init_node()
+  MPI_Barrier(MPI_COMM_WORLD); // see MPI_Barrier in initNode()
   
  retry:
   HHS = (struct shdata*)ipsm_join(HH_IPSM_KEY);
@@ -373,7 +373,7 @@ static int join_proc(int lrank, int rank)
 
 /* Called by every process */
 /* This may cause waiting */
-static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
+static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 {
   assert(lsize <= MAX_LSIZE);
 
@@ -435,7 +435,7 @@ static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->devheaps[HHL->curdevid] = h;
 #else
-  fprintf(stderr, "[HH:init_proc@p%d] skip init devheap. it will be done later\n",
+  fprintf(stderr, "[HH:initProc@p%d] skip init devheap. it will be done later\n",
 	  HH_MYID);
 #endif
 
@@ -602,10 +602,10 @@ int HHMPI_Init(int *argcp, char ***argvp)
 
   if (lrank == 0) {
     /* Called only once per node */
-    init_node(lsize, size, &conf);
+    initNode(lsize, size, &conf);
   }
   else {
-    join_proc(lrank, rank);
+    joinProc(lrank, rank);
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -614,7 +614,7 @@ int HHMPI_Init(int *argcp, char ***argvp)
 #endif
 
   /* initialize process info */
-  init_proc(lrank, lsize, rank, size, &conf);
+  initProc(lrank, lsize, rank, size, &conf);
 
   return 0;
 }

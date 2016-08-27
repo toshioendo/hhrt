@@ -301,9 +301,11 @@ cudaError_t HHcudaSetDevice(int devid)
 {
   HHL->curdevid = devid;
 
+  cudaError_t crc = cudaSetDevice(devid);
+
   HH_checkDev(); // init heap for new device if not
 
-  return cudaSetDevice(devid);
+  return crc;
 }
 
 /* Wrappers of cudaMalloc/cudaFree */

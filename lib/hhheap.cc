@@ -109,6 +109,8 @@ void* heap::alloc(size_t size0)
   size_t freed = 0;
   int nretries = 0;
 
+  assert(heapptr != NULL);
+
   /* search membufs */
   list<membuf *>::iterator it;
   for (it = membufs.begin(); it != membufs.end(); it++) {
@@ -327,6 +329,10 @@ int heap::swapIn()
 
   if (heapptr == NULL) { // firstswapin
     allocHeap();
+#ifdef HHLOG_SWAP
+    fprintf(stderr, "[HH:%s::swapIn@p%d] allocHeap() for first swapin\n",
+	    name, HH_MYID);
+#endif
     return 0;
   }
 
@@ -453,7 +459,7 @@ devheap::devheap(size_t heapsize0, dev *device0) : heap(heapsize0)
   cudaError_t crc;
   crc = cudaStreamCreate(&swapstream);
 #endif
-  strcpy(name, "devheap");
+  sprintf(name, "devheap(d%d)", device->devid);
   hp_baseptr = NULL;
 
   return;
@@ -494,8 +500,8 @@ void *devheap::allocDevMem(size_t heapsize)
     else {
       crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
       if (crc != cudaSuccess) {
-	fprintf(stderr, "[HH:%s::allocHeap@p%d] ERROR: cudaIpcOpenMemHandle failed! (rc=%d)\n",
-		name, HH_MYID, crc);
+	fprintf(stderr, "[HH:%s::allocHeap@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
+		name, HH_MYID, cudaGetErrorString(crc));
 	exit(1);
       }
     }
