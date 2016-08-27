@@ -418,15 +418,26 @@ static int init_proc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL->hpid = lrank % HHS->ndhslots;
 
   // setup heap structures
+  HHL2->nheaps = 0;
+  for (int id = 0; id < MAX_LDEVS; id++) {
+    HHL2->heaps[id] = NULL;
+  }
+
   heap *h;
 #ifdef USE_SWAPHOST
   h = HH_hostheapCreate();
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->hostheap = h;
 #endif
+
+#if 0
   h = HH_devheapCreate(HH_curdev());
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->devheaps[HHL->curdevid] = h;
+#else
+  fprintf(stderr, "[HH:init_proc@p%d] skip init devheap. it will be done later\n",
+	  HH_MYID);
+#endif
 
   // blocked until heaps are accessible
   HH_sleepForMemory();

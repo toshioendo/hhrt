@@ -165,6 +165,7 @@ void* heap::alloc(size_t size0)
 	      name, HH_MYID, size);
       fprintf(stderr, "[%s::alloc@p%d] heap %ld bytes, free %ld bytes (%d chunks), used %ld bytes (%d chunks)\n",
 	      name, HH_MYID, heapsize, freed, nfreed, used, nused);
+      HHstacktrace();
       exit(1);
       return NULL;
     }

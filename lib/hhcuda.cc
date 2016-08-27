@@ -20,6 +20,11 @@ int HH_checkDev()
 
   if (h != NULL) {
     // device heap is already initialized. Do nothing
+#if 0
+    fprintf(stderr, 
+	    "[HH_checkDev@p%d] devid %d is already initialized.\n",
+	    HH_MYID, HHL->curdevid);
+#endif
     return 0;
   }
 
@@ -27,12 +32,16 @@ int HH_checkDev()
 	  "[HH_checkDev@p%d] First use of devid %d. initialize...\n",
 	  HH_MYID, HHL->curdevid);
 
+  // swap out existing heaps
+  HH_swapOutIfBetter();
+
   h = HH_devheapCreate(HH_curdev());
   assert(HHL2->nheaps < MAX_HEAPS-1);
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->devheaps[HHL->curdevid] = h;
 
   // blocked until heaps are accessible
+  HHL->pmode = HHP_RUNNABLE;
   HH_sleepForMemory();
   HHL->pmode = HHP_RUNNING;
 
