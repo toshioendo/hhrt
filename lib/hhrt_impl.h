@@ -506,6 +506,7 @@ heap *HH_devheapCreate(dev *d);
 #ifdef USE_SWAPHOST
 heap *HH_hostheapCreate();
 #endif
+int HH_finalizeHeaps();
 
 /****************************************/
 /* hhsched.cc: scheduling */
@@ -527,6 +528,10 @@ int HH_hsc_init_proc();
 int HH_hsc_fin_node();
 void *HH_hsc_alloc(int id);
 int HH_hsc_free(void *p);
+
+/****************************************/
+/* hhcuda.cc: for CUDA */
+int HH_checkDev();
 
 
 void HHstacktrace();

@@ -4,12 +4,42 @@
 #include <string.h>
 #include "hhrt_impl.h"
 
-#define HOSTNAMELEN 64
-
 /* CUDA interface */
-/* Exceptionally, cudaMalloc/cudaFree are put in hhmem.cc */
-/* Also some HHRT specific APIs are here */
 
+// Initialize device structure if it is used for first time
+// This may be blocked
+int HH_checkDev()
+{
+  if (HHL->curdevid < 0 || HHL->curdevid >= MAX_LDEVS) {
+    fprintf(stderr, 
+	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
+	    HH_MYID, HHL->curdevid);
+    exit(1);
+  }
+  heap *h = HHL2->devheaps[HHL->curdevid];
+
+  if (h != NULL) {
+    // device heap is already initialized. Do nothing
+    return 0;
+  }
+
+  fprintf(stderr, 
+	  "[HH_checkDev@p%d] First use of devid %d. initialize...\n",
+	  HH_MYID, HHL->curdevid);
+
+  h = HH_devheapCreate(HH_curdev());
+  assert(HHL2->nheaps < MAX_HEAPS-1);
+  HHL2->heaps[HHL2->nheaps++] = h;
+  HHL2->devheaps[HHL->curdevid] = h;
+
+  // blocked until heaps are accessible
+  HH_sleepForMemory();
+  HHL->pmode = HHP_RUNNING;
+
+  return 0;
+}
+
+#if 0////////
 membuf *HH_findMembuf(void *p)
 {
   return HH_curdevheap()->findMembuf(p);
@@ -130,6 +160,7 @@ static int memcpy2D_inner(void * dst,
 
   return 0;
 }
+#endif /////////////
 
 cudaError_t HHcudaMemcpy(void * dst,
 		       const void * src,
@@ -137,6 +168,10 @@ cudaError_t HHcudaMemcpy(void * dst,
 		       enum cudaMemcpyKind kind 
 		       )
 {
+  HH_checkDev();
+#if 1
+  return cudaMemcpy(dst, src, count, kind);
+#else
   if (HHL->dmode == HHD_ON_DEV) {
     return cudaMemcpy(dst, src, count, kind);
   }
@@ -144,6 +179,7 @@ cudaError_t HHcudaMemcpy(void * dst,
     memcpy_inner(dst, src, count, kind);
     return cudaSuccess;
   }
+#endif
 }
 
 cudaError_t HHcudaMemcpyAsync(void * dst,
@@ -153,6 +189,10 @@ cudaError_t HHcudaMemcpyAsync(void * dst,
 			    cudaStream_t stream 
 			    )
 {
+  HH_checkDev();
+#if 1
+  return cudaMemcpyAsync(dst, src, count, kind, stream);
+#else
   if (HHL->dmode == HHD_ON_DEV) {
     return cudaMemcpyAsync(dst, src, count, kind, stream);
   }
@@ -160,6 +200,7 @@ cudaError_t HHcudaMemcpyAsync(void * dst,
     memcpy_inner(dst, src, count, kind);
     return cudaSuccess;
   }
+#endif
 }
 
 cudaError_t HHcudaMemcpy2D(void * dst,
@@ -171,6 +212,10 @@ cudaError_t HHcudaMemcpy2D(void * dst,
 			 enum cudaMemcpyKind kind 
 			 )
 {
+  HH_checkDev();
+#if 1
+  return cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
+#else
   if (HHL->dmode == HHD_ON_DEV) {
     return cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
   }
@@ -178,6 +223,7 @@ cudaError_t HHcudaMemcpy2D(void * dst,
     memcpy2D_inner(dst, dpitch, src, spitch, width, height, kind);
     return cudaSuccess;
   }
+#endif
 }
 
 
@@ -191,6 +237,10 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
 			      cudaStream_t stream 
 			      )
 {
+  HH_checkDev();
+#if 1
+  return cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
+#else
   if (HHL->dmode == HHD_ON_DEV) {
     return cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
   }
@@ -198,6 +248,7 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
     memcpy2D_inner(dst, dpitch, src, spitch, width, height, kind);
     return cudaSuccess;
   }
+#endif
 }
 
 
@@ -219,6 +270,8 @@ int HH_devUnlock()
 
 int HH_devSetMode(int mode)
 {
+  HH_checkDev();
+
   assert(HHL->pmode == HHP_RUNNING);
   int prevmode = HHL->devmode;
   HHL->devmode = mode;
@@ -235,18 +288,64 @@ int HH_devSetMode(int mode)
   return 0;
 }
 
-cudaError_t HHcudaSetDevice(int device)
+cudaError_t HHcudaSetDevice(int devid)
 {
-  /* device is interepreted as virtual device id */
+  HHL->curdevid = devid;
 
-  if (HHL->curdevid >= 0 && HHL->curdevid != device) {
-    fprintf(stderr, 
-	    "[HHcudaSetDevice@p%d] ERROR: Currently changing device id (other than default id %d) is NOT supported\n",
-	    HH_MYID, HHL->curdevid);
-    exit(1);
+  HH_checkDev(); // init heap for new device if not
+
+  return cudaSetDevice(devid);
+}
+
+/* Wrappers of cudaMalloc/cudaFree */
+cudaError_t HHcudaMalloc(void **pp, size_t size)
+{
+  HH_checkDev();
+
+  void *p = NULL;
+
+  if (HHL->devmode == HHDEV_NORMAL) {
+    assert(HHL->dmode == HHD_ON_DEV);
   }
 
-  HHL->curdevid = device;
-
-  return cudaSetDevice(device);
+  p = HH_curdevheap()->alloc(size);
+  *pp = p;
+  return cudaSuccess;
 }
+
+cudaError_t HHcudaFree(void *p)
+{
+  HH_checkDev();
+
+  if (p == NULL) return cudaSuccess;
+
+  int rc;
+  rc = HH_curdevheap()->free(p);
+  if (rc != 0) {
+    return cudaErrorInvalidDevicePointer;
+  }
+  return cudaSuccess;
+}
+
+#ifdef USE_SWAPHOST
+cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags)
+{
+  HH_checkDev();
+
+  void *p;
+  if (HH_MYID == 0) {
+    fprintf(stderr, "[HHcudaHostAlloc@p%d] WARNING: normal malloc is used now\n",
+	    HH_MYID);
+  }
+  p = HHL2->hostheap->alloc(size);
+  *pp = p;
+  return cudaSuccess;
+}
+
+cudaError_t HHcudaMallocHost(void ** pp, size_t size)
+{
+  HH_checkDev();
+
+  return HHcudaHostAlloc(pp, size, cudaHostAllocDefault);
+}
+#endif

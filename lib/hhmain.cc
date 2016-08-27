@@ -618,7 +618,7 @@ int HHMPI_Finalize()
   }
 #endif
 
-  HH_finalizeHeap();
+  HH_finalizeHeaps();
 
 #ifdef USE_CUDA_MPS
   MPI_Barrier(MPI_COMM_WORLD);

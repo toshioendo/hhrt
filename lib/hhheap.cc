@@ -48,7 +48,7 @@ heap *HH_hostheapCreate()
 }
 #endif
 
-int HH_finalizeHeap()
+int HH_finalizeHeaps()
 {
   assert(HHL->dmode == HHD_ON_DEV);
   int ih;
