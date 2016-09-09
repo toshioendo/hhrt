@@ -60,6 +60,7 @@ int HH_finalizeHeaps()
 
   HHL->dmode = HHD_NONE;
   HHL->pmode = HHP_RUNNABLE;
+  HH_profSetMode("RUNNABLE");
 
   HH_unlockSched();
 

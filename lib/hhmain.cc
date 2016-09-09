@@ -268,6 +268,7 @@ static int initNode(int lsize, int size, hhconf *confp)
     exit(1);
   }
 
+  HHS->stime = Wtime();
   HHS->nlprocs = lsize;
   HHS->nprocs = size;
   strcpy(HHS->hostname, hostname);
@@ -381,6 +382,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL->rank = rank;
   HHL->lrank = lrank;
   HHL->pid = getpid();
+
   /* default mode */
   HHL->pmode = HHP_RUNNABLE;
   HHL->dmode = HHD_NONE;
@@ -392,6 +394,8 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   for (i = 0; i < HHST_MAX; i++) {
     HHL->hmstat.used[i] = 0;
   }
+
+  HH_profInit();
 
   HHL->curdevid = -1;
   {
@@ -442,6 +446,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   // blocked until heaps are accessible
   HH_sleepForMemory();
   HHL->pmode = HHP_RUNNING;
+  HH_profSetMode("RUNNING");
 
   return 0;
 }

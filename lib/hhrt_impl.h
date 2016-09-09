@@ -443,6 +443,14 @@ struct proc2 {
 #elif defined USE_MMAPSWAP
   int hswfd; // mmap fd for host swapper buffer
 #endif
+
+  struct {
+    FILE *fp;
+    char mode[64];
+    double modest;
+    char act[64];
+    double actst;
+  } prof;
 };
 
 /* Info about a node */
@@ -469,6 +477,8 @@ struct shdata {
   int shsc_users[MAX_SHSC];
   pthread_mutex_t shsc_ml;
 #endif
+
+  double stime; // start time. mainly used for profiling and debug print
 };
 
 extern struct proc *HHL;
@@ -533,6 +543,12 @@ int HH_hsc_free(void *p);
 /* hhcuda.cc: for CUDA */
 int HH_checkDev();
 
+/* hhaux.c */
+int HH_profInit();
+int HH_profSetMode(const char *str);
+int HH_profBeginAction(const char *str);
+int HH_profEndAction(const char *str);
+
 
 void HHstacktrace();
 
@@ -547,7 +563,8 @@ static double Wtime()
 /* Convert a time value to printable one */
 static double Wtime_conv_prt(double t)
 {
-  double td = (double)(((long)t/100000)*100000);
+  //double td = (double)(((long)t/100000)*100000);
+  double td = HHS->stime;
   return t-td;
 }
 

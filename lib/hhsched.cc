@@ -58,9 +58,11 @@ int HH_swapOutD2H()
   HH_unlockSched();
 
   /* D -> H */
+  HH_profBeginAction("D2H");
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swapOutD2H();
   }
+  HH_profEndAction("D2H");
 
   HH_lockSched();
   HHL->dmode = HHD_ON_HOST;
@@ -80,9 +82,11 @@ int HH_swapInH2D()
   HH_unlockSched();
 
   /* H -> D */
+  HH_profBeginAction("H2D");
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swapInH2D();
   }
+  HH_profEndAction("H2D");
 
   HH_lockSched();
   HHL->dmode = HHD_ON_DEV;
@@ -103,9 +107,11 @@ static int beforeSwapOutH2F()
 static int mainSwapOutH2F()
 {
   /* H -> F */
+  HH_profBeginAction("H2F");
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swapOutH2F();
   }
+  HH_profEndAction("H2F");
   return 0;
 }
 
@@ -191,9 +197,11 @@ static int beforeSwapInF2H()
 
 static int mainSwapInF2H()
 {
+  HH_profBeginAction("F2H");
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swapInF2H();
   }
+  HH_profEndAction("F2H");
   return 0;
 }
 
@@ -439,6 +447,7 @@ int HH_sleepForMemory()
   }
 
   HHL->pmode = HHP_RUNNABLE;
+  HH_profSetMode("RUNNABLE");
 
 #ifdef HHLOG_SCHED
   fprintf(stderr, "[sleepForMemory@p%d] sleep for heap capacity\n",
@@ -474,6 +483,7 @@ int HH_enterAPI(const char *str)
 #endif
     assert(HHL->pmode == HHP_RUNNING);
     HHL->pmode = HHP_BLOCKED;
+    HH_profSetMode("BLOCKED");
 #ifdef HHLOG_API
     fprintf(stderr, "[HH_enterAPI@p%d] API [%s] end\n",
 	    HH_MYID, HHL2->api_str);
@@ -492,6 +502,7 @@ int HH_exitAPI()
     HH_sleepForMemory();
     /* now I'm awake */
     HHL->pmode = HHP_RUNNING;
+    HH_profSetMode("RUNNING");
 #ifdef HHLOG_API
     fprintf(stderr, "[HH_exitAPI@p%d] API [%s] end\n",
 	    HH_MYID, HHL2->api_str);
@@ -531,6 +542,7 @@ int HH_exitGComm()
     HH_sleepForMemory();
     /* now I'm awake */
     HHL->pmode = HHP_RUNNING;
+    HH_profSetMode("RUNNING");
 #ifdef HHLOG_API
     fprintf(stderr, "[HH_exitGComm@p%d] API [%s] end\n",
 	    HH_MYID, HHL2->api_str);
@@ -552,10 +564,10 @@ int HH_yield()
   /* I may be swapped out if appropriate */
   HH_swapOutIfBetter();
 
-  HHL->pmode = HHP_RUNNABLE;
   HH_sleepForMemory();
 
   HHL->pmode = HHP_RUNNING;
+  HH_profSetMode("RUNNING");
 
   return 0;
 }
