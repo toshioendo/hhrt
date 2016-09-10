@@ -55,6 +55,8 @@ int HH_swapOutD2H()
 	  HH_MYID);
 #endif
 
+  HH_reserveRes(HHD_SO_D2H);
+
   HH_unlockSched();
 
   /* D -> H */
@@ -99,6 +101,7 @@ int HH_swapInH2D()
 static int beforeSwapOutH2F()
 {
   assert(HHL->dmode == HHD_ON_HOST);
+  HH_reserveRes(HHD_SO_H2F);
   HHL->dmode = HHD_SO_H2F;
 
   return 0;

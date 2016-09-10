@@ -43,7 +43,7 @@ static double Wtime_prt()
 #define USE_MADVISE
 #define INIT_ON_GPU
 
-#define GPUS_PER_NODE 2
+#define GPUS_PER_NODE 1
 
 #define BSX 32
 #define BSY 8

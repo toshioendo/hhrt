@@ -555,9 +555,11 @@ int devheap::restoreHeap()
 
 int devheap::swapOutD2H()
 {
+#if 0
   HH_lockSched();
   device->np_out++;
   HH_unlockSched();
+#endif
   
   swapOut();
   
@@ -602,9 +604,11 @@ int devheap::swapInF2H()
 
 int devheap::swapInH2D()
 {
+#if 0
   HH_lockSched();
   device->np_in++;
   HH_unlockSched();
+#endif
 
   swapIn();
 
@@ -643,14 +647,16 @@ int devheap::reserveRes(int kind)
   // This must be called after last checkRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
     device->dhslot_users[HHL->hpid] = HH_MYID;
+    device->np_in++;
+  }
+  else if (kind == HHD_SO_D2H) {
+    device->np_out++;
   }
   else if (kind == HHD_SI_F2H) {
     // reserve is done by hostheap. is it OK?
   }
   else {
-    fprintf(stderr, "[HH:devheap::reserveRes@p%d] ERROR: kind %d invalid\n",
-	    HH_MYID, kind);
-    exit(1);
+    // do nothing
   }
   return 0;
 }
@@ -885,9 +891,7 @@ int hostheap::reserveRes(int kind)
     HHS->nhostusers[HHL->hpid]++;
   }
   else {
-    fprintf(stderr, "[HH:hostheap::reserveRes@p%d] ERROR: kind %d invalid\n",
-	    HH_MYID, kind);
-    exit(1);
+    // do nothing
   }
   return 0;
 }
