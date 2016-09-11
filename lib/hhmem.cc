@@ -23,7 +23,7 @@ int HH_addHostMemStat(int kind, ssize_t incr)
 	    HH_MYID, hhst_names[kind], s>>20L);
   }
 
-#if 1
+#if 0
   fprintf(stderr, "[HH_addHostMemStat@p%d] host mem usage (kind %s) %ldMB -> %ldMB.\n",
 	  HH_MYID, hhst_names[kind], olds>>20L, s>>20L);
 #endif
