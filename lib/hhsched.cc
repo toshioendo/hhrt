@@ -389,7 +389,7 @@ int HH_swapOutIfOver()
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s before SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
   if (HHL->dmode == HHD_ON_DEV &&
-      HHS->nlprocs > HHS->ndhslots) {
+      HHS->nlprocs > HHS->ndh_slots) {
     HH_swapOutD2H();
   }
 

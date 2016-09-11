@@ -42,10 +42,10 @@ int main(int argc, char *argv[])
   int i, j;
 
   fprintf(out, "HHVIEW@%s [%.2lf]\n", hostname, Wtime_prt());
-  fprintf(out, "nps=%d, nlps=%d, ndevs=%d, ndhslots=%d\n",
-	  HHS->nprocs, HHS->nlprocs, HHS->ndevs, HHS->ndhslots);
+  fprintf(out, "nps=%d, nlps=%d, ndevs=%d, ndh_slots=%d\n",
+	  HHS->nprocs, HHS->nlprocs, HHS->ndevs, HHS->ndh_slots);
   fprintf(out, "nhostusers: ");
-  for (j = 0; j < HHS->ndhslots; j++) {
+  for (j = 0; j < HHS->ndh_slots; j++) {
     fprintf(out, "%d, ", HHS->nhostusers[j]);
   }
   fprintf(out, "\n");
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
     fprintf(out, "DEVICE %d: memsize=%ldMiB, heapsize=%ldMiB, np_in=%d, np_out=%d \n",
 	    d->devid, d->memsize>>20, d->default_heapsize>>20, d->np_in, d->np_out);
     fprintf(out, "    heapslot_user: ");
-    for (j = 0; j < HHS->ndhslots; j++) {
+    for (j = 0; j < HHS->ndh_slots; j++) {
       fprintf(out, "%d, ", d->dhslot_users[j]);
     }
     fprintf(out, "\n");

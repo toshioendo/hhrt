@@ -15,7 +15,7 @@ using namespace std;
 #define MAX_LDEVS 16  /* max #GPUs per node */
 #define MAX_LSIZE 256 /* max #procs per node */
 #define MAX_HEAPS (MAX_LDEVS+1) /* max # of heaps per proc */
-#define MAX_MAXRP 8 /* HH_MAXRP (env var) cannot exceed this */
+#define MAX_DH_SLOTS 8 /* HH_DH_SLOTS (env var) cannot exceed this */
 #define HOSTNAMELEN 64
 #define CONFSTRLEN 128
 #define HEAP_ALIGN (size_t)(1024*1024)
@@ -136,7 +136,7 @@ struct dev {
   cudaIpcMemHandle_t hp_handle;
   void *hp_baseptr0; /* usable only for leader process. ugly */
 
-  int dhslot_users[MAX_MAXRP];
+  int dhslot_users[MAX_DH_SLOTS];
 };
 
 // info about fileswap dir */
@@ -388,12 +388,14 @@ struct reqfin {
 
 /* user configuration */
 struct hhconf {
-  int mvp;
   size_t devmem;
-  int maxrp; /* max runnable processes per device */
+  int dh_slots; /* # of heap slots in a GPU */
+  //int maxrp; /* max runnable processes per device */
   int nlphost; /* if lrank < nlphost, host swapper is forcibly used */
   int n_fileswap_dirs;
   char fileswap_dirs[MAX_FILESWAP_DIRS][CONFSTRLEN];
+  int use_prof;
+  char prof_dir[CONFSTRLEN];
 };
 
 /****************************************/
@@ -460,10 +462,10 @@ struct shdata {
   int nprocs;
   int nlprocs;
   int ndevs; /* # of physical devs */
-  int ndhslots; /* # of dev heap slots */
+  int ndh_slots; /* # of dev heap slots */
 
   // scheduling
-  int nhostusers[MAX_MAXRP]; // # procs that use host-mem OR dev-mem
+  int nhostusers[MAX_DH_SLOTS]; // # procs that use host-mem OR dev-mem
   
   pthread_mutex_t sched_ml;
 

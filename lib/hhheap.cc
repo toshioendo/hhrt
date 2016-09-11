@@ -493,7 +493,7 @@ void *devheap::allocDevMem(size_t heapsize)
   cudaError_t crc;
   void *dp;
 
-  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
+  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
   if (hp_baseptr == NULL) {
     if (HHL->lrank == 0) {
       hp_baseptr = d->hp_baseptr0;
@@ -571,7 +571,7 @@ int devheap::swapOutD2H()
 	    HH_MYID, device->np_out);
   }
 #if 1
-  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndhslots);
+  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
   assert(device->dhslot_users[HHL->hpid] == HH_MYID);
   device->dhslot_users[HHL->hpid] = -1;
   fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
@@ -865,7 +865,7 @@ int hostheap::checkRes(int kind)
     }
     assert(fsd->np_filein == 0);
     
-    int limperslot = (HHL2->conf.nlphost+HHS->ndhslots-1)/HHS->ndhslots;
+    int limperslot = (HHL2->conf.nlphost+HHS->ndh_slots-1)/HHS->ndh_slots;
     if (HHS->nhostusers[HHL->hpid] >= limperslot) {
       return 0;
     }

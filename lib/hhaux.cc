@@ -5,12 +5,16 @@
 #include <assert.h>
 #include "hhrt_impl.h"
 
-#define PROFFN "logs/hhprof-p%d.log"
+#define PROFFN "%s/hhprof-p%d.log"
 
 int HH_profInit()
 {
-  char fn[64];
-  sprintf(fn, PROFFN, HH_MYID);
+  if (!HHL2->conf.use_prof) {
+    return 0; // do nothing
+  }
+
+  char fn[CONFSTRLEN+32];
+  sprintf(fn, PROFFN, HHL2->conf.prof_dir, HH_MYID);
   HHL2->prof.fp = fopen(fn, "w");
   if (HHL2->prof.fp == NULL) {
     fprintf(stderr, "[HH_profInit@p%d] fopen %s failed\n",
@@ -28,6 +32,10 @@ int HH_profInit()
 
 int HH_profSetMode(const char *str)
 {
+  if (!HHL2->conf.use_prof) {
+    return 0; // do nothing
+  }
+
   double et = Wtime();
   if (strlen(HHL2->prof.mode) > 0) {
     // output info of previous mode 
@@ -48,6 +56,10 @@ int HH_profSetMode(const char *str)
 
 int HH_profBeginAction(const char *str)
 {
+  if (!HHL2->conf.use_prof) {
+    return 0; // do nothing
+  }
+
   double t = Wtime();
   strcpy(HHL2->prof.act, str);
   HHL2->prof.actst = t;
@@ -56,6 +68,10 @@ int HH_profBeginAction(const char *str)
 
 int HH_profEndAction(const char *str)
 {
+  if (!HHL2->conf.use_prof) {
+    return 0; // do nothing
+  }
+
   double st = HHL2->prof.actst;
   double et = Wtime();
   assert(strcmp(str, HHL2->prof.act) == 0);

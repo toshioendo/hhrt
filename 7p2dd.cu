@@ -18,20 +18,6 @@ static double Wtime()
   return (double)tv.tv_sec + (double)tv.tv_usec * 0.000001;
 }
 
-/* Convert a time value to printable one */
-static double Wtime_conv_prt(double t)
-{
-  double td = (double)(((long)t/100000)*100000);
-  return t-td;
-}
-
-/* printable walltime clock */
-static double Wtime_prt()
-{
-  return Wtime_conv_prt(Wtime());
-}
-
-
 #if 1
 #  define REAL float
 #  define REAL_MT MPI_FLOAT
@@ -448,7 +434,7 @@ int comm_boundary(int bufid)
   rs = 0;
 
   /* CUDA D2H */
-  st = Wtime_prt();
+  st = Wtime();
   for (i = 0; i < 8; i++) {
     struct comminfo *cip = &comminfo[i];
     /* communication buddy */
@@ -462,7 +448,7 @@ int comm_boundary(int bufid)
   }
   
   cudaDeviceSynchronize();
-  et = Wtime_prt();
+  et = Wtime();
 
   /* MPI Isend/Irecv */
   for (i = 0; i < 8; i++) {
@@ -493,22 +479,22 @@ int comm_boundary(int bufid)
   ms = (long)((et-st)*1000);
   if (myy < 2 && myz < 2) {
     fprintf(stderr,
-	    "[comm_boundary@p%d] [%5.2f-%5.2f] cudaMemcpy D2H %ldMB took %ldms. call Waitall...\n",
-	    myid, st, et, (sizeof(REAL)*ss)>>20, ms);
+	    "[comm_boundary@p%d] cudaMemcpy D2H %ldMB took %ldms. call Waitall...\n",
+	    myid, (sizeof(REAL)*ss)>>20, ms);
   }
   
   /* wait all */
-  st = Wtime_prt();
+  st = Wtime();
   MPI_Waitall(nreqs, reqs, stats);
-  et = Wtime_prt();
+  et = Wtime();
 
   if (myy < 2 && myz < 2) {
     fprintf(stderr,
-	    "[comm_boundary@p%d] [%5.2f-%5.2f] MPI_Waitall finished\n",
-	    myid, st, et);
+	    "[comm_boundary@p%d] MPI_Waitall took %5.2lfsec\n",
+	    myid, et-st);
   }
 
-  st = Wtime_prt();
+  st = Wtime();
   /* CUDA H2D */
   for (i = 0; i < 8; i++) {
     struct comminfo *cip = &comminfo[i];
@@ -522,12 +508,12 @@ int comm_boundary(int bufid)
     }
   }
   cudaDeviceSynchronize();
-  et = Wtime_prt();
+  et = Wtime();
   ms = (long)((et-st)*1000);
   if (myy < 2 && myz < 2) {
     fprintf(stderr,
-	    "[comm_boundary@p%d] [%5.2f-%5.2f] cudaMemcpy H2D %ldMB took %ldms\n",
-	    myid, st, et, (sizeof(REAL)*rs)>>20, ms);
+	    "[comm_boundary@p%d] cudaMemcpy H2D %ldMB took %ldms\n",
+	    myid, (sizeof(REAL)*rs)>>20, ms);
   }
 
   return 0;
@@ -554,7 +540,7 @@ int mainloop()
 	      myid, iter, iter+ntinner);
     }
 
-    double st = Wtime_prt();
+    double st = Wtime();
 #ifdef USE_MADVISE
     HH_madvise(dps[1-bufid], bufsize, HHMADV_CANDISCARD); /* hint for optimization */
 #endif
@@ -562,17 +548,17 @@ int mainloop()
 #ifdef USE_MADVISE
     HH_madvise(dps[1-bufid], bufsize, HHMADV_NORMAL); /* hint for optimization */
 #endif
-    double et = Wtime_prt();
+    double et = Wtime();
     long ms = (long)((et-st)*1000);
     if (logflag) {
       fprintf(stderr,
-	      "[mainloop@p%d] [%5.2lf-%5.2lf] COMM %ld ms to send %ldMB, recv %ldMB\n",
-	      myid, st, et, ms, (ss*sizeof(REAL)) >>20 , (rs*sizeof(REAL)) >>20);
+	      "[mainloop@p%d] COMM %ld ms to send %ldMB, recv %ldMB\n",
+	      myid, ms, (ss*sizeof(REAL)) >>20 , (rs*sizeof(REAL)) >>20);
     }
 
     /* bt-steps local computation */
     HH_devLock(); /* this may improve overall performance */
-    st = Wtime_prt();
+    st = Wtime();
     for (ii = 0; ii < ntinner; ii++) {
       
       /* computation */
@@ -584,12 +570,12 @@ int mainloop()
     cudaDeviceSynchronize();
     HH_devUnlock(); /* this may improve overall performance */
     if (logflag) {
-      et = Wtime_prt();
+      et = Wtime();
       ms = (long)((et-st)*1000);
       long flop = (long)nx*(ey-sy)*(ez-sz)*ntinner*FLOP_PER_POINT;
       double gflops = (double)flop/(et-st)/1.0e+9;
-      fprintf(stderr, "[mainloop@p%d] [%5.2lf-%5.2lf] COMP %ld ms for %dx%dx%d (%.3lfGFlops) t=[%d,%d)\n",
-	      myid, st, et, ms, nx, ey-sy, ez-sz, gflops, iter, iter+ntinner);
+      fprintf(stderr, "[mainloop@p%d] COMP %ld ms for %dx%dx%d (%.3lfGFlops) t=[%d,%d)\n",
+	      myid, ms, nx, ey-sy, ez-sz, gflops, iter, iter+ntinner);
     }
 
     if (myid == 0) {

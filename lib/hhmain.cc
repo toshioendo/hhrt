@@ -18,11 +18,6 @@ proc *HHL;
 proc2 hhl2s;
 proc2 *HHL2 = &hhl2s;
 
-int HH_default_devid(int lrank)
-{
-  return (lrank/HHL2->conf.mvp)%HHS->ndevs;
-}
-
 dev *HH_curdev()
 {
   if (HHL->curdevid < 0) {
@@ -170,7 +165,7 @@ static int initSharedDevmem(dev *d)
   }
   
   size_t heapsize = d->default_heapsize;
-  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndhslots);
+  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndh_slots);
   if (crc != cudaSuccess) {
     fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
 	    HHS->hostname, devid, heapsize>>20);
@@ -218,7 +213,7 @@ int initDev(int i, int lsize, int size, hhconf *confp)
 #else
   avail -= DEVMEM_USED_BY_PROC * lsize;
 #endif
-  d->default_heapsize = avail / HHS->ndhslots;
+  d->default_heapsize = avail / HHS->ndh_slots;
   d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
   
 #if 1
@@ -230,7 +225,7 @@ int initDev(int i, int lsize, int size, hhconf *confp)
 
   int ih;
   /* setup heap slots on device */
-  for (ih = 0; ih < HHS->ndhslots; ih++) {
+  for (ih = 0; ih < HHS->ndh_slots; ih++) {
     d->dhslot_users[ih] = -1;
   }
   
@@ -300,9 +295,9 @@ static int initNode(int lsize, int size, hhconf *confp)
 	  HHS->hostname, ndevs);
 #endif
 
-  HHS->ndhslots = confp->maxrp;
-  if (HHS->ndhslots > lsize) HHS->ndhslots = lsize;
-  for (i = 0; i < HHS->ndhslots; i++) {
+  HHS->ndh_slots = confp->dh_slots;
+  if (HHS->ndh_slots > lsize) HHS->ndh_slots = lsize;
+  for (i = 0; i < HHS->ndh_slots; i++) {
     HHS->nhostusers[i] = 0;
   }
 
@@ -419,7 +414,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HH_hsc_init_proc();
 
   // see also HH_canSwapIn()
-  HHL->hpid = lrank % HHS->ndhslots;
+  HHL->hpid = lrank % HHS->ndh_slots;
 
   // setup heap structures
   HHL2->nheaps = 0;
@@ -455,13 +450,6 @@ int HH_readConf(hhconf *confp)
 {
   char *p;
 
-  /* HH_MVP */
-  confp->mvp = 99999;
-  p = getenv("HH_MVP");
-  if (p != NULL) {
-    confp->mvp = (int)getLP(p);
-  }
-  
   /* HH_DEVMEM */
   confp->devmem = 0;
   p = getenv("HH_DEVMEM");
@@ -469,17 +457,26 @@ int HH_readConf(hhconf *confp)
     confp->devmem = getLP(p);
   }
 
+  /* HH_DH_SLOTS */
+  confp->dh_slots = 2;
+  p = getenv("HH_DH_SLOTS");
+  if (p != NULL) {
+    confp->dh_slots = (int)getLP(p);
+  }
+  if (confp->dh_slots > MAX_DH_SLOTS) {
+    fprintf(stderr, "[HH_readConf] HH_DH_SLOTS(%d) cannot exceed %d\n",
+	    confp->dh_slots, MAX_DH_SLOTS);
+    exit(1);
+  }
+
+#if 0
   /* HH_MAXRP */
-  confp->maxrp = 2;
+  confp->maxrp = 1;
   p = getenv("HH_MAXRP");
   if (p != NULL) {
     confp->maxrp = (int)getLP(p);
   }
-  if (confp->maxrp > MAX_MAXRP) {
-    fprintf(stderr, "[HH_readConf] HH_MAXRP(%d) cannot exceed %d\n",
-	    confp->maxrp, MAX_MAXRP);
-    exit(1);
-  }
+#endif
 
   /* HH_NLPHOST */
   confp->nlphost = 99999;
@@ -519,6 +516,23 @@ int HH_readConf(hhconf *confp)
     }
   }
 
+  /* HH_PROF_PATH */
+  /* default value */
+  confp->use_prof = 0;
+  strcpy(confp->prof_dir, "");
+
+  p = getenv("HH_PROF_PATH");
+  if (p != NULL) {
+    confp->use_prof = 1;
+    int len = strlen(p);
+    if (len >= CONFSTRLEN) {
+      fprintf(stderr, "[HH_readConf] ERROR: Too long string in HH_PROF_PATH:%s\n",
+	      p);
+      exit(1);
+    }
+    strncpy(confp->prof_dir, p, len+1);
+  }
+
 
   return 0;
 }
@@ -526,9 +540,9 @@ int HH_readConf(hhconf *confp)
 int HH_printConf(FILE *ofp, hhconf *confp)
 {
   fprintf(ofp, "[HH_printConf] configuration:\n");
-  fprintf(ofp, "  HH_MVP=%d\n", confp->mvp);
   fprintf(ofp, "  HH_DEVMEM=%ld\n", confp->devmem);
-  fprintf(ofp, "  HH_MAXRP=%d\n", confp->maxrp);
+  fprintf(ofp, "  HH_DH_SLOTS=%d\n", confp->dh_slots);
+  //fprintf(ofp, "  HH_MAXRP=%d\n", confp->maxrp);
   fprintf(ofp, "  HH_NLPHOST=%d\n", confp->nlphost);
   fprintf(ofp, "  HH_FILESWAP_PATH= ");
   int i;
@@ -536,6 +550,7 @@ int HH_printConf(FILE *ofp, hhconf *confp)
     fprintf(ofp, "[%s] ", confp->fileswap_dirs[i]);
   }
   fprintf(ofp, "\n");
+  fprintf(ofp, "  HH_PROF_PATH=%s\n", confp->prof_dir);
   return 0;
 }
 
