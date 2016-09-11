@@ -28,22 +28,34 @@ int HH_checkDev()
     return 0;
   }
 
+  double st = Wtime_prt(), et;
   fprintf(stderr, 
-	  "[HH_checkDev@p%d] First use of devid %d. initialize...\n",
-	  HH_MYID, HHL->curdevid);
+	  "[HH_checkDev@p%d] [%.2lf] First use of devid %d. initialize...\n",
+	  HH_MYID, st, HHL->curdevid);
 
   // swap out existing heaps
-  HH_swapOutIfBetter();
+  HH_swapOutIfOver();
 
+  fprintf(stderr, 
+	  "[HH_checkDev@p%d] After swapOutIfOver: dmode=%s\n",
+	  HH_MYID, hhd_names[HHL->dmode]);
+
+  // create heap structure for current GPU
   h = HH_devheapCreate(HH_curdev());
   assert(HHL2->nheaps < MAX_HEAPS-1);
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->devheaps[HHL->curdevid] = h;
 
   // blocked until heaps are accessible
-  HHL->pmode = HHP_RUNNABLE;
   HH_sleepForMemory();
-  HHL->pmode = HHP_RUNNING;
+
+  et = Wtime_prt();
+  fprintf(stderr, 
+	  "[HH_checkDev@p%d] [%.2lf] now process restarts. checkDev %.2lfsec\n",
+	  HH_MYID, et, et-st);
+
+  HH_printHostMemStat();
+
 
   return 0;
 }
@@ -291,7 +303,6 @@ int HH_devSetMode(int mode)
 	    HH_MYID);
 #endif
     HH_sleepForMemory();
-    HHL->pmode = HHP_RUNNING;
   }
 
   return 0;

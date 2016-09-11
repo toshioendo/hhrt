@@ -390,7 +390,7 @@ struct reqfin {
 struct hhconf {
   size_t devmem;
   int dh_slots; /* # of heap slots in a GPU */
-  //int maxrp; /* max runnable processes per device */
+  int maxrp; /* max runnable processes per device */
   int nlphost; /* if lrank < nlphost, host swapper is forcibly used */
   int n_fileswap_dirs;
   char fileswap_dirs[MAX_FILESWAP_DIRS][CONFSTRLEN];
@@ -511,6 +511,7 @@ int HH_startSwapOutH2F();
 int HH_tryfinSwapOutH2F();
 
 int HH_addHostMemStat(int kind, ssize_t incr);
+int HH_printHostMemStat();
 
 /****************************************/
 /* hhheap.cc: heap structures */
@@ -534,6 +535,7 @@ int HH_exitGComm();
 int HH_sleepForMemory();
 int HH_swapInIfOk();
 int HH_swapOutIfBetter();
+int HH_swapOutIfOver();
 
 int HH_hsc_init_node();
 int HH_hsc_init_proc();

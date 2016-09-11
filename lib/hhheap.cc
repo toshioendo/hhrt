@@ -584,8 +584,10 @@ int devheap::swapOutD2H()
 
 int devheap::swapOutH2F()
 {
-  if (curswapper == NULL || curswapper->curswapper) {
-  return 0;
+  if (curswapper == NULL || curswapper->curswapper == NULL) {
+    fprintf(stderr, "[HH:%s::swapOutH2F@p%d] SKIP SO_H2F\n",
+	    name, HH_MYID);
+    return 0;
   }
 
   curswapper->swapOut();
@@ -594,7 +596,7 @@ int devheap::swapOutH2F()
 
 int devheap::swapInF2H()
 {
-  if (curswapper == NULL || curswapper->curswapper) {
+  if (curswapper == NULL || curswapper->curswapper == NULL) {
     return 0;
   }
 
@@ -754,12 +756,14 @@ int hostheap::releaseHeap()
 	  name, HH_MYID, heapptr, piadd(heapptr,heapsize));
 #endif
 
-  /* Free memory! */
-  rc = munmap(heapptr, heapsize);
-  if (rc != 0) {
-    fprintf(stderr, "[HH:hostheap::releaseHeap@p%d] munmap failed!\n",
-	    HH_MYID);
-    exit(1);
+  if (heapsize > 0L) {
+    /* Free memory! */
+    rc = munmap(heapptr, heapsize);
+    if (rc != 0) {
+      fprintf(stderr, "[HH:hostheap::releaseHeap@p%d] munmap(ptr=%p, size=%lx) failed!\n",
+	      HH_MYID, heapptr, heapsize);
+      exit(1);
+    }
   }
   HH_addHostMemStat(HHST_HOSTHEAP, -heapsize);
 

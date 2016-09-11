@@ -411,6 +411,8 @@ int hostswapper::swapOut()
 
   if (swapped == 1) {
     /* do not nothing */
+    fprintf(stderr, "[HH:hostswapper::swapOut@p%d] SKIP swapOut\n",
+	    HH_MYID);
     return 0;
   }
 

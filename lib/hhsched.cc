@@ -388,6 +388,7 @@ int HH_swapOutIfOver()
   HH_lockSched();
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s before SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
+  HH_printHostMemStat();
   if (HHL->dmode == HHD_ON_DEV &&
       HHS->nlprocs > HHS->ndh_slots) {
     HH_swapOutD2H();
@@ -400,6 +401,7 @@ int HH_swapOutIfOver()
 
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s after SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
+  HH_printHostMemStat();
 
   HH_unlockSched();
 
@@ -470,6 +472,10 @@ int HH_sleepForMemory()
   fprintf(stderr, "[sleepForMemory@p%d] wake up!\n",
 	  HH_MYID);
 #endif
+
+  HHL->pmode = HHP_RUNNING;
+  HH_profSetMode("RUNNING");
+
   return 0;
 }
 
@@ -504,8 +510,7 @@ int HH_exitAPI()
     assert(HHL->pmode == HHP_BLOCKED);
     HH_sleepForMemory();
     /* now I'm awake */
-    HHL->pmode = HHP_RUNNING;
-    HH_profSetMode("RUNNING");
+    assert(HHL->pmode == HHP_RUNNING);
 #ifdef HHLOG_API
     fprintf(stderr, "[HH_exitAPI@p%d] API [%s] end\n",
 	    HH_MYID, HHL2->api_str);
@@ -544,8 +549,7 @@ int HH_exitGComm()
     assert(HHL->pmode == HHP_BLOCKED);
     HH_sleepForMemory();
     /* now I'm awake */
-    HHL->pmode = HHP_RUNNING;
-    HH_profSetMode("RUNNING");
+    assert(HHL->pmode == HHP_RUNNING);
 #ifdef HHLOG_API
     fprintf(stderr, "[HH_exitGComm@p%d] API [%s] end\n",
 	    HH_MYID, HHL2->api_str);
@@ -569,8 +573,6 @@ int HH_yield()
 
   HH_sleepForMemory();
 
-  HHL->pmode = HHP_RUNNING;
-  HH_profSetMode("RUNNING");
-
+  assert(HHL->pmode == HHP_RUNNING);
   return 0;
 }

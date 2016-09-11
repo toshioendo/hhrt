@@ -469,14 +469,12 @@ int HH_readConf(hhconf *confp)
     exit(1);
   }
 
-#if 0
   /* HH_MAXRP */
-  confp->maxrp = 1;
+  confp->maxrp = 99999;
   p = getenv("HH_MAXRP");
   if (p != NULL) {
     confp->maxrp = (int)getLP(p);
   }
-#endif
 
   /* HH_NLPHOST */
   confp->nlphost = 99999;
@@ -542,7 +540,7 @@ int HH_printConf(FILE *ofp, hhconf *confp)
   fprintf(ofp, "[HH_printConf] configuration:\n");
   fprintf(ofp, "  HH_DEVMEM=%ld\n", confp->devmem);
   fprintf(ofp, "  HH_DH_SLOTS=%d\n", confp->dh_slots);
-  //fprintf(ofp, "  HH_MAXRP=%d\n", confp->maxrp);
+  fprintf(ofp, "  HH_MAXRP=%d\n", confp->maxrp);
   fprintf(ofp, "  HH_NLPHOST=%d\n", confp->nlphost);
   fprintf(ofp, "  HH_FILESWAP_PATH= ");
   int i;
