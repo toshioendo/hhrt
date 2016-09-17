@@ -448,12 +448,20 @@ int HH_swapWithCheck(int kind)
     }
     HH_unlockSched();
     et = Wtime();
+#if 0
     if (et-st > 1.0) {
-      fprintf(stderr, "[HH_swapWithCheck@p%d] [%.2lf-%.2lf] Wait long for %s\n",
+      fprintf(stderr, "[HH_swapWithCheck@p%d] [%.2lf-%.2lf] Waiting long for %s...\n",
 	      HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), hhd_names[kind]);
     }
-    usleep(100*1000);
+#endif
+    usleep(10*1000);
     HH_lockSched();
+  }
+
+  et = Wtime();
+  if (et-st > 1.0) {
+    fprintf(stderr, "[HH_swapWithCheck@p%d] [%.2lf-%.2lf] Waited long for %s\n",
+	    HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), hhd_names[kind]);
   }
   
   HH_swap(kind);
