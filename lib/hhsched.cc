@@ -43,6 +43,14 @@ int HH_reserveRes(int kind)
   return 0;
 }
 
+int HH_releaseRes(int kind)
+{
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    HHL2->heaps[ih]->releaseRes(kind);
+  }
+  return 0;
+}
+
 
 //------------------------------- D2H
 // This function assumes sched_ml is locked
@@ -67,6 +75,8 @@ int HH_swapOutD2H()
   HH_profEndAction("D2H");
 
   HH_lockSched();
+  HH_releaseRes(HHD_SO_D2H);
+
   HHL->dmode = HHD_ON_HOST;
 
   return 0;
@@ -91,6 +101,7 @@ int HH_swapInH2D()
   HH_profEndAction("H2D");
 
   HH_lockSched();
+  HH_releaseRes(HHD_SI_H2D);
   HHL->dmode = HHD_ON_DEV;
 
   return 0;
@@ -120,6 +131,7 @@ static int mainSwapOutH2F()
 
 static int afterSwapOutH2F()
 {
+  HH_releaseRes(HHD_SO_H2F);
   HHL->dmode = HHD_ON_FILE;
   return 0;
 }
@@ -210,6 +222,7 @@ static int mainSwapInF2H()
 
 static int afterSwapInF2H()
 {
+  HH_releaseRes(HHD_SI_F2H);
   HHL->dmode = HHD_ON_HOST;
   return 0;
 }
@@ -251,10 +264,11 @@ int HH_swapInF2H()
 {
   beforeSwapInF2H();
   HH_unlockSched();
-  mainSwapInF2H();
-  HH_lockSched();
 
-  HHL->dmode = HHD_ON_HOST;
+  mainSwapInF2H();
+
+  HH_lockSched();
+  afterSwapInF2H();
 
   return 0;
 }
@@ -388,7 +402,7 @@ int HH_swapOutIfOver()
   HH_lockSched();
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s before SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
-  HH_printHostMemStat();
+
   if (HHL->dmode == HHD_ON_DEV &&
       HHS->nlprocs > HHS->ndh_slots) {
     HH_swapOutD2H();
@@ -401,7 +415,6 @@ int HH_swapOutIfOver()
 
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s after SwapOut\n",
 	  HH_MYID, hhd_names[HHL->dmode]);
-  HH_printHostMemStat();
 
   HH_unlockSched();
 

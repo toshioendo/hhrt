@@ -297,6 +297,7 @@ class heap: public mempool {
 
   virtual int checkRes(int kind) {};
   virtual int reserveRes(int kind) {};
+  virtual int releaseRes(int kind) {};
 
   virtual int madvise(void *p, size_t size, int kind);
 
@@ -328,6 +329,7 @@ class devheap: public heap {
 
   virtual int checkRes(int kind);
   virtual int reserveRes(int kind);
+  virtual int releaseRes(int kind);
 
   void *allocDevMem(size_t heapsize);
   void *hp_baseptr;
@@ -352,6 +354,7 @@ class hostheap: public heap {
 
   virtual int checkRes(int kind);
   virtual int reserveRes(int kind);
+  virtual int releaseRes(int kind);
 
   virtual void *allocCapacity(size_t offset, size_t size);
   int swapfd;

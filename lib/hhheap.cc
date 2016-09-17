@@ -565,12 +565,14 @@ int devheap::swapOutD2H()
   
   // release resource information on device
   HH_lockSched();
+#if 0
   device->np_out--;
   if (device->np_out < 0) {
     fprintf(stderr, "[swapOutD2H@p%d] np_out = %d strange\n",
 	    HH_MYID, device->np_out);
   }
-#if 1
+#endif
+#if 0
   assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
   assert(device->dhslot_users[HHL->hpid] == HH_MYID);
   device->dhslot_users[HHL->hpid] = -1;
@@ -614,9 +616,11 @@ int devheap::swapInH2D()
 
   swapIn();
 
+#if 0
   HH_lockSched();
   device->np_in--;
   HH_unlockSched();
+#endif
   return 0;
 }
 
@@ -646,13 +650,42 @@ int devheap::checkRes(int kind)
 int devheap::reserveRes(int kind)
 {
   // Reserve resource information before swapping
-  // This must be called after last checkRes(), without releasing schedule lock
+  // This is called after last checkRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
     device->dhslot_users[HHL->hpid] = HH_MYID;
     device->np_in++;
   }
   else if (kind == HHD_SO_D2H) {
     device->np_out++;
+  }
+  else if (kind == HHD_SI_F2H) {
+    // reserve is done by hostheap. is it OK?
+  }
+  else {
+    // do nothing
+  }
+  return 0;
+}
+
+int devheap::releaseRes(int kind)
+{
+  // Release resource information after swapping
+  if (kind == HHD_SI_H2D) {
+    device->np_in--;
+  }
+  else if (kind == HHD_SO_D2H) {
+    device->np_out--;
+    if (device->np_out < 0) {
+      fprintf(stderr, "[HH:%s::releaseRes@p%d] np_out = %d strange\n",
+	      name, HH_MYID, device->np_out);
+    }
+#if 1
+    assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
+    assert(device->dhslot_users[HHL->hpid] == HH_MYID);
+    device->dhslot_users[HHL->hpid] = -1;
+    fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release heap slot %d\n",
+	    name, HH_MYID, Wtime_prt(), HHL->hpid);
+#endif
   }
   else if (kind == HHD_SI_F2H) {
     // reserve is done by hostheap. is it OK?
@@ -818,12 +851,14 @@ int hostheap::swapOutH2F()
 
   swapOut();
 
+#if 0
   // release resource information
   HH_lockSched();
   HHS->nhostusers[HHL->hpid]--;
   fprintf(stderr, "[HH:%s::swapOutH2F@p%d] [%.2f] I release host capacity\n",
 	  name, HH_MYID, Wtime_prt());
   HH_unlockSched();
+#endif
 
   return 0;
 }
@@ -893,6 +928,46 @@ int hostheap::reserveRes(int kind)
   }
   else if (kind == HHD_SI_F2H) {
     HHS->nhostusers[HHL->hpid]++;
+
+    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsd->np_filein++;
+  }
+  else if (kind == HHD_SO_H2F) {
+    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsd->np_fileout++;
+  }
+  else {
+    // do nothing
+  }
+  return 0;
+}
+
+int hostheap::releaseRes(int kind)
+{
+  // Reserve resource information before swapping
+  // This must be called after last checkRes(), without releasing schedule lock
+  if (kind == HHD_SI_H2D) {
+    // do nothing
+  }
+  else if (kind == HHD_SI_F2H) {
+    HHS->nhostusers[HHL->hpid]--;
+    fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release host capacity\n",
+	    name, HH_MYID, Wtime_prt());
+
+    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsd->np_filein--;
+    if (fsd->np_filein < 0) {
+      fprintf(stderr, "[HH:%s::releaseRes@p%d] np_filein = %d strange\n",
+	      name, HH_MYID, fsd->np_filein);
+    }
+  }
+  else if (kind == HHD_SO_H2F) {
+    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsd->np_fileout--;
+    if (fsd->np_fileout < 0) {
+      fprintf(stderr, "[HH:%s::releaseRes@p%d] np_fileout = %d strange\n",
+	      name, HH_MYID, fsd->np_fileout);
+    }
   }
   else {
     // do nothing
