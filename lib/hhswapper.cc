@@ -36,6 +36,8 @@ hostswapper::hostswapper() : swapper()
   copyunit = 32L*1024*1024;
   initing = 1;
 
+  sprintf(name, "hostswapper");
+
   int i;
   for (i = 0; i < 2; i++) {
     crc = cudaHostAlloc(&copybufs[i], copyunit, cudaHostAllocDefault);
@@ -609,6 +611,8 @@ fileswapper::fileswapper(int id, fsdir *fsd0) : swapper()
 {
   int rc;
   cudaError_t crc;
+
+  sprintf(name, "fileswapper");
 
   align = 512;
 

@@ -176,6 +176,7 @@ class mempool {
 
   swapper *curswapper;
   int swapped;
+  char name[16]; /* for debug */
 
 };
 
@@ -300,7 +301,7 @@ class heap: public mempool {
   int expandable;
   int memkind; // HHM_*
 
-  char name[16]; /* for debug */
+  //char name[16]; /* for debug */
 };
 
 class devheap: public heap {

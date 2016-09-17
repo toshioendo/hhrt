@@ -257,7 +257,25 @@ int HH_tryfinSwapInF2H()
   return 1;
 }
 
+// This function assumes sched_ml is locked
+int HH_swapInF2H()
+{
+  beforeSwapInF2H();
+  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, NULL);
+
+  while (1) {
+    int rc = HH_tryfinSwapInF2H();
+    if (rc > 0) break;
+    HH_unlockSched();
+    usleep(100);
+    HH_lockSched();
+  }
+
+  return 0;
+}
+
 #else // !USE_FILESWAP_THREAD
+
 // F2H
 // This function assumes sched_ml is locked
 int HH_swapInF2H()
@@ -272,9 +290,31 @@ int HH_swapInF2H()
 
   return 0;
 }
-
 #endif // !USE_FILESWAP_THREAD
 
+
+// This function assumes sched_ml is locked
+int HH_swap(int kind)
+{
+  if (kind == HHD_SO_D2H) {
+    return HH_swapOutD2H();
+  }
+  else if (kind == HHD_SI_H2D) {
+    return HH_swapInH2D();
+  }
+  else if (kind == HHD_SO_H2F) {
+    return HH_swapOutH2F();
+  }
+  else if (kind == HHD_SI_F2H) {
+    return HH_swapInF2H();
+  }
+  else {
+    fprintf(stderr, "[HH_swap@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
+  return 0;
+}
    
 /************************************************************/
 int HH_swapInIfOk()
@@ -397,6 +437,25 @@ int HH_swapOutIfBetter()
   return 0;
 }
 
+// This function assumes sched_ml is locked
+int HH_swapWithCheck(int kind)
+{
+
+  while (1) {
+    if (HH_checkRes(HHD_SO_D2H)) {
+      // can proceed
+      break;
+    }
+    HH_unlockSched();
+    usleep(1000);
+    HH_lockSched();
+  }
+  
+  HH_swap(kind);
+
+  return 0;
+}
+
 int HH_swapOutIfOver()
 {
   HH_lockSched();
@@ -405,12 +464,12 @@ int HH_swapOutIfOver()
 
   if (HHL->dmode == HHD_ON_DEV &&
       HHS->nlprocs > HHS->ndh_slots) {
-    HH_swapOutD2H();
+    HH_swapWithCheck(HHD_SO_D2H);
   }
 
   if (HHL->dmode == HHD_ON_HOST &&
       HHS->nlprocs > HHL2->conf.nlphost) {
-    HH_swapOutH2F();
+    HH_swapWithCheck(HHD_SO_H2F);
   }
 
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s after SwapOut\n",
