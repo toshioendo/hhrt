@@ -946,10 +946,6 @@ int hostheap::releaseRes(int kind)
     // do nothing
   }
   else if (kind == HHD_SI_F2H) {
-    HHS->nhostusers[HHL->hpid]--;
-    fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release host capacity\n",
-	    name, HH_MYID, Wtime_prt());
-
     fsdir *fsd = ((fileswapper*)curswapper)->fsd;
     fsd->np_filein--;
     if (fsd->np_filein < 0) {
@@ -958,6 +954,10 @@ int hostheap::releaseRes(int kind)
     }
   }
   else if (kind == HHD_SO_H2F) {
+    HHS->nhostusers[HHL->hpid]--;
+    fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release host capacity\n",
+	    name, HH_MYID, Wtime_prt());
+
     fsdir *fsd = ((fileswapper*)curswapper)->fsd;
     fsd->np_fileout--;
     if (fsd->np_fileout < 0) {

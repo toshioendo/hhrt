@@ -731,10 +731,11 @@ int fileswapper::write1(ssize_t offs, void *buf, int bufkind, size_t size)
     {
       // Refrain writing if someone is reading
       while (fsd->np_filein > 0) {
+#if 0
 	fprintf(stderr, "[HH:fileswapper::write1@p%d] suspend writing since np_filein=%d\n",
 		HH_MYID, fsd->np_filein);
-
-	usleep(100*1000);
+#endif
+	usleep(10*1000);
       }
     }
 

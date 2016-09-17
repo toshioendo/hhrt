@@ -40,7 +40,7 @@ using namespace std;
 
 //#define HHLOG_SCHED
 #define HHLOG_SWAP
-//#define HHLOG_API
+#define HHLOG_API
 
 #define HSC_SIZE (1L*1024*1024*1024) // host swapper chunk size
 

@@ -440,14 +440,19 @@ int HH_swapOutIfBetter()
 // This function assumes sched_ml is locked
 int HH_swapWithCheck(int kind)
 {
-
+  double st = Wtime(), et;
   while (1) {
     if (HH_checkRes(kind)) {
       // can proceed
       break;
     }
     HH_unlockSched();
-    usleep(1000);
+    et = Wtime();
+    if (et-st > 1.0) {
+      fprintf(stderr, "[HH_swapWithCheck@p%d] [%.2lf-%.2lf] Wait long for %s\n",
+	      HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), hhd_names[kind]);
+    }
+    usleep(100*1000);
     HH_lockSched();
   }
   
@@ -605,8 +610,8 @@ int HH_enterGComm(const char *str)
   if (HHL->in_api == 0) {
 #ifdef HHLOG_API
     strcpy(HHL2->api_str, str);
-    fprintf(stderr, "[HH_enterGComm@p%d] GComm [%s] start\n",
-	    HH_MYID, HHL2->api_str);
+    fprintf(stderr, "[HH_enterGComm@p%d] [%.2lf] GComm [%s] start\n",
+	    HH_MYID, Wtime_prt(), HHL2->api_str);
 #endif
     assert(HHL->pmode == HHP_RUNNING);
 
@@ -633,8 +638,8 @@ int HH_exitGComm()
     /* now I'm awake */
     assert(HHL->pmode == HHP_RUNNING);
 #ifdef HHLOG_API
-    fprintf(stderr, "[HH_exitGComm@p%d] API [%s] end\n",
-	    HH_MYID, HHL2->api_str);
+    fprintf(stderr, "[HH_exitGComm@p%d] [%.2lf] API [%s] end\n",
+	    HH_MYID, Wtime_prt(), HHL2->api_str);
 #endif
   }
   return 0;
