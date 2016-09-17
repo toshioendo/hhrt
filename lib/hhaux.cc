@@ -46,6 +46,12 @@ int HH_profSetMode(const char *str)
 	      "%d MODE %s %.3lf %.3lf\n",
 	      HH_MYID, HHL2->prof.mode, Wtime_conv_prt(st), Wtime_conv_prt(et));
       fflush(HHL2->prof.fp);
+
+#if 1
+      fprintf(stderr,
+	      "[HH_profSetMode@p%d] [%.2lf] Change Mode %s to %s\n",
+	      HH_MYID, Wtime_conv_prt(et), HHL2->prof.mode, str);
+#endif
     }
   }
 

@@ -442,7 +442,7 @@ int HH_swapWithCheck(int kind)
 {
 
   while (1) {
-    if (HH_checkRes(HHD_SO_D2H)) {
+    if (HH_checkRes(kind)) {
       // can proceed
       break;
     }
@@ -466,10 +466,18 @@ int HH_swapOutIfOver()
       HHS->nlprocs > HHS->ndh_slots) {
     HH_swapWithCheck(HHD_SO_D2H);
   }
+  else {
+    fprintf(stderr, "[HH_swapOutIfOver@p%d] D2H skipped (OK?)\n",
+	    HH_MYID);
+  }
 
   if (HHL->dmode == HHD_ON_HOST &&
       HHS->nlprocs > HHL2->conf.nlphost) {
     HH_swapWithCheck(HHD_SO_H2F);
+  }
+  else {
+    fprintf(stderr, "[HH_swapOutIfOver@p%d] H2F skipped (OK?)\n",
+	    HH_MYID);
   }
 
   fprintf(stderr, "[HH_swapOutIfOver@p%d] %s after SwapOut\n",
@@ -602,10 +610,12 @@ int HH_enterGComm(const char *str)
 #endif
     assert(HHL->pmode == HHP_RUNNING);
 
+    HHL->pmode = HHP_BLOCKED;
+    HH_profSetMode("BLOCKED");
+
     /* When device is oversubscribed, I sleep eagerly */
     HH_swapOutIfOver();
 
-    HHL->pmode = HHP_BLOCKED;
   }
   HHL->in_api++;
 
