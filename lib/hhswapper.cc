@@ -409,12 +409,10 @@ int hostswapper::swapOut()
 
   t0 = Wtime();
 
-  curswapper->startContWrite();
   if (swapped == 1) {
     /* do not nothing */
     fprintf(stderr, "[HH:hostswapper::swapOut@p%d] SKIP swapOut\n",
 	    HH_MYID);
-    curswapper->endContWrite();
     return 0;
   }
 
@@ -459,7 +457,6 @@ int hostswapper::swapOut()
 #endif
 
   releaseBuf();
-  curswapper->endContWrite();
 
   return 0;
 }
@@ -469,7 +466,6 @@ int hostswapper::swapIn()
 {
   double t0, t1;
 
-  curswapper->startContRead();
   if (initing) {
     /* first call */
 #if 1
@@ -477,7 +473,6 @@ int hostswapper::swapIn()
 	    HH_MYID);
 #endif
     initing = 0;
-    curswapper->endContRead();
     return 0;
   }
 
@@ -526,7 +521,6 @@ int hostswapper::swapIn()
 #endif
 
   curswapper->releaseBuf();
-  curswapper->endContRead();
   swapped = 0;
 
   return 0;
@@ -835,62 +829,6 @@ int fileswapper::read1(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
-/* */
-int fileswapper::startContWrite()
-{
-#if 0 // moved to hostheap::reserveRes
-  HH_lockSched();
-  fsd->np_fileout++;
-  if (fsd->np_fileout >= 2) {
-    fprintf(stderr, "[HH:fileswapper@p%d] np_fileout = %d strange (usually harmless)\n",
-	    HH_MYID, fsd->np_fileout);
-  }
-  HH_unlockSched();
-#endif
-  return 0;
-}
-
-int fileswapper::endContWrite()
-{
-#if 0
-  HH_lockSched();
-  fsd->np_fileout--;
-  if (fsd->np_fileout < 0) {
-    fprintf(stderr, "[HH:fileswapper@p%d] np_fileout = %d strange\n",
-	    HH_MYID, fsd->np_fileout);
-  }
-  HH_unlockSched();
-#endif
-  return 0;
-}
-
-int fileswapper::startContRead()
-{
-#if 0 // moved to hostheap::reserveRes
-  HH_lockSched();
-  fsd->np_filein++;
-  if (fsd->np_filein >= 2) {
-    fprintf(stderr, "[HH:fileswapper@p%d] np_filein = %d strange (usually harmless)\n",
-	    HH_MYID, fsd->np_filein);
-  }
-  HH_unlockSched();
-#endif
-  return 0;
-}
-
-int fileswapper::endContRead()
-{
-#if 0
-  HH_lockSched();
-  fsd->np_filein--;
-  if (fsd->np_filein < 0) {
-    fprintf(stderr, "[HH:fileswapper@p%d] np_filein = %d strange\n",
-	    HH_MYID, fsd->np_filein);
-  }
-  HH_unlockSched();
-#endif
-  return 0;
-}
 
 /* */
 int fileswapper::swapOut()

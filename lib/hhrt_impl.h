@@ -202,11 +202,6 @@ class swapper: public mempool {
   size_t align;
   virtual int beginSeqWrite();
   virtual size_t allocSeq(size_t size);
-
-  virtual int startContWrite() {};
-  virtual int endContWrite() {};
-  virtual int startContRead() {};
-  virtual int endContRead() {};
 };
 
 class hostswapper: public swapper {
@@ -254,11 +249,6 @@ class fileswapper: public swapper {
 
   virtual int swapOut();
   virtual int swapIn();
-
-  virtual int startContWrite();
-  virtual int endContWrite();
-  virtual int startContRead();
-  virtual int endContRead();
 
   size_t copyunit;
   void *copybufs[2];
