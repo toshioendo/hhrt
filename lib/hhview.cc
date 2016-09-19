@@ -14,6 +14,15 @@ shdata *HHS;
 int main(int argc, char *argv[])
 {
   FILE *out = stdout;
+  int loopsec = -1;
+
+  /* check arguments */
+  if (argc >= 2) {
+    if (strcmp(argv[1], "-l") == 0) {
+      loopsec = atoi(argv[2]);
+    }
+  }
+
   /* for debug print */
   char hostname[HOSTNAMELEN];
   memset(hostname, 0, HOSTNAMELEN);
@@ -39,6 +48,7 @@ int main(int argc, char *argv[])
   }
 
   /****************/
+ loop:
   int i, j;
 
   fprintf(out, "HHVIEW@%s [%.2lf]\n", hostname, Wtime_prt());
@@ -96,6 +106,11 @@ int main(int argc, char *argv[])
     fprintf(out, "\n");
   }
   fprintf(out, "\n");
+
+  if (loopsec >= 0) {
+    sleep(loopsec);
+    goto loop;
+  }
 
   exit(0);
 }

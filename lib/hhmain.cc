@@ -440,8 +440,6 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   // blocked until heaps are accessible
   HH_sleepForMemory();
-  HHL->pmode = HHP_RUNNING;
-  HH_profSetMode("RUNNING");
 
   return 0;
 }
@@ -470,7 +468,7 @@ int HH_readConf(hhconf *confp)
   }
 
   /* HH_MAXRP */
-  confp->maxrp = 99999;
+  confp->maxrp = 1;
   p = getenv("HH_MAXRP");
   if (p != NULL) {
     confp->maxrp = (int)getLP(p);

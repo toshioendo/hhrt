@@ -24,6 +24,18 @@ int HH_unlockSched()
   return 0;
 }
 
+// sched_ml should be locked in caller
+int HH_countProcsInMode(int mode)
+{
+  int n = 0;
+  for (int ip = 0; ip < HHS->nlprocs; ip++) {
+    if (HHS->lprocs[ip].pmode == mode) {
+      n++;
+    }
+  }
+  return n;
+}
+
 // check resouce availability before swapping
 int HH_checkRes(int kind)
 {
@@ -534,19 +546,9 @@ int HH_progressSched()
 /* This function may be blocked */
 int HH_sleepForMemory()
 {
-  if (HHL->dmode == HHD_ON_DEV ||
-      HHL->devmode == HHDEV_NOTUSED) {
-    /* we do nothing, immediate return */
-#if 1 && defined HHLOG_SCHED
-    fprintf(stderr, "[sleepForMemory@p%d] wake up, but data are in SWAPPED_OUT mode!!!\n",
-	    HH_MYID);
-#endif
-    return 0;
-  }
-
   HHL->pmode = HHP_RUNNABLE;
   HH_profSetMode("RUNNABLE");
-
+  
 #ifdef HHLOG_SCHED
   fprintf(stderr, "[sleepForMemory@p%d] sleep for heap capacity\n",
 	  HH_MYID);
@@ -557,18 +559,30 @@ int HH_sleepForMemory()
     if (HHL->dmode == HHD_ON_DEV) {
       break;
     }
-
+    
     usleep(1000);
   } while (1);
+  
+  // check #running procs
+  do {
+    HH_lockSched();
+    int nrp = HH_countProcsInMode(HHP_RUNNING);
+    if (nrp+1 <= HHL2->conf.maxrp) { // ok
+      HHL->pmode = HHP_RUNNING;
+      HH_unlockSched();
+      HH_profSetMode("RUNNING");
+      break;
+    }
+    HH_unlockSched();
+    usleep(10*1000);
+  } while (1);
+
 
 #if 1 && defined HHLOG_SCHED
-  fprintf(stderr, "[sleepForMemory@p%d] wake up!\n",
+  fprintf(stderr, "[HH_sleepForMemory@p%d] wake up!\n",
 	  HH_MYID);
 #endif
-
-  HHL->pmode = HHP_RUNNING;
-  HH_profSetMode("RUNNING");
-
+  
   return 0;
 }
 
