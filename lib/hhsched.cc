@@ -46,7 +46,7 @@ int HH_checkRes(int kind)
 }
 
 // This function assumes sched_ml is locked
-// reserve resource for swapIn. called soon after HH_checkResH2D
+// reserve resource for swapIn. called soon after HH_checkRes
 static int beforeSwap(int kind)
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
