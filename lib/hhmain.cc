@@ -438,6 +438,8 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 	  HH_MYID);
 #endif
 
+  HHL2->swap_kind = -1;
+
   // blocked until heaps are accessible
   HH_sleepForMemory();
 

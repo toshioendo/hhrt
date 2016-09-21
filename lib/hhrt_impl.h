@@ -427,9 +427,8 @@ struct proc2 {
   heap *hostheap;
 #endif
 
-#ifdef USE_FILESWAP_THREAD
-  pthread_t fileswap_tid;
-#endif
+  pthread_t swap_tid;
+  int swap_kind;
 
   std::map<MPI_Request, reqfin> reqfins;
 

@@ -66,56 +66,56 @@ int HH_releaseRes(int kind)
 
 //------------------------------- D2H
 // This function assumes sched_ml is locked
-int HH_swapOutD2H()
+static int beforeSwapOutD2H()
 {
   assert (HHL->dmode == HHD_ON_DEV);
   HHL->dmode = HHD_SO_D2H;
-#if 0
-  fprintf(stderr, "[swapOut@p%d] START\n",
-	  HH_MYID);
-#endif
-
   HH_reserveRes(HHD_SO_D2H);
+  return 0;
+}
 
-  HH_unlockSched();
-
-  /* D -> H */
+static int mainSwapOutD2H()
+{
   HH_profBeginAction("D2H");
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swapOutD2H();
   }
   HH_profEndAction("D2H");
-
-  HH_lockSched();
-  HH_releaseRes(HHD_SO_D2H);
-
-  HHL->dmode = HHD_ON_HOST;
-
   return 0;
 }
 
+static int afterSwapOutD2H()
+{
+  HH_releaseRes(HHD_SO_D2H);
+  HHL->dmode = HHD_ON_HOST;
+  return 0;
+}
+
+
 //------------------------------- H2D
 // This function assumes sched_ml is locked
-int HH_swapInH2D()
+static int beforeSwapInH2D()
 {
   assert(HHL->dmode == HHD_ON_HOST);
   HHL->dmode = HHD_SI_H2D;
-
   HH_reserveRes(HHD_SI_H2D);
+  return 0;
+}
 
-  HH_unlockSched();
-
-  /* H -> D */
+static int mainSwapInH2D()
+{
   HH_profBeginAction("H2D");
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swapInH2D();
   }
   HH_profEndAction("H2D");
+  return 0;
+}
 
-  HH_lockSched();
+static int afterSwapInH2D()
+{
   HH_releaseRes(HHD_SI_H2D);
   HHL->dmode = HHD_ON_DEV;
-
   return 0;
 }
 
@@ -148,69 +148,6 @@ static int afterSwapOutH2F()
   return 0;
 }
 
-#ifdef USE_FILESWAP_THREAD
-
-static void *swapOutH2Fthread(void *arg)
-{
-  mainSwapOutH2F();
-  return NULL;
-}
-
-// This function assumes sched_ml is locked
-int HH_tryfinSwapOutH2F()
-{
-  int rc;
-  void *retval;
-  assert(HHL->dmode == HHD_SO_H2F);
-
-  rc= pthread_tryjoin_np(HHL2->fileswap_tid, &retval);
-  if (rc == EBUSY) return 0;
-
-  // thread has terminated
-  afterSwapOutH2F();
-
-  return 1;
-}
-
-int HH_startSwapOutH2F()
-{
-  beforeSwapOutH2F();
-  pthread_create(&HHL2->fileswap_tid, NULL, swapOutH2Fthread, NULL);
-  return 0;
-}
-
-// This function assumes sched_ml is locked
-int HH_swapOutH2F()
-{
-  beforeSwapOutH2F();
-  pthread_create(&HHL2->fileswap_tid, NULL, swapOutH2Fthread, NULL);
-
-  while (1) {
-    int rc = HH_tryfinSwapOutH2F();
-    if (rc > 0) break;
-    HH_unlockSched();
-    usleep(100);
-    HH_lockSched();
-  }
-
-  return 0;
-}
-
-#else // !USE_FILESWAP_THREAD
-
-// H2F
-// This function assumes sched_ml is locked
-int HH_swapOutH2F()
-{
-  beforeSwapOutH2F();
-  HH_unlockSched();
-  mainSwapOutH2F();
-  HH_lockSched();
-  afterSwapOutH2F();
-  return 0;
-}
-
-#endif // !USE_FILESWAP_THREAD
 
 //----------------------------- F2H
 static int beforeSwapInF2H()
@@ -239,214 +176,187 @@ static int afterSwapInF2H()
   return 0;
 }
 
-#ifdef USE_FILESWAP_THREAD
-static void *swapInF2Hthread(void *arg)
+
+
+static int beforeSwap(int kind)
 {
-  mainSwapInF2H();
+  if (kind == HHD_SO_D2H) {
+    return beforeSwapOutD2H();
+  }
+  else if (kind == HHD_SI_H2D) {
+    return beforeSwapInH2D();
+  }
+  else if (kind == HHD_SO_H2F) {
+    return beforeSwapOutH2F();
+  }
+  else if (kind == HHD_SI_F2H) {
+    return beforeSwapInF2H();
+  }
+  else {
+    fprintf(stderr, "[HH:beforeSwapIn@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
+  return 0;
+}
+
+static int mainSwap(int kind)
+{
+  if (kind == HHD_SO_D2H) {
+    return mainSwapOutD2H();
+  }
+  else if (kind == HHD_SI_H2D) {
+    return mainSwapInH2D();
+  }
+  else if (kind == HHD_SO_H2F) {
+    return mainSwapOutH2F();
+  }
+  else if (kind == HHD_SI_F2H) {
+    return mainSwapInF2H();
+  }
+  else {
+    fprintf(stderr, "[HH:mainSwapIn@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
+  return 0;
+}
+
+static int afterSwap(int kind)
+{
+  if (kind == HHD_SO_D2H) {
+    return afterSwapOutD2H();
+  }
+  else if (kind == HHD_SI_H2D) {
+    return afterSwapInH2D();
+  }
+  else if (kind == HHD_SO_H2F) {
+    return afterSwapOutH2F();
+  }
+  else if (kind == HHD_SI_F2H) {
+    return afterSwapInF2H();
+  }
+  else {
+    fprintf(stderr, "[HH:afterSwapIn@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
+  return 0;
+}
+
+static void *swap_thread_func(void *arg)
+{
+  int kind = (int)(long)arg;
+  mainSwap(kind);
   return NULL;
 }
 
 // This function assumes sched_ml is locked
-int HH_startSwapInF2H()
+int HH_startSwap(int kind)
 {
-  beforeSwapInF2H();
-  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, NULL);
+  beforeSwap(kind);
+  HHL2->swap_kind = kind;
+  pthread_create(&HHL2->swap_tid, NULL, swap_thread_func, (void*)(long)kind);
   return 0;
 }
 
 // This function assumes sched_ml is locked
-int HH_tryfinSwapInF2H()
+int HH_tryfinSwap()
 {
+  int kind = HHL2->swap_kind;
   int rc;
   void *retval;
-  assert(HHL->dmode == HHD_SI_F2H);
 
-  rc= pthread_tryjoin_np(HHL2->fileswap_tid, &retval);
+  rc= pthread_tryjoin_np(HHL2->swap_tid, &retval);
   if (rc == EBUSY) return 0;
 
   // thread has terminated
-  afterSwapInF2H();
+  afterSwap(kind);
+  HHL2->swap_kind = -1;
   return 1;
 }
-
-// This function assumes sched_ml is locked
-int HH_swapInF2H()
-{
-  beforeSwapInF2H();
-  pthread_create(&HHL2->fileswap_tid, NULL, swapInF2Hthread, NULL);
-
-  while (1) {
-    int rc = HH_tryfinSwapInF2H();
-    if (rc > 0) break;
-    HH_unlockSched();
-    usleep(100);
-    HH_lockSched();
-  }
-
-  return 0;
-}
-
-#else // !USE_FILESWAP_THREAD
-
-// F2H
-// This function assumes sched_ml is locked
-int HH_swapInF2H()
-{
-  beforeSwapInF2H();
-  HH_unlockSched();
-
-  mainSwapInF2H();
-
-  HH_lockSched();
-  afterSwapInF2H();
-
-  return 0;
-}
-#endif // !USE_FILESWAP_THREAD
 
 
 // This function assumes sched_ml is locked
 int HH_swap(int kind)
 {
-  if (kind == HHD_SO_D2H) {
-    return HH_swapOutD2H();
-  }
-  else if (kind == HHD_SI_H2D) {
-    return HH_swapInH2D();
-  }
-  else if (kind == HHD_SO_H2F) {
-    return HH_swapOutH2F();
-  }
-  else if (kind == HHD_SI_F2H) {
-    return HH_swapInF2H();
-  }
-  else {
-    fprintf(stderr, "[HH_swap@p%d] ERROR: kind %d unknown\n",
-	    HH_MYID, kind);
-    exit(1);
-  }
+  beforeSwap(kind);
+  HH_unlockSched();
+
+  mainSwap(kind);
+
+  HH_lockSched();
+  afterSwap(kind);
   return 0;
 }
    
 /************************************************************/
 int HH_swapInIfOk()
 {
-  if (HHL->dmode == HHD_ON_DEV) {
+  int kind = -1;
+
+  if (HHL->dmode == HHD_ON_HOST) {
+    kind = HHD_SI_H2D;
+  }
+  else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
+    kind = HHD_SI_F2H;
+  }
+  else {
     // do nothing 
     return 0;
   }
-  else if (HHL->dmode == HHD_ON_HOST) {
-    if (!HH_checkRes(HHD_SI_H2D)) {
-      return 0;
-    }
 
-    HH_lockSched();
-    if (!HH_checkRes(HHD_SI_H2D)) {
-      HH_unlockSched();
-      return 0;
-    }
+  if (!HH_checkRes(kind)) return 0;
 
-#if 0
-    fprintf(stderr, "[HH_swapInIfOk@p%d] [%.2lf] Now I start H2D (heap slot %d)\n",
-	    HH_MYID, Wtime_prt(), HHL->hpid);
-#endif
-
-    // now I can proceed!
-    HH_swapInH2D();
-
-    assert(HHL->dmode == HHD_ON_DEV);
+  HH_lockSched();
+  if (!HH_checkRes(kind)) {
     HH_unlockSched();
-    return 1;
+    return 0;
   }
-  else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
-    if (!HH_checkRes(HHD_SI_F2H)) {
-      return 0;
-    }
-
-    HH_lockSched();
-    if (!HH_checkRes(HHD_SI_F2H)) {
-      HH_unlockSched();
-      return 0;
-    }
-
-#if 0
-    fprintf(stderr, "[HH_swapInIfOk@p%d] [%.2lf] Now I start F2H\n",
-	    HH_MYID, Wtime_prt());
-#endif
 
 #ifdef USE_FILESWAP_THREAD
-    HH_startSwapInF2H();
-    assert(HHL->dmode == HHD_SI_F2H);
+  HH_startSwap(kind);
+  assert(HHL->dmode == kind);
 #else
-    HH_swapInF2H();
-    assert(HHL->dmode == HHD_ON_HOST);
+  HH_swap(kind);
 #endif
 
-    HH_unlockSched();
-    return 1;
-  }
-  else {
-    fprintf(stderr, "[HH_swapInIfOk@p%d] [%.2lf] dmode %s strange\n",
-	    HH_MYID, Wtime_prt(), hhd_names[HHL->dmode]);
-    assert(0);
-  }
-  
-  return 0;
+  HH_unlockSched();
+  return 1;
 }
 
 /* swapOut may be called in this function */
 int HH_swapOutIfBetter()
 {
-  if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
+  int kind = -1;
+  if (HHL->dmode == HHD_ON_HOST) {
+    kind = HHD_SO_H2F;
+  }
+  else if (HHL->dmode == HHD_ON_DEV) {
+    kind = HHD_SO_D2H;
+  }
+  else {
     // do nothing
     return 0;
   }
-  else if (HHL->dmode == HHD_ON_HOST) {
-    if (!HH_checkRes(HHD_SO_H2F)) {
-      return 0;
-    }
+  
+  if (!HH_checkRes(kind)) return 0;
 
-    HH_lockSched();
-    if (!HH_checkRes(HHD_SO_H2F)) {
-      HH_unlockSched();
-      return 0;
-    }
+  HH_lockSched();
+  if (!HH_checkRes(kind)) {
+    HH_unlockSched();
+    return 0;
+  }
 
-#if 0
-    fprintf(stderr, "[HH_swapOutIfBetter@p%d] [%.2lf] Now H2F starts\n",
-	    HH_MYID, Wtime_prt());
-#endif
-
-#ifdef USE_FILESWAP_THREAD
-    HH_startSwapOutH2F();
-    assert(HHL->dmode == HHD_SO_H2F);
+#if 1
+  HH_startSwap(kind);
+  assert(HHL->dmode == kind);
 #else
-    HH_swapOutH2F();
-    assert(HHL->dmode == HHD_ON_FILE);
+  HH_swap(kind);
 #endif
-    HH_unlockSched();
-    return 1;
-  }
-  else if (HHL->dmode == HHD_ON_DEV) {
-    if (!HH_checkRes(HHD_SO_D2H)) {
-      return 0;
-    }
+  HH_unlockSched();
 
-    HH_lockSched();
-    if (!HH_checkRes(HHD_SO_D2H)) {
-      HH_unlockSched();
-      return 0;
-    }
-
-    HH_swapOutD2H();
-    assert(HHL->dmode == HHD_ON_HOST);
-    HH_unlockSched();
-    return 1;
-  }
-  else {
-    assert(0);
-  }
-  return 0;
+  return 1;
 }
 
 // This function assumes sched_ml is locked
@@ -518,15 +428,10 @@ int HH_progressSched()
 {
   int rc;
 #ifdef USE_FILESWAP_THREAD
-  if (HHL->dmode == HHD_SO_H2F) {
+  if (HHL->dmode == HHD_SO_H2F || HHL->dmode == HHD_SI_F2H ||
+      HHL->dmode == HHD_SO_D2H || HHL->dmode == HHD_SI_H2D) {
     HH_lockSched();
-    rc = HH_tryfinSwapOutH2F();
-    HH_unlockSched();
-    return rc;
-  }
-  else if (HHL->dmode == HHD_SI_F2H) {
-    HH_lockSched();
-    rc = HH_tryfinSwapInF2H();
+    rc = HH_tryfinSwap();
     HH_unlockSched();
     return rc;
   }
