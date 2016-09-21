@@ -28,7 +28,7 @@ using namespace std;
 // If you use hhview for debug, disable this
 #define EAGER_IPSM_DESTROY 1
 
-#define USE_FILESWAP_THREAD 1
+#define USE_SWAP_THREAD 1
 
 //#define USE_SHARED_HSC 1 // buggy
 
@@ -99,6 +99,20 @@ static const char *hhd_names[] = {
   "SO_H2F",
   "SI_F2H",
   "SI_H2D",
+  "XXX",
+  NULL,
+};
+
+static const char *hhd_snames[] = {
+  "INVALID0",
+  "INVALID1",
+  "INVALID2",
+  "INVALID3",
+
+  "D2H",
+  "H2F",
+  "F2H",
+  "H2D",
   "XXX",
   NULL,
 };
@@ -280,12 +294,7 @@ class heap: public mempool {
   virtual int swapOut();
   virtual int swapIn();
 
-  // TODO: make it cleaner
-  virtual int swapOutD2H() {};
-  virtual int swapInH2D() {};
-  virtual int swapOutH2F() {};
-  virtual int swapInF2H() {};
-
+  virtual int swap(int kind) {};
   virtual int checkRes(int kind) {};
   virtual int reserveRes(int kind) {};
   virtual int releaseRes(int kind) {};
@@ -300,8 +309,6 @@ class heap: public mempool {
   size_t align;
   int expandable;
   int memkind; // HHM_*
-
-  //char name[16]; /* for debug */
 };
 
 class devheap: public heap {
@@ -313,11 +320,7 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int swapOutD2H();
-  virtual int swapInH2D();
-  virtual int swapOutH2F();
-  virtual int swapInF2H();
-
+  virtual int swap(int kind);
   virtual int checkRes(int kind);
   virtual int reserveRes(int kind);
   virtual int releaseRes(int kind);
@@ -338,11 +341,7 @@ class hostheap: public heap {
   virtual int releaseHeap();
   virtual int restoreHeap();
 
-  virtual int swapOutD2H() {}; // do nothing
-  virtual int swapInH2D() {}; // do nothing
-  virtual int swapOutH2F();
-  virtual int swapInF2H();
-
+  virtual int swap(int kind);
   virtual int checkRes(int kind);
   virtual int reserveRes(int kind);
   virtual int releaseRes(int kind);

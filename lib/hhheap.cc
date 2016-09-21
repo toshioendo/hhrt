@@ -549,74 +549,38 @@ int devheap::restoreHeap()
   return 0;
 }
 
-int devheap::swapOutD2H()
+////////////////////////
+int devheap::swap(int kind)
 {
-#if 0
-  HH_lockSched();
-  device->np_out++;
-  HH_unlockSched();
-#endif
-  
-  swapOut();
-  
-  // release resource information on device
-  HH_lockSched();
-#if 0
-  device->np_out--;
-  if (device->np_out < 0) {
-    fprintf(stderr, "[swapOutD2H@p%d] np_out = %d strange\n",
-	    HH_MYID, device->np_out);
+  if (kind == HHD_SO_D2H) {
+    swapOut();
   }
-#endif
-#if 0
-  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
-  assert(device->dhslot_users[HHL->hpid] == HH_MYID);
-  device->dhslot_users[HHL->hpid] = -1;
-  fprintf(stderr, "[HH_afterDevSwapOut@p%d] [%.2f] I release heap slot %d\n",
-    HH_MYID, Wtime_prt(), HHL->hpid);
-#endif
-  
-  HH_unlockSched();
-  return 0;
-}
-
-int devheap::swapOutH2F()
-{
-  if (curswapper == NULL || curswapper->curswapper == NULL) {
-    fprintf(stderr, "[HH:%s::swapOutH2F@p%d] SKIP SO_H2F\n",
-	    name, HH_MYID);
-    return 0;
+  else if (kind == HHD_SI_H2D) {
+    swapIn();
   }
-
-  curswapper->swapOut();
-  return 0;
-}
-
-int devheap::swapInF2H()
-{
-  if (curswapper == NULL || curswapper->curswapper == NULL) {
-    return 0;
+  else if (kind == HHD_SO_H2F) {
+    if (curswapper == NULL || curswapper->curswapper == NULL) {
+      fprintf(stderr, "[HH:%s::swap(H2F)@p%d] SKIP\n",
+	      name, HH_MYID);
+      return 0;
+    }
+    
+    curswapper->swapOut();
   }
-
-  curswapper->swapIn();
-  return 0;
-}
-
-int devheap::swapInH2D()
-{
-#if 0
-  HH_lockSched();
-  device->np_in++;
-  HH_unlockSched();
-#endif
-
-  swapIn();
-
-#if 0
-  HH_lockSched();
-  device->np_in--;
-  HH_unlockSched();
-#endif
+  else if (kind == HHD_SI_F2H) {
+    if (curswapper == NULL || curswapper->curswapper == NULL) {
+      fprintf(stderr, "[HH:%s::swap(F2H)@p%d] SKIP\n",
+	      name, HH_MYID);
+      return 0;
+    }
+    
+    curswapper->swapIn();
+  }
+  else {
+    fprintf(stderr, "[HH:devheap::checkRes@p%d] ERROR: kind %d unknown\n",
+	    HH_MYID, kind);
+    exit(1);
+  }
   return 0;
 }
 
@@ -839,35 +803,37 @@ int hostheap::restoreHeap()
   return 0;
 }
 
-int hostheap::swapOutH2F()
+//////////////////////////////////
+int hostheap::swap(int kind)
 {
-  if (curswapper == NULL) {
+  if (kind == HHD_SO_D2H) {
     return 0;
   }
+  else if (kind == HHD_SI_H2D) {
+    return 0;
+  }
+  else if (kind == HHD_SO_H2F) {
+    if (curswapper == NULL) {
+      return 0;
+    }
+    
+    swapOut();
+  }
+  else if (kind == HHD_SI_F2H) {
+    if (curswapper == NULL) {
+      return 0;
+    }
 
-  swapOut();
-
-#if 0
-  // release resource information
-  HH_lockSched();
-  HHS->nhostusers[HHL->hpid]--;
-  fprintf(stderr, "[HH:%s::swapOutH2F@p%d] [%.2f] I release host capacity\n",
-	  name, HH_MYID, Wtime_prt());
-  HH_unlockSched();
-#endif
-
+    swapIn();
+  }
+  else {
+    fprintf(stderr, "[HH:%s::swap@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
+    exit(1);
+  }
   return 0;
 }
 
-int hostheap::swapInF2H()
-{
-  if (curswapper == NULL) {
-    return 0;
-  }
-
-  swapIn();
-  return 0;
-}
 
 int hostheap::checkRes(int kind)
 {
