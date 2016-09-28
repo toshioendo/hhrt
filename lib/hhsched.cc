@@ -39,6 +39,7 @@ int HH_countProcsInMode(int mode)
 // check resouce availability before swapping
 int HH_checkRes(int kind)
 {
+  HHL2->swap_kind = kind;
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     if (!HHL2->heaps[ih]->checkRes(kind)) return 0;
   }
@@ -47,33 +48,33 @@ int HH_checkRes(int kind)
 
 // This function assumes sched_ml is locked
 // reserve resource for swapIn. called soon after HH_checkRes
-static int beforeSwap(int kind)
+static int beforeSwap()
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->reserveRes();
   }
 
-  HHL->dmode = kind;
+  HHL->dmode = HHL2->swap_kind;
   return 0;
 }
 
-static int mainSwap(int kind)
+static int mainSwap()
 {
-  HH_profBeginAction(hhd_snames[kind]);
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->swap();
   }
-  HH_profEndAction(hhd_snames[kind]);
+
   return 0;
 }
 
 // This function assumes sched_ml is locked
-static int afterSwap(int kind)
+static int afterSwap()
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->releaseRes();
   }
 
+  int kind = HHL2->swap_kind;
   // state transition
   if (kind == HHD_SO_D2H) {
     HHL->dmode = HHD_ON_HOST;
@@ -92,29 +93,44 @@ static int afterSwap(int kind)
 	    HH_MYID, kind);
     exit(1);
   }
+
+  HHL2->swap_kind = -1;
+  return 0;
+}
+
+// This function assumes sched_ml is locked
+// This must be called after HH_checkRes() returns 1
+int HH_swap()
+{
+  beforeSwap();
+  HH_unlockSched();
+
+  mainSwap();
+
+  HH_lockSched();
+  afterSwap();
   return 0;
 }
 
 static void *swap_thread_func(void *arg)
 {
-  int kind = (int)(long)arg;
-  mainSwap(kind);
+  mainSwap();
   return NULL;
 }
 
+// Thread version of HH_swap()
 // This function assumes sched_ml is locked
-int HH_startSwap(int kind)
+// This must be called after HH_checkRes() returns 1
+int HH_startSwap()
 {
-  beforeSwap(kind);
-  HHL2->swap_kind = kind;
-  pthread_create(&HHL2->swap_tid, NULL, swap_thread_func, (void*)(long)kind);
+  beforeSwap();
+  pthread_create(&HHL2->swap_tid, NULL, swap_thread_func, NULL);
   return 0;
 }
 
 // This function assumes sched_ml is locked
 int HH_tryfinSwap()
 {
-  int kind = HHL2->swap_kind;
   int rc;
   void *retval;
 
@@ -122,24 +138,10 @@ int HH_tryfinSwap()
   if (rc == EBUSY) return 0;
 
   // thread has terminated
-  afterSwap(kind);
-  HHL2->swap_kind = -1;
+  afterSwap();
   return 1;
 }
 
-// This function assumes sched_ml is locked
-int HH_swap(int kind)
-{
-  beforeSwap(kind);
-  HH_unlockSched();
-
-  mainSwap(kind);
-
-  HH_lockSched();
-  afterSwap(kind);
-  return 0;
-}
-   
 /************************************************************/
 int HH_swapInIfOk()
 {
@@ -165,10 +167,10 @@ int HH_swapInIfOk()
   }
 
 #ifdef USE_SWAP_THREAD
-  HH_startSwap(kind);
+  HH_startSwap();
   assert(HHL->dmode == kind);
 #else
-  HH_swap(kind);
+  HH_swap();
 #endif
 
   HH_unlockSched();
@@ -199,10 +201,10 @@ int HH_swapOutIfBetter()
   }
 
 #if 1
-  HH_startSwap(kind);
+  HH_startSwap();
   assert(HHL->dmode == kind);
 #else
-  HH_swap(kind);
+  HH_swap();
 #endif
   HH_unlockSched();
 
@@ -236,7 +238,7 @@ int HH_swapWithCheck(int kind)
 	    HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), hhd_names[kind]);
   }
   
-  HH_swap(kind);
+  HH_swap();
 
   return 0;
 }

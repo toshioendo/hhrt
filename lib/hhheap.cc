@@ -554,6 +554,7 @@ int devheap::restoreHeap()
 int devheap::swap()
 {
   int kind = swap_kind;
+  HH_profBeginAction(hhd_snames[kind]);
 
   if (kind == HHD_SO_D2H) {
     swapOut();
@@ -565,7 +566,7 @@ int devheap::swap()
     if (curswapper == NULL || curswapper->curswapper == NULL) {
       fprintf(stderr, "[HH:%s::swap(H2F)@p%d] SKIP\n",
 	      name, HH_MYID);
-      return 0;
+      goto out;
     }
     
     curswapper->swapOut();
@@ -574,7 +575,7 @@ int devheap::swap()
     if (curswapper == NULL || curswapper->curswapper == NULL) {
       fprintf(stderr, "[HH:%s::swap(F2H)@p%d] SKIP\n",
 	      name, HH_MYID);
-      return 0;
+      goto out;
     }
     
     curswapper->swapIn();
@@ -584,6 +585,8 @@ int devheap::swap()
 	    HH_MYID, kind);
     exit(1);
   }
+ out:
+  HH_profEndAction(hhd_snames[kind]);
   return 0;
 }
 
@@ -829,23 +832,24 @@ int HH_countHostUsers()
 int hostheap::swap()
 {
   int kind = swap_kind;
+  HH_profBeginAction(hhd_snames[kind]);
 
   if (kind == HHD_SO_D2H) {
-    return 0;
+    goto out;
   }
   else if (kind == HHD_SI_H2D) {
-    return 0;
+    goto out;
   }
   else if (kind == HHD_SO_H2F) {
     if (curswapper == NULL) {
-      return 0;
+      goto out;
     }
     
     swapOut();
   }
   else if (kind == HHD_SI_F2H) {
     if (curswapper == NULL) {
-      return 0;
+      goto out;
     }
 
     swapIn();
@@ -855,6 +859,8 @@ int hostheap::swap()
 	    name, HH_MYID, kind);
     exit(1);
   }
+ out:
+  HH_profEndAction(hhd_snames[kind]);
   return 0;
 }
 
