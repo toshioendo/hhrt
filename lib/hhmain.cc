@@ -418,15 +418,22 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   // setup heap structures
   HHL2->nheaps = 0;
-  for (int id = 0; id < MAX_LDEVS; id++) {
+  for (int id = 0; id < MAX_HEAPS; id++) {
     HHL2->heaps[id] = NULL;
+  }
+  for (int id = 0; id < MAX_LDEVS; id++) {
+    HHL2->devheaps[id] = NULL;
   }
 
   heap *h;
 #ifdef USE_SWAPHOST
   h = HH_hostheapCreate();
+  /* h is referred by heaps[] and hostheap */
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->hostheap = h;
+  HHL->host_use = 0;
+#else
+  HHL->host_use = 1;
 #endif
 
 #if 0

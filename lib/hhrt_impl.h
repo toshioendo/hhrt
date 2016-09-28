@@ -407,6 +407,7 @@ struct proc {
 
   int in_api; /* 0: usual, >=1: in API */
 
+  int host_use;
   /* statistics */
   struct {
     ssize_t used[HHST_MAX];

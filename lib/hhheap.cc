@@ -680,6 +680,7 @@ int hostheap::finalize()
   
   HH_lockSched();
   HHS->nhostusers[HHL->hpid]--;
+  HHL->host_use = 0;
   HH_unlockSched();
   return 0;
 }
@@ -804,6 +805,17 @@ int hostheap::restoreHeap()
 }
 
 //////////////////////////////////
+// sched_ml should be locked in caller
+int HH_countHostUsers()
+{
+  int i;
+  int count = 0;
+  for (i = 0; i < HHS->nlprocs; i++) {
+    if (HHS->lprocs[i].host_use > 0) count++;
+  }
+  return count++;
+}
+
 int hostheap::swap(int kind)
 {
   if (kind == HHD_SO_D2H) {
@@ -865,12 +877,18 @@ int hostheap::checkRes(int kind)
       return 0;
     }
     assert(fsd->np_filein == 0);
-    
+
+#if 1
+    if (HH_countHostUsers() >= HHL2->conf.nlphost) {
+      return 0;
+    }
+#else    
     int limperslot = (HHL2->conf.nlphost+HHS->ndh_slots-1)/HHS->ndh_slots;
     if (HHS->nhostusers[HHL->hpid] >= limperslot) {
       return 0;
     }
-    
+#endif
+
     /* I can start swapF2H */
     return 1;
   }
@@ -890,6 +908,7 @@ int hostheap::reserveRes(int kind)
   }
   else if (kind == HHD_SI_F2H) {
     HHS->nhostusers[HHL->hpid]++;
+    HHL->host_use = 1;
 
     fsdir *fsd = ((fileswapper*)curswapper)->fsd;
     fsd->np_filein++;
@@ -921,6 +940,7 @@ int hostheap::releaseRes(int kind)
   }
   else if (kind == HHD_SO_H2F) {
     HHS->nhostusers[HHL->hpid]--;
+    HHL->host_use = 0;
     fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
 
