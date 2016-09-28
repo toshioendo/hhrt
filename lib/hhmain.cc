@@ -413,7 +413,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   HH_hsc_init_proc();
 
-  // see also HH_canSwapIn()
+  // see also devheap::reserveRes()
   HHL->hpid = lrank % HHS->ndh_slots;
 
   // setup heap structures
@@ -436,13 +436,10 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL->host_use = 1;
 #endif
 
-#if 0
+#if 0 // Now this is done lazily. see HH_checkDev() in hhcuda.cc
   h = HH_devheapCreate(HH_curdev());
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->devheaps[HHL->curdevid] = h;
-#else
-  fprintf(stderr, "[HH:initProc@p%d] skip init devheap. it will be done later\n",
-	  HH_MYID);
 #endif
 
   HHL2->swap_kind = -1;

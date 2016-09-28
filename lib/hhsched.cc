@@ -50,7 +50,7 @@ int HH_checkRes(int kind)
 static int beforeSwap(int kind)
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->reserveRes(kind);
+    HHL2->heaps[ih]->reserveRes();
   }
 
   HHL->dmode = kind;
@@ -61,7 +61,7 @@ static int mainSwap(int kind)
 {
   HH_profBeginAction(hhd_snames[kind]);
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->swap(kind);
+    HHL2->heaps[ih]->swap();
   }
   HH_profEndAction(hhd_snames[kind]);
   return 0;
@@ -71,7 +71,7 @@ static int mainSwap(int kind)
 static int afterSwap(int kind)
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->releaseRes(kind);
+    HHL2->heaps[ih]->releaseRes();
   }
 
   // state transition

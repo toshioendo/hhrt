@@ -79,6 +79,7 @@ heap::heap(size_t heapsize0) : mempool()
     membufs.push_back(mbp);
   }
 
+  swap_kind = -1;
   curswapper = NULL;
   strcpy(name, "(HEAP)");
 
@@ -550,8 +551,10 @@ int devheap::restoreHeap()
 }
 
 ////////////////////////
-int devheap::swap(int kind)
+int devheap::swap()
 {
+  int kind = swap_kind;
+
   if (kind == HHD_SO_D2H) {
     swapOut();
   }
@@ -577,7 +580,7 @@ int devheap::swap(int kind)
     curswapper->swapIn();
   }
   else {
-    fprintf(stderr, "[HH:devheap::checkRes@p%d] ERROR: kind %d unknown\n",
+    fprintf(stderr, "[HH:devheap::swap@p%d] ERROR: kind %d unknown\n",
 	    HH_MYID, kind);
     exit(1);
   }
@@ -587,6 +590,7 @@ int devheap::swap(int kind)
 // check resource availability before actual swapping
 int devheap::checkRes(int kind)
 {
+  swap_kind = kind;
   if (kind == HHD_SO_D2H) {
     if (device->np_out > 0) return 0;  // someone is doing swapD2H
     return 1;
@@ -607,8 +611,10 @@ int devheap::checkRes(int kind)
   }
 }
 
-int devheap::reserveRes(int kind)
+int devheap::reserveRes()
 {
+  int kind = swap_kind;
+
   // Reserve resource information before swapping
   // This is called after last checkRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
@@ -627,8 +633,10 @@ int devheap::reserveRes(int kind)
   return 0;
 }
 
-int devheap::releaseRes(int kind)
+int devheap::releaseRes()
 {
+  int kind = swap_kind;
+
   // Release resource information after swapping
   if (kind == HHD_SI_H2D) {
     device->np_in--;
@@ -653,6 +661,8 @@ int devheap::releaseRes(int kind)
   else {
     // do nothing
   }
+
+  swap_kind = -1;
   return 0;
 }
 
@@ -816,8 +826,10 @@ int HH_countHostUsers()
   return count++;
 }
 
-int hostheap::swap(int kind)
+int hostheap::swap()
 {
+  int kind = swap_kind;
+
   if (kind == HHD_SO_D2H) {
     return 0;
   }
@@ -849,6 +861,8 @@ int hostheap::swap(int kind)
 
 int hostheap::checkRes(int kind)
 {
+  swap_kind = kind;
+
   if (kind == HHD_SO_D2H) {
     return 1;
   }
@@ -899,8 +913,10 @@ int hostheap::checkRes(int kind)
   }
 }
 
-int hostheap::reserveRes(int kind)
+int hostheap::reserveRes()
 {
+  int kind = swap_kind;
+  
   // Reserve resource information before swapping
   // This must be called after last checkRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
@@ -923,8 +939,10 @@ int hostheap::reserveRes(int kind)
   return 0;
 }
 
-int hostheap::releaseRes(int kind)
+int hostheap::releaseRes()
 {
+  int kind = swap_kind;
+
   // Reserve resource information before swapping
   // This must be called after last checkRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
@@ -954,6 +972,7 @@ int hostheap::releaseRes(int kind)
   else {
     // do nothing
   }
+  swap_kind = -1;
   return 0;
 }
 

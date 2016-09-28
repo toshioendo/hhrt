@@ -294,10 +294,10 @@ class heap: public mempool {
   virtual int swapOut();
   virtual int swapIn();
 
-  virtual int swap(int kind) {};
   virtual int checkRes(int kind) {};
-  virtual int reserveRes(int kind) {};
-  virtual int releaseRes(int kind) {};
+  virtual int reserveRes() {};
+  virtual int swap() {};
+  virtual int releaseRes() {};
 
   virtual int madvise(void *p, size_t size, int kind);
 
@@ -309,6 +309,7 @@ class heap: public mempool {
   size_t align;
   int expandable;
   int memkind; // HHM_*
+  int swap_kind;
 };
 
 class devheap: public heap {
@@ -320,10 +321,10 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int swap(int kind);
   virtual int checkRes(int kind);
-  virtual int reserveRes(int kind);
-  virtual int releaseRes(int kind);
+  virtual int reserveRes();
+  virtual int swap();
+  virtual int releaseRes();
 
   void *allocDevMem(size_t heapsize);
   void *hp_baseptr;
@@ -341,10 +342,10 @@ class hostheap: public heap {
   virtual int releaseHeap();
   virtual int restoreHeap();
 
-  virtual int swap(int kind);
   virtual int checkRes(int kind);
-  virtual int reserveRes(int kind);
-  virtual int releaseRes(int kind);
+  virtual int reserveRes();
+  virtual int swap();
+  virtual int releaseRes();
 
   virtual void *allocCapacity(size_t offset, size_t size);
   int swapfd;
