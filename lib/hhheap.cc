@@ -637,10 +637,29 @@ int devheap::checkRes(int kind0)
       line = __LINE__;
     }
   }
-  else if (kind == HHD_SO_H2F || kind == HHD_SI_F2H) {
-    // check is done by hostheap. is it OK?
-    res = HHSS_OK;
-    line = __LINE__;
+  else if (kind == HHD_SO_H2F) {
+    fsdir *fsd = ((fileswapper*)curswapper->curswapper)->fsd;
+    if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
+      // someone is doing swapF2H or swapH2F
+      res = HHSS_EBUSY;
+      line = __LINE__;
+    }
+    else {
+      res = HHSS_OK;
+      line = __LINE__;
+    }
+  }
+  else if (kind == HHD_SI_F2H) {
+    fsdir *fsd = ((fileswapper*)curswapper->curswapper)->fsd;
+    if (fsd->np_filein > 0) {
+      // someone is doing swapF2H or swapH2F
+      res = HHSS_EBUSY;
+      line = __LINE__;
+    }
+    else {
+      res = HHSS_OK;
+      line = __LINE__;
+    }
   }
   else {
     fprintf(stderr, "[HH:%s::checkRes@p%d] ERROR: kind %d unknown\n",
