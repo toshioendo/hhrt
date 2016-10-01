@@ -37,16 +37,16 @@ int HH_countProcsInMode(int mode)
 }
 
 // This function assumes sched_ml is locked
-// This must be called after h->checkRes() returns OK
+// This must be called after h->checkSwapRes() returns OK
 int HH_swapHeap(heap *h, int kind)
 {
-  h->reserveRes(kind);
+  h->reserveSwapRes(kind);
   HH_unlockSched();
 
-  h->swap();
+  h->doSwap();
 
   HH_lockSched();
-  h->releaseRes();
+  h->releaseSwapRes();
   return 0;
 }
 
@@ -54,7 +54,7 @@ int HH_swapHeap(heap *h, int kind)
 static void *swapheap_thread_func(void *arg)
 {
   heap *h = (heap *)arg;
-  h->swap();
+  h->doSwap();
   return NULL;
 }
 
@@ -64,7 +64,7 @@ static void *swapheap_thread_func(void *arg)
 int HH_startSwapHeap(heap *h, int kind)
 {
   assert(HHL2->swapping_heap == NULL);
-  h->reserveRes(kind);
+  h->reserveSwapRes(kind);
   pthread_create(&HHL2->swap_tid, NULL, swapheap_thread_func, (void*)h);
   HHL2->swapping_heap = h;
   return 0;
@@ -84,7 +84,7 @@ int HH_tryfinSwap()
   // thread has terminated
   heap *h = (heap *)HHL2->swapping_heap;
   assert(h != NULL);
-  h->releaseRes();
+  h->releaseSwapRes();
   HHL2->swapping_heap = NULL;
   return 1;
 }
@@ -96,9 +96,9 @@ int HH_swapInIfOk()
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     heap *h = HHL2->heaps[ih];
     int kind = HHD_SI_ANY;
-    if (h->checkRes(kind) == HHSS_OK) {
+    if (h->checkSwapRes(kind) == HHSS_OK) {
       HH_lockSched();
-      if (h->checkRes(kind) == HHSS_OK) {
+      if (h->checkSwapRes(kind) == HHSS_OK) {
 	HH_unlockSched();
 	// can proceed swap
 #ifdef USE_SWAP_THREAD
@@ -122,9 +122,9 @@ int HH_swapOutIfBetter()
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     heap *h = HHL2->heaps[ih];
     int kind = HHD_SO_ANY;
-    if (h->checkRes(kind) == HHSS_OK) {
+    if (h->checkSwapRes(kind) == HHSS_OK) {
       HH_lockSched();
-      if (h->checkRes(kind) == HHSS_OK) {
+      if (h->checkSwapRes(kind) == HHSS_OK) {
 	HH_unlockSched();
 	// can proceed swap
 #ifdef USE_SWAP_THREAD
@@ -153,7 +153,7 @@ int HH_isSwapCompleted(int kind) // kind should be HHD_SI_ANY or HHD_SO_ANY
 
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     heap *h = HHL2->heaps[ih];
-    if (h->checkRes(kind) != HHSS_NONEED) {
+    if (h->checkSwapRes(kind) != HHSS_NONEED) {
       return 0;
     }
   }

@@ -592,7 +592,7 @@ int devheap::inferSwapMode(int kind0)
 }
 
 // check resource availability before actual swapping
-int devheap::checkRes(int kind0)
+int devheap::checkSwapRes(int kind0)
 {
   int res;
   int line = -100; // debug
@@ -625,7 +625,7 @@ int devheap::checkRes(int kind0)
     else if (device->dhslot_users[HHL->hpid] >= 0) {
       res = HHSS_EBUSY; // device heap slot is occupied
       if (device->dhslot_users[HHL->hpid] == HH_MYID) {
-	fprintf(stderr, "[HH:%s::checkRes@p%d] I'm devslot's user, STRANGE?\n",
+	fprintf(stderr, "[HH:%s::checkSwapRes@p%d] I'm devslot's user, STRANGE?\n",
 		name, HH_MYID);
       }
       line = __LINE__;
@@ -660,7 +660,7 @@ int devheap::checkRes(int kind0)
     }
   }
   else {
-    fprintf(stderr, "[HH:%s::checkRes@p%d] ERROR: kind %d unknown\n",
+    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
 	    name, HH_MYID, kind);
     exit(1);
   }
@@ -668,20 +668,20 @@ int devheap::checkRes(int kind0)
 #if 0
   if (rand() % 256 == 0) {
     const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
-    fprintf(stderr, "[HH:%s::checkRes@p%d] result=%s (line=%d)\n",
+    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] result=%s (line=%d)\n",
 	    name, HH_MYID, strs[res], line);
   }
 #endif
   return res;
 }
 
-int devheap::reserveRes(int kind0)
+int devheap::reserveSwapRes(int kind0)
 {
   int kind = inferSwapMode(kind0);
   swap_kind = kind; // remember the kind
 
   // Reserve resource information before swapping
-  // This is called after last checkRes(), without releasing schedule lock
+  // This is called after last checkSwapRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
     device->dhslot_users[HHL->hpid] = HH_MYID;
     device->np_in++;
@@ -698,7 +698,7 @@ int devheap::reserveRes(int kind0)
   return 0;
 }
 
-int devheap::swap()
+int devheap::doSwap()
 {
   int kind = swap_kind;
   HH_profBeginAction(hhd_snames[kind]);
@@ -737,7 +737,7 @@ int devheap::swap()
   return 0;
 }
 
-int devheap::releaseRes()
+int devheap::releaseSwapRes()
 {
   int kind = swap_kind;
 
@@ -748,14 +748,14 @@ int devheap::releaseRes()
   else if (kind == HHD_SO_D2H) {
     device->np_out--;
     if (device->np_out < 0) {
-      fprintf(stderr, "[HH:%s::releaseRes@p%d] np_out = %d strange\n",
+      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_out = %d strange\n",
 	      name, HH_MYID, device->np_out);
     }
 
     assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
     assert(device->dhslot_users[HHL->hpid] == HH_MYID);
     device->dhslot_users[HHL->hpid] = -1;
-    fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release heap slot %d\n",
+    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
 	    name, HH_MYID, Wtime_prt(), HHL->hpid);
   }
   else if (kind == HHD_SI_F2H) {
@@ -928,41 +928,6 @@ int HH_countHostUsers()
   return count++;
 }
 
-int hostheap::swap()
-{
-  int kind = swap_kind;
-  HH_profBeginAction(hhd_snames[kind]);
-
-  if (kind == HHD_SO_D2H) {
-    goto out;
-  }
-  else if (kind == HHD_SI_H2D) {
-    goto out;
-  }
-  else if (kind == HHD_SO_H2F) {
-    if (curswapper == NULL) {
-      goto out;
-    }
-    
-    swapOut();
-  }
-  else if (kind == HHD_SI_F2H) {
-    if (curswapper == NULL) {
-      goto out;
-    }
-
-    swapIn();
-  }
-  else {
-    fprintf(stderr, "[HH:%s::swap@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
-    exit(1);
-  }
- out:
-  HH_profEndAction(hhd_snames[kind]);
-  return 0;
-}
-
 int hostheap::inferSwapMode(int kind0)
 {
   int res_kind;
@@ -1001,7 +966,7 @@ int hostheap::inferSwapMode(int kind0)
   return res_kind;
 }
 
-int hostheap::checkRes(int kind0)
+int hostheap::checkSwapRes(int kind0)
 {
   int res;
   int line = -200; // debug
@@ -1052,7 +1017,7 @@ int hostheap::checkRes(int kind0)
     }
     else if (HH_countHostUsers() >= HHL2->conf.nlphost) {
 #if 0
-      fprintf(stderr, "[HH:%s::checkRes@p%d] hostusers=%d >= nlphost=%d\n",
+      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] hostusers=%d >= nlphost=%d\n",
 	      name, HH_MYID, HH_countHostUsers(), HHL2->conf.nlphost);
       usleep(10*1000);
 #endif
@@ -1066,7 +1031,7 @@ int hostheap::checkRes(int kind0)
     }
   }
   else {
-    fprintf(stderr, "[HH:%s::checkRes@p%d] ERROR: kind %d unknown\n",
+    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
 	    name, HH_MYID, kind);
     exit(1);
   }
@@ -1074,20 +1039,20 @@ int hostheap::checkRes(int kind0)
 #if 0
   if (rand() % 256 == 0) {
     const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
-    fprintf(stderr, "[HH:%s::checkRes@p%d] result=%s (line=%d)\n",
+    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] result=%s (line=%d)\n",
 	    name, HH_MYID, strs[res], line);
   }
 #endif
   return res;
 }
 
-int hostheap::reserveRes(int kind0)
+int hostheap::reserveSwapRes(int kind0)
 {
   int kind = inferSwapMode(kind0);
   swap_kind = kind; // remember the kind
   
   // Reserve resource information before swapping
-  // This must be called after last checkRes(), without releasing schedule lock
+  // This must be called after last checkSwapRes(), without releasing schedule lock
   if (kind == HHD_SI_H2D) {
     // do nothing
   }
@@ -1107,7 +1072,42 @@ int hostheap::reserveRes(int kind0)
   return 0;
 }
 
-int hostheap::releaseRes()
+int hostheap::doSwap()
+{
+  int kind = swap_kind;
+  HH_profBeginAction(hhd_snames[kind]);
+
+  if (kind == HHD_SO_D2H) {
+    goto out;
+  }
+  else if (kind == HHD_SI_H2D) {
+    goto out;
+  }
+  else if (kind == HHD_SO_H2F) {
+    if (curswapper == NULL) {
+      goto out;
+    }
+    
+    swapOut();
+  }
+  else if (kind == HHD_SI_F2H) {
+    if (curswapper == NULL) {
+      goto out;
+    }
+
+    swapIn();
+  }
+  else {
+    fprintf(stderr, "[HH:%s::swap@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
+    exit(1);
+  }
+ out:
+  HH_profEndAction(hhd_snames[kind]);
+  return 0;
+}
+
+int hostheap::releaseSwapRes()
 {
   int kind = swap_kind;
 
@@ -1119,19 +1119,19 @@ int hostheap::releaseRes()
     fsdir *fsd = ((fileswapper*)curswapper)->fsd;
     fsd->np_filein--;
     if (fsd->np_filein < 0) {
-      fprintf(stderr, "[HH:%s::releaseRes@p%d] np_filein = %d strange\n",
+      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_filein = %d strange\n",
 	      name, HH_MYID, fsd->np_filein);
     }
   }
   else if (kind == HHD_SO_H2F) {
     HHL->host_use = 0;
-    fprintf(stderr, "[HH:%s::releaseRes@p%d] [%.2f] I release host capacity\n",
+    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
 
     fsdir *fsd = ((fileswapper*)curswapper)->fsd;
     fsd->np_fileout--;
     if (fsd->np_fileout < 0) {
-      fprintf(stderr, "[HH:%s::releaseRes@p%d] np_fileout = %d strange\n",
+      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_fileout = %d strange\n",
 	      name, HH_MYID, fsd->np_fileout);
     }
   }
