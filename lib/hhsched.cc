@@ -36,95 +36,37 @@ int HH_countProcsInMode(int mode)
   return n;
 }
 
-// check resouce availability before swapping
-int HH_checkRes(int kind)
-{
-  HHL2->swap_kind = kind;
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    if (!HHL2->heaps[ih]->checkRes(kind)) return 0;
-  }
-  return 1;
-}
-
 // This function assumes sched_ml is locked
-// reserve resource for swapIn. called soon after HH_checkRes
-static int beforeSwap()
+// This must be called after h->checkRes() returns OK
+int HH_swapHeap(heap *h, int kind)
 {
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->reserveRes();
-  }
-
-  HHL->dmode = HHL2->swap_kind;
-  return 0;
-}
-
-static int mainSwap()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->swap();
-  }
-
-  return 0;
-}
-
-// This function assumes sched_ml is locked
-static int afterSwap()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->releaseRes();
-  }
-
-  int kind = HHL2->swap_kind;
-  // state transition
-  if (kind == HHD_SO_D2H) {
-    HHL->dmode = HHD_ON_HOST;
-  }
-  else if (kind == HHD_SI_H2D) {
-    HHL->dmode = HHD_ON_DEV;
-  }
-  else if (kind == HHD_SO_H2F) {
-    HHL->dmode = HHD_ON_FILE;
-  }
-  else if (kind == HHD_SI_F2H) {
-    HHL->dmode = HHD_ON_HOST;
-  }
-  else {
-    fprintf(stderr, "[HH:afterSwap@p%d] ERROR: kind %d unknown\n",
-	    HH_MYID, kind);
-    exit(1);
-  }
-
-  HHL2->swap_kind = -1;
-  return 0;
-}
-
-// This function assumes sched_ml is locked
-// This must be called after HH_checkRes() returns 1
-int HH_swap()
-{
-  beforeSwap();
+  h->reserveRes(kind);
   HH_unlockSched();
 
-  mainSwap();
+  h->swap();
 
   HH_lockSched();
-  afterSwap();
+  h->releaseRes();
   return 0;
 }
 
-static void *swap_thread_func(void *arg)
+#ifdef USE_SWAP_THREAD
+static void *swapheap_thread_func(void *arg)
 {
-  mainSwap();
+  heap *h = (heap *)arg;
+  h->swap();
   return NULL;
 }
 
 // Thread version of HH_swap()
 // This function assumes sched_ml is locked
-// This must be called after HH_checkRes() returns 1
-int HH_startSwap()
+// This must be called after h->checkRes() returns OK
+int HH_startSwapHeap(heap *h, int kind)
 {
-  beforeSwap();
-  pthread_create(&HHL2->swap_tid, NULL, swap_thread_func, NULL);
+  assert(HHL2->swapping_heap == NULL);
+  h->reserveRes(kind);
+  pthread_create(&HHL2->swap_tid, NULL, swapheap_thread_func, (void*)h);
+  HHL2->swapping_heap = h;
   return 0;
 }
 
@@ -134,143 +76,129 @@ int HH_tryfinSwap()
   int rc;
   void *retval;
 
+  if (HHL2->swapping_heap == NULL) return 0;
+
   rc= pthread_tryjoin_np(HHL2->swap_tid, &retval);
   if (rc == EBUSY) return 0;
 
   // thread has terminated
-  afterSwap();
+  heap *h = (heap *)HHL2->swapping_heap;
+  assert(h != NULL);
+  h->releaseRes();
+  HHL2->swapping_heap = NULL;
   return 1;
 }
+#endif
 
 /************************************************************/
 int HH_swapInIfOk()
 {
-  int kind = -1;
-
-  if (HHL->dmode == HHD_ON_HOST) {
-    kind = HHD_SI_H2D;
-  }
-  else if (HHL->dmode == HHD_ON_FILE || HHL->dmode == HHD_NONE) {
-    kind = HHD_SI_F2H;
-  }
-  else {
-    // do nothing 
-    return 0;
-  }
-
-  if (!HH_checkRes(kind)) return 0;
-
-  HH_lockSched();
-  if (!HH_checkRes(kind)) {
-    HH_unlockSched();
-    return 0;
-  }
-
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    heap *h = HHL2->heaps[ih];
+    int kind = HHD_SI_ANY;
+    if (h->checkRes(kind) == HHSS_OK) {
+      HH_lockSched();
+      if (h->checkRes(kind) == HHSS_OK) {
+	HH_unlockSched();
+	// can proceed swap
 #ifdef USE_SWAP_THREAD
-  HH_startSwap();
-  assert(HHL->dmode == kind);
+	HH_startSwapHeap(h, kind);
 #else
-  HH_swap();
+	HH_swapHeap(h, kind);
 #endif
+	return 1;
+      }
 
-  HH_unlockSched();
-  return 1;
+      HH_unlockSched();
+    }
+  }
+
+  return 0; // nothing done
 }
 
 /* swapOut may be called in this function */
 int HH_swapOutIfBetter()
 {
-  int kind = -1;
-  if (HHL->dmode == HHD_ON_HOST) {
-    kind = HHD_SO_H2F;
-  }
-  else if (HHL->dmode == HHD_ON_DEV) {
-    kind = HHD_SO_D2H;
-  }
-  else {
-    // do nothing
-    return 0;
-  }
-  
-  if (!HH_checkRes(kind)) return 0;
-
-  HH_lockSched();
-  if (!HH_checkRes(kind)) {
-    HH_unlockSched();
-    return 0;
-  }
-
-#if 1
-  HH_startSwap();
-  assert(HHL->dmode == kind);
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    heap *h = HHL2->heaps[ih];
+    int kind = HHD_SO_ANY;
+    if (h->checkRes(kind) == HHSS_OK) {
+      HH_lockSched();
+      if (h->checkRes(kind) == HHSS_OK) {
+	HH_unlockSched();
+	// can proceed swap
+#ifdef USE_SWAP_THREAD
+	HH_startSwapHeap(h, kind);
 #else
-  HH_swap();
+	HH_swapHeap(h, kind);
 #endif
-  HH_unlockSched();
+	return 1;
+      }
 
-  return 1;
+      HH_unlockSched();
+    }
+  }
+
+  return 0; // nothing done
 }
 
 // This function assumes sched_ml is locked
-int HH_swapWithCheck(int kind)
+int HH_isSwapCompleted(int kind) // kind should be HHD_SI_ANY or HHD_SO_ANY
 {
-  double st = Wtime(), et;
-  while (1) {
-    if (HH_checkRes(kind)) {
-      // can proceed
-      break;
-    }
-    HH_unlockSched();
-    et = Wtime();
-#if 0
-    if (et-st > 1.0) {
-      fprintf(stderr, "[HH_swapWithCheck@p%d] [%.2lf-%.2lf] Waiting long for %s...\n",
-	      HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), hhd_names[kind]);
-    }
+#ifdef USE_SWAP_THREAD
+  if (HHL2->swapping_heap != NULL) {
+    return 0;
+  }
 #endif
-    usleep(10*1000);
-    HH_lockSched();
-  }
 
-  et = Wtime();
-  if (et-st > 1.0) {
-    fprintf(stderr, "[HH_swapWithCheck@p%d] [%.2lf-%.2lf] Waited long for %s\n",
-	    HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), hhd_names[kind]);
+  for (int ih = 0; ih < HHL2->nheaps; ih++) {
+    heap *h = HHL2->heaps[ih];
+    if (h->checkRes(kind) != HHSS_NONEED) {
+      return 0;
+    }
   }
-  
-  HH_swap();
-
-  return 0;
+  return 1;
 }
+
 
 int HH_swapOutIfOver()
 {
-  HH_lockSched();
-  fprintf(stderr, "[HH_swapOutIfOver@p%d] %s before SwapOut\n",
-	  HH_MYID, hhd_names[HHL->dmode]);
+#ifdef HHLOG_SCHED
+  fprintf(stderr, "[HH_swapOutIfOver@p%d] started\n",
+	  HH_MYID);
+#endif
 
-  if (HHL->dmode == HHD_ON_DEV &&
-      HHS->nlprocs > HHS->ndh_slots) {
-    HH_swapWithCheck(HHD_SO_D2H);
-  }
-  else {
-    fprintf(stderr, "[HH_swapOutIfOver@p%d] D2H skipped (OK?)\n",
-	    HH_MYID);
+  while (1) {
+    HH_lockSched();
+    if (HH_isSwapCompleted(HHD_SO_ANY)) {
+      HH_unlockSched();
+      break;
+    }
+    HH_unlockSched();
+
+    HH_swapOutIfBetter();
+
+#ifdef USE_SWAP_THREAD
+    HH_lockSched();
+    if (HHL2->swapping_heap != NULL) {
+      while (1) {
+	if (HH_tryfinSwap()) break;
+
+	HH_unlockSched();
+	usleep(1000);
+	HH_lockSched();
+      }
+    }
+    HH_unlockSched();
+#endif
+
+    usleep(1000);
   }
 
-  if (HHL->dmode == HHD_ON_HOST &&
-      HHS->nlprocs > HHL2->conf.nlphost) {
-    HH_swapWithCheck(HHD_SO_H2F);
-  }
-  else {
-    fprintf(stderr, "[HH_swapOutIfOver@p%d] H2F skipped (OK?)\n",
-	    HH_MYID);
-  }
-
-  fprintf(stderr, "[HH_swapOutIfOver@p%d] %s after SwapOut\n",
-	  HH_MYID, hhd_names[HHL->dmode]);
-
-  HH_unlockSched();
+#ifdef HHLOG_SCHED
+  fprintf(stderr, "[HH_swapOutIfOver@p%d] finished\n",
+	  HH_MYID);
+#endif
 
   return 0;
 }
@@ -279,15 +207,17 @@ int HH_swapOutIfOver()
 int HH_progressSched()
 {
   int rc;
+
 #ifdef USE_SWAP_THREAD
-  if (HHL->dmode == HHD_SO_H2F || HHL->dmode == HHD_SI_F2H ||
-      HHL->dmode == HHD_SO_D2H || HHL->dmode == HHD_SI_H2D) {
-    HH_lockSched();
+  HH_lockSched();
+  if (HHL2->swapping_heap != NULL) {
     rc = HH_tryfinSwap();
     HH_unlockSched();
     return rc;
   }
+  HH_unlockSched();
 #endif
+
 
   if (HHL->pmode == HHP_BLOCKED) {
     rc = HH_swapOutIfBetter();
@@ -307,15 +237,19 @@ int HH_sleepForMemory()
   HH_profSetMode("RUNNABLE");
   
 #ifdef HHLOG_SCHED
-  fprintf(stderr, "[sleepForMemory@p%d] sleep for heap capacity\n",
-	  HH_MYID);
+  fprintf(stderr, "[HH_sleepForMemory@p%d] start sleeping (pid=%d)\n",
+	  HH_MYID, getpid());
 #endif
 
   do {
     HH_progressSched();
-    if (HHL->dmode == HHD_ON_DEV) {
+
+    HH_lockSched();
+    if (HH_isSwapCompleted(HHD_SI_ANY)) {
+      HH_unlockSched();
       break;
     }
+    HH_unlockSched();
     
     usleep(1000);
   } while (1);
@@ -336,8 +270,8 @@ int HH_sleepForMemory()
 
 
 #if 1 && defined HHLOG_SCHED
-  fprintf(stderr, "[HH_sleepForMemory@p%d] wake up!\n",
-	  HH_MYID);
+  fprintf(stderr, "[HH_sleepForMemory@p%d] wake up! (pid=%d)\n",
+	  HH_MYID, getpid());
 #endif
   
   return 0;

@@ -38,7 +38,7 @@ using namespace std;
 #define HOSTHEAP_PTR ((void*)0x700000000000)
 #define HOSTHEAP_STEP (1L*1024*1024*1024)
 
-//#define HHLOG_SCHED
+#define HHLOG_SCHED
 #define HHLOG_SWAP
 #define HHLOG_API
 
@@ -83,10 +83,13 @@ enum {
   HHD_ON_HOST,
   HHD_ON_FILE,
 
+  HHD_SO_ANY,
   HHD_SO_D2H,
   HHD_SO_H2F,
+  HHD_SI_ANY,
   HHD_SI_F2H,
   HHD_SI_H2D,
+  HHD_SWAP_NONE,
 };
 
 static const char *hhd_names[] = {
@@ -95,10 +98,13 @@ static const char *hhd_names[] = {
   "ON_HOST",
   "ON_FILE",
 
+  "SO_ANY",
   "SO_D2H",
   "SO_H2F",
+  "SI_ANY",
   "SI_F2H",
   "SI_H2D",
+  "S_NONE",
   "XXX",
   NULL,
 };
@@ -109,12 +115,22 @@ static const char *hhd_snames[] = {
   "INVALID2",
   "INVALID3",
 
+  "SO",
   "D2H",
   "H2F",
+  "SI",
   "F2H",
   "H2D",
+  "S_N",
   "XXX",
   NULL,
+};
+
+// result of checkRes
+enum {
+  HHSS_OK = 0, // swapping can be started
+  HHSS_EBUSY, // swapping must be suspended since resource is unavailable
+  HHSS_NONEED, // no need for swapping
 };
 
 /* host memory statistics */
@@ -294,8 +310,9 @@ class heap: public mempool {
   virtual int swapOut();
   virtual int swapIn();
 
+  virtual int inferSwapMode(int kind) {};
   virtual int checkRes(int kind) {};
-  virtual int reserveRes() {};
+  virtual int reserveRes(int kind) {};
   virtual int swap() {};
   virtual int releaseRes() {};
 
@@ -321,8 +338,9 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
+  virtual int inferSwapMode(int kind);
   virtual int checkRes(int kind);
-  virtual int reserveRes();
+  virtual int reserveRes(int kind);
   virtual int swap();
   virtual int releaseRes();
 
@@ -342,8 +360,9 @@ class hostheap: public heap {
   virtual int releaseHeap();
   virtual int restoreHeap();
 
+  virtual int inferSwapMode(int kind);
   virtual int checkRes(int kind);
-  virtual int reserveRes();
+  virtual int reserveRes(int kind);
   virtual int swap();
   virtual int releaseRes();
 
@@ -428,8 +447,10 @@ struct proc2 {
   heap *hostheap;
 #endif
 
+#ifdef USE_SWAP_THREAD
   pthread_t swap_tid;
-  int swap_kind;
+  heap *swapping_heap;
+#endif
 
   std::map<MPI_Request, reqfin> reqfins;
 
@@ -458,9 +479,6 @@ struct shdata {
   int ndevs; /* # of physical devs */
   int ndh_slots; /* # of dev heap slots */
 
-  // scheduling
-  int nhostusers[MAX_DH_SLOTS]; // # procs that use host-mem OR dev-mem
-  
   pthread_mutex_t sched_ml;
 
   struct dev devs[MAX_LDEVS]; /* physical device */

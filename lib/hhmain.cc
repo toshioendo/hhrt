@@ -297,9 +297,6 @@ static int initNode(int lsize, int size, hhconf *confp)
 
   HHS->ndh_slots = confp->dh_slots;
   if (HHS->ndh_slots > lsize) HHS->ndh_slots = lsize;
-  for (i = 0; i < HHS->ndh_slots; i++) {
-    HHS->nhostusers[i] = 0;
-  }
 
   /* init device structures */
   {
@@ -442,7 +439,9 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   HHL2->devheaps[HHL->curdevid] = h;
 #endif
 
-  HHL2->swap_kind = -1;
+#ifdef USE_SWAP_THREAD
+  HHL2->swapping_heap = NULL;
+#endif
 
   // blocked until heaps are accessible
   HH_sleepForMemory();

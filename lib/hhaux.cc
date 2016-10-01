@@ -69,6 +69,10 @@ int HH_profBeginAction(const char *str)
   double t = Wtime();
   strcpy(HHL2->prof.act, str);
   HHL2->prof.actst = t;
+#if 0
+  fprintf(stderr, "[HH_profBeginAction@p%d] begin %s\n",
+	  HH_MYID, str);
+#endif
   return 0;
 }
 
@@ -80,8 +84,16 @@ int HH_profEndAction(const char *str)
 
   double st = HHL2->prof.actst;
   double et = Wtime();
+  if (strcmp(str, HHL2->prof.act) != 0) {
+    fprintf(stderr, "[HH_profEndAction@p%d] %s is specified now, but current action has been %s\n",
+	    HH_MYID, str, HHL2->prof.act);
+  }
   assert(strcmp(str, HHL2->prof.act) == 0);
 
+#if 0
+  fprintf(stderr, "[HH_profEndAction@p%d] end %s\n",
+	  HH_MYID, str);
+#endif
   if (et-st > 0.002) {
     fprintf(HHL2->prof.fp,
 	    "%d ACT %s %.3lf %.3lf\n",

@@ -459,6 +459,7 @@ int hostswapper::swapOut()
 #endif
 
   releaseBuf();
+  swapped = 1;
 
   return 0;
 }

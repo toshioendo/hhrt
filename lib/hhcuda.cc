@@ -37,8 +37,8 @@ int HH_checkDev()
   HH_swapOutIfOver();
 
   fprintf(stderr, 
-	  "[HH_checkDev@p%d] After swapOutIfOver: dmode=%s\n",
-	  HH_MYID, hhd_names[HHL->dmode]);
+	  "[HH_checkDev@p%d] After swapOutIfOver\n",
+	  HH_MYID);
 
   // create heap structure for current GPU
   h = HH_devheapCreate(HH_curdev());
@@ -102,7 +102,6 @@ static int memcpy_inner(void * dst,
 			)
 {
   void *src = const_cast<void *>(src0);
-  assert (HHL->dmode != HHD_ON_DEV);
 
   if (kind == cudaMemcpyDefault) {
     fprintf(stderr, "[convDstSrc] cudaMemcpyDefault not supported yet!!!\n");
@@ -327,7 +326,6 @@ cudaError_t HHcudaMalloc(void **pp, size_t size)
   void *p = NULL;
 
   if (HHL->devmode == HHDEV_NORMAL) {
-    assert(HHL->dmode == HHD_ON_DEV);
   }
 
   p = HH_curdevheap()->alloc(size);
