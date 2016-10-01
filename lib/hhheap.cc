@@ -50,7 +50,6 @@ heap *HH_hostheapCreate()
 
 int HH_finalizeHeaps()
 {
-  assert(HHL->dmode == HHD_ON_DEV);
   int ih;
   for (ih = 0; ih < HHL2->nheaps; ih++) {
     HHL2->heaps[ih]->finalizeRec();
@@ -58,7 +57,6 @@ int HH_finalizeHeaps()
 
   HH_lockSched();
 
-  HHL->dmode = HHD_NONE;
   HHL->pmode = HHP_RUNNABLE;
   HH_profSetMode("RUNNABLE");
 

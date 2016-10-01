@@ -295,8 +295,8 @@ int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
   et = Wtime();
   long ms = (long)(1000.0*(et-st));
   if (1) {
-    fprintf(stderr, "[HHMPI_Waitall@p%d] [%.2lf] BLOCKED (%ldms) -> RUNNABLE/%s\n", 
-	    HH_MYID, Wtime_conv_prt(et), ms, hhd_names[HHL->dmode]);
+    fprintf(stderr, "[HHMPI_Waitall@p%d] [%.2lf] BLOCKED (%ldms) -> RUNNABLE\n", 
+	    HH_MYID, Wtime_conv_prt(et), ms]);
   }
 #endif
 

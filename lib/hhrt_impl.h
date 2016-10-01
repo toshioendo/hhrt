@@ -421,7 +421,6 @@ struct proc {
   int curdevid; /* device id now this process is using */
   int curfsdirid; /* fileswap dir id now this process is using (constant) */
   int pmode; /* process mode: HHP_* */
-  int dmode; /* data mode: HHD_* */
   int devmode; /* device usage mode: specified by HH_devSetMode */
   int hpid; /* heap slot id on device */
 

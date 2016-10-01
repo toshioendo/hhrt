@@ -68,9 +68,9 @@ int main(int argc, char *argv[])
   fprintf(out, "----------------------\n");
   for (i = 0; i < HHS->nlprocs; i++) {
     struct proc *HHL = &HHS->lprocs[i];
-    fprintf(out, "P%03d/L%03d/pid%05d:  %-10s %-10s hpid=%d in_api=%d host_use=%d\n",
+    fprintf(out, "P%03d/L%03d/pid%05d:  %-10s hpid=%d in_api=%d host_use=%d\n",
 	    HHL->rank, HHL->lrank, HHL->pid,
-	    hhp_names[HHL->pmode], hhd_names[HHL->dmode], HHL->hpid, HHL->in_api, HHL->host_use);
+	    hhp_names[HHL->pmode], HHL->hpid, HHL->in_api, HHL->host_use);
     fprintf(out, "    host mem stat(MiB): ");
     for (j = 0; j < HHST_MAX; j++) {
       fprintf(out, "%s=%ld  ", hhst_names[j], HHL->hmstat.used[j]>>20L);
