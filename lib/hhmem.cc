@@ -30,20 +30,20 @@ int HH_finalizeHeaps()
 // mempool class 
 int mempool::setSwapper(swapper *swapper0) 
 {
-    if (curswapper != NULL) {
-      fprintf(stderr, "[HH:mempool@p%d] curswapper set twice, this is ERROR!\n",
+    if (lower != NULL) {
+      fprintf(stderr, "[HH:mempool@p%d] lower set twice, this is ERROR!\n",
 	      HH_MYID);
       exit(1);
     }
-    curswapper = swapper0;
+    lower = swapper0;
     return 0;
 }
 
 int mempool::finalizeRec()
 {
-  if (curswapper != NULL) {
+  if (lower != NULL) {
     /* recursive finalize */
-    curswapper->finalizeRec();
+    lower->finalizeRec();
   }
 
   finalize();
@@ -63,7 +63,7 @@ heap::heap(size_t heapsize0) : mempool()
   }
 
   swap_kind = HHD_SWAP_NONE;
-  curswapper = NULL;
+  lower = NULL;
   strcpy(name, "(HEAP)");
 
   return;
@@ -241,9 +241,9 @@ int heap::swapOut()
     return 0;
   }
 
-  assert(curswapper != NULL);
-  curswapper->allocBuf();
-  curswapper->beginSeqWrite();
+  assert(lower != NULL);
+  lower->allocBuf();
+  lower->beginSeqWrite();
   swapped = 1;
 
 #if 1
@@ -259,9 +259,9 @@ int heap::swapOut()
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
 	void *dp = piadd(heapptr, mbp->doffs);
-	mbp->soffs = curswapper->allocSeq(mbp->size);
+	mbp->soffs = lower->allocSeq(mbp->size);
 
-	curswapper->write1(mbp->soffs, dp, memkind, mbp->size);
+	lower->write1(mbp->soffs, dp, memkind, mbp->size);
 
 	nmoved++;
 	smoved += mbp->size;
@@ -319,7 +319,7 @@ int heap::swapIn()
     return 0;
   }
 
-  if ( curswapper == NULL || swapped == 0) {
+  if ( lower == NULL || swapped == 0) {
     return 0;
   }
   
@@ -335,7 +335,7 @@ int heap::swapIn()
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
 	void *dp = piadd(heapptr, mbp->doffs);
-	curswapper->read1(mbp->soffs, dp, memkind, mbp->size);
+	lower->read1(mbp->soffs, dp, memkind, mbp->size);
 
 	mbp->soffs = (ssize_t)-1;
 
@@ -360,7 +360,7 @@ int heap::swapIn()
   }
 #endif
 
-  curswapper->releaseBuf();
+  lower->releaseBuf();
   swapped = 0;
 
   return 0;

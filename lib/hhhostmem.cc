@@ -231,7 +231,7 @@ int hostheap::inferSwapMode(int kind0)
       // no need to use fileswapper
       res_kind = HHD_SWAP_NONE;
     }
-    else if (curswapper != NULL && swapped == 0) {
+    else if (lower != NULL && swapped == 0) {
       res_kind = HHD_SO_H2F;
     }
     else {
@@ -243,7 +243,7 @@ int hostheap::inferSwapMode(int kind0)
       res_kind = HHD_SWAP_NONE; // nothing requried
     }
     else {
-      assert(curswapper != NULL);
+      assert(lower != NULL);
       res_kind = HHD_SI_F2H;
     }
   }
@@ -287,13 +287,13 @@ int hostheap::checkSwapRes(int kind0)
     assert(0);
   }
   else if (kind == HHD_SO_H2F) {
-    if (curswapper == NULL) {
+    if (lower == NULL) {
       res = HHSS_OK;
       line = __LINE__;
       assert(0);
     }
     
-    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower)->fsd;
     if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
       // someone is doing swapF2H or swapH2F
       res = HHSS_EBUSY;
@@ -305,7 +305,7 @@ int hostheap::checkSwapRes(int kind0)
     }
   }
   else if (kind == HHD_SI_F2H) {
-    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower)->fsd;
     if (fsd->np_filein > 0) {
       res = HHSS_EBUSY;
       line = __LINE__;
@@ -354,11 +354,11 @@ int hostheap::reserveSwapRes(int kind0)
   else if (kind == HHD_SI_F2H) {
     HHL->host_use = 1;
 
-    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower)->fsd;
     fsd->np_filein++;
   }
   else if (kind == HHD_SO_H2F) {
-    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower)->fsd;
     fsd->np_fileout++;
   }
   else {
@@ -379,14 +379,14 @@ int hostheap::doSwap()
     goto out;
   }
   else if (kind == HHD_SO_H2F) {
-    if (curswapper == NULL) {
+    if (lower == NULL) {
       goto out;
     }
     
     swapOut();
   }
   else if (kind == HHD_SI_F2H) {
-    if (curswapper == NULL) {
+    if (lower == NULL) {
       goto out;
     }
 
@@ -411,7 +411,7 @@ int hostheap::releaseSwapRes()
     // do nothing
   }
   else if (kind == HHD_SI_F2H) {
-    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower)->fsd;
     fsd->np_filein--;
     if (fsd->np_filein < 0) {
       fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_filein = %d strange\n",
@@ -423,7 +423,7 @@ int hostheap::releaseSwapRes()
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
 
-    fsdir *fsd = ((fileswapper*)curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower)->fsd;
     fsd->np_fileout--;
     if (fsd->np_fileout < 0) {
       fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_fileout = %d strange\n",
@@ -830,9 +830,9 @@ int hostswapper::swapOut()
     return 0;
   }
 
-  assert(curswapper != NULL);
-  curswapper->allocBuf();
-  curswapper->beginSeqWrite();
+  assert(lower != NULL);
+  lower->allocBuf();
+  lower->beginSeqWrite();
 
   /* write the entire swapbuf */
   /* data size is given by swcur (see allocSeq()) */
@@ -848,7 +848,7 @@ int hostswapper::swapOut()
     }
 
     void *chunk = *it;
-    curswapper->write1(0, chunk, HHM_HOST, lsize);
+    lower->write1(0, chunk, HHM_HOST, lsize);
     sum += lsize;
   }
 
@@ -876,7 +876,7 @@ int hostswapper::swapOut()
   return 0;
 }
 
-// Swaps in data FROM another swapper (curswapper) TO myself
+// Swaps in data FROM another swapper (lower) TO myself
 int hostswapper::swapIn()
 {
   double t0, t1;
@@ -891,8 +891,8 @@ int hostswapper::swapIn()
     return 0;
   }
 
-  if ( curswapper == NULL) {
-    fprintf(stderr, "[HH:hostswapper::swapIn@p%d] BUG: curswapper==NULL\n",
+  if ( lower == NULL) {
+    fprintf(stderr, "[HH:hostswapper::swapIn@p%d] BUG: lower==NULL\n",
 	    HH_MYID);
     exit(1);
   }
@@ -916,7 +916,7 @@ int hostswapper::swapIn()
       lsize = swcur % HSC_SIZE;
     }
 
-    curswapper->read1(0, chunk, HHM_HOST, lsize);
+    lower->read1(0, chunk, HHM_HOST, lsize);
     sum += lsize;
   }
   if (sum != swcur) {
@@ -935,7 +935,7 @@ int hostswapper::swapIn()
   }
 #endif
 
-  curswapper->releaseBuf();
+  lower->releaseBuf();
   swapped = 0;
 
   return 0;

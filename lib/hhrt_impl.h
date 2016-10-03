@@ -196,7 +196,7 @@ class swapper;
 // parent of swapper and heap
 class mempool {
  public:
-  mempool() {curswapper = NULL; swapped = 0;};
+  mempool() {lower = NULL; swapped = 0;};
 
   virtual int swapOut() {};
   virtual int swapIn() {};
@@ -204,7 +204,7 @@ class mempool {
   virtual int finalize() {};
   virtual int finalizeRec(); // recursive finalize
 
-  swapper *curswapper;
+  swapper *lower;
   int swapped;
   char name[16]; /* for debug */
 
@@ -214,7 +214,7 @@ class mempool {
 class swapper: public mempool {
  public:
  swapper(): mempool() {
-    align = 1; curswapper = NULL;
+    align = 1; lower = NULL;
   }
 
   virtual int finalize() {};

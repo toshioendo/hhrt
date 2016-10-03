@@ -148,7 +148,7 @@ int devheap::inferSwapMode(int kind0)
     else if (swapped == 0) {
       res_kind = HHD_SO_D2H;
     }
-    else if (curswapper->curswapper != NULL && curswapper->swapped == 0) {
+    else if (lower->lower != NULL && lower->swapped == 0) {
       res_kind = HHD_SO_H2F;
     }
     else {
@@ -159,11 +159,11 @@ int devheap::inferSwapMode(int kind0)
     if (heapptr != NULL && swapped == 0) {
       res_kind = HHD_SWAP_NONE;
     }
-    else if (curswapper->swapped == 0) {
+    else if (lower->swapped == 0) {
       res_kind = HHD_SI_H2D;
     }
     else {
-      assert(curswapper->curswapper != NULL);
+      assert(lower->lower != NULL);
       res_kind = HHD_SI_F2H;
     }
   }
@@ -225,7 +225,7 @@ int devheap::checkSwapRes(int kind0)
     }
   }
   else if (kind == HHD_SO_H2F) {
-    fsdir *fsd = ((fileswapper*)curswapper->curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower->lower)->fsd;
     if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
       // someone is doing swapF2H or swapH2F
       res = HHSS_EBUSY;
@@ -237,7 +237,7 @@ int devheap::checkSwapRes(int kind0)
     }
   }
   else if (kind == HHD_SI_F2H) {
-    fsdir *fsd = ((fileswapper*)curswapper->curswapper)->fsd;
+    fsdir *fsd = ((fileswapper*)lower->lower)->fsd;
     if (fsd->np_filein > 0) {
       // someone is doing swapF2H or swapH2F
       res = HHSS_EBUSY;
@@ -299,22 +299,22 @@ int devheap::doSwap()
     swapIn();
   }
   else if (kind == HHD_SO_H2F) {
-    if (curswapper == NULL || curswapper->curswapper == NULL) {
+    if (lower == NULL || lower->lower == NULL) {
       fprintf(stderr, "[HH:%s::swap(H2F)@p%d] SKIP\n",
 	      name, HH_MYID);
       goto out;
     }
     
-    curswapper->swapOut();
+    lower->swapOut();
   }
   else if (kind == HHD_SI_F2H) {
-    if (curswapper == NULL || curswapper->curswapper == NULL) {
+    if (lower == NULL || lower->lower == NULL) {
       fprintf(stderr, "[HH:%s::swap(F2H)@p%d] SKIP\n",
 	      name, HH_MYID);
       goto out;
     }
     
-    curswapper->swapIn();
+    lower->swapIn();
   }
   else {
     fprintf(stderr, "[HH:devheap::swap@p%d] ERROR: kind %d unknown\n",
