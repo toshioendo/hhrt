@@ -154,7 +154,7 @@ int hostheap::releaseHeap()
 
 #if 0
   fprintf(stderr, "[%s::releaseHeap@p%d] try to release heap [%p,%p)\n",
-	  name, HH_MYID, heapptr, piadd(heapptr,heapsize));
+	  name, HH_MYID, heapptr, off2ptr(heapsize));
 #endif
 
   if (heapsize > 0L) {
@@ -204,7 +204,7 @@ int hostheap::restoreHeap()
   HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
 #if 0
   fprintf(stderr, "[HH:%s::restoreHeap@p%d] sucessfully heap [%p,%p) is recoverd\n",
-	  name, HH_MYID, heapptr, piadd(heapptr,heapsize));
+	  name, HH_MYID, heapptr, offs2ptr(heapsize));
 #endif
 
   /* Now we can access HEAPPTR */
@@ -884,7 +884,7 @@ int hostswapper::swapIn()
   if (initing) {
     /* first call */
 #if 1
-    fprintf(stderr, "[HH:hostswapper::swapIn@p%d] do nothing\n",
+    fprintf(stderr, "[HH:hostswapper::swapIn@p%d] do nothing (since in initialization)\n",
 	    HH_MYID);
 #endif
     initing = 0;

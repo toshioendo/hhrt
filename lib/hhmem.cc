@@ -81,6 +81,17 @@ int heap::finalize()
   return 0;
 }
 
+void* heap::offs2ptr(ssize_t offs)
+{
+  return piadd(heapptr, offs);
+}
+
+ssize_t heap::ptr2offs(void* p)
+{
+  return ppsub(p, heapptr);
+}
+
+
 void* heap::alloc(size_t size0)
 {
   /* round up for alignment */
@@ -117,7 +128,7 @@ void* heap::alloc(size_t size0)
     /* found */
     membuf *umbp = new membuf(mbp->doffs, size, size0, HHMADV_NORMAL);
     membufs.insert(it, umbp);
-    p = piadd(heapptr, mbp->doffs);
+    p = offs2ptr(mbp->doffs);
 
     /* change the rest free buffer */
     mbp->doffs += size;
@@ -178,7 +189,7 @@ list<membuf *>::iterator heap::findMembufIter(ssize_t doffs)
 
 membuf *heap::findMembuf(void *p)
 {
-  ssize_t doffs = ppsub(p, heapptr);
+  ssize_t doffs = ptr2offs(p);
   if (doffs < 0 || doffs >= heapsize) {
     return NULL;
   }
@@ -248,7 +259,7 @@ int heap::swapOut()
 
 #if 1
   fprintf(stderr, "[HH:%s::swapOut@p%d] [%.2lf] start. heap region is [%p,%p)\n",
-	  name, HH_MYID, Wtime_conv_prt(t0), heapptr, piadd(heapptr,heapsize));
+	  name, HH_MYID, Wtime_conv_prt(t0), heapptr, offs2ptr(heapsize));
 #endif
 
   /* for all membufs */
@@ -258,7 +269,7 @@ int heap::swapOut()
       /* scan all buffers in queue */
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
-	void *dp = piadd(heapptr, mbp->doffs);
+	void *dp = offs2ptr(mbp->doffs);
 	mbp->soffs = lower->allocSeq(mbp->size);
 
 	lower->write1(mbp->soffs, dp, memkind, mbp->size);
@@ -334,7 +345,7 @@ int heap::swapIn()
       /* scan all buffers in queue */
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
-	void *dp = piadd(heapptr, mbp->doffs);
+	void *dp = offs2ptr(mbp->doffs);
 	lower->read1(mbp->soffs, dp, memkind, mbp->size);
 
 	mbp->soffs = (ssize_t)-1;
@@ -383,7 +394,7 @@ int heap::madvise(void *p, size_t size, int kind)
     mbp->kind = kind;
   }
   else if (kind == HHMADV_CANDISCARD) {
-    ssize_t doffs = ppsub(p, heapptr);
+    ssize_t doffs = ptr2offs(p);
     if (doffs == mbp->doffs && size >= mbp->usersize) {
       /* mark CANDISCARD if the whole region is specified */
       mbp->kind = kind;
@@ -419,7 +430,7 @@ int heap::dump()
     }
 
     fprintf(stderr, "  [%p,%p) --> %s\n",
-	    piadd(heapptr, mbp->doffs), piadd(heapptr, mbp->doffs+mbp->size),
+	    offs2ptr(mbp->doffs), offs2ptr(mbp->doffs+mbp->size),
 	    kind);
   }
   return 0;
