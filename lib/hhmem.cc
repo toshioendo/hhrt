@@ -27,11 +27,11 @@ int HH_finalizeHeaps()
   return 0;
 }
 
-// mempool class 
-int mempool::setSwapper(swapper *swapper0) 
+// memlayer class 
+int memlayer::setSwapper(swapper *swapper0) 
 {
     if (lower != NULL) {
-      fprintf(stderr, "[HH:mempool@p%d] lower set twice, this is ERROR!\n",
+      fprintf(stderr, "[HH:memlayer@p%d] lower set twice, this is ERROR!\n",
 	      HH_MYID);
       exit(1);
     }
@@ -39,7 +39,7 @@ int mempool::setSwapper(swapper *swapper0)
     return 0;
 }
 
-int mempool::finalizeRec()
+int memlayer::finalizeRec()
 {
   if (lower != NULL) {
     /* recursive finalize */
@@ -52,7 +52,7 @@ int mempool::finalizeRec()
 
 // heap class
 
-heap::heap(size_t heapsize0) : mempool()
+heap::heap(size_t heapsize0) : memlayer()
 {
   heapsize = roundup(heapsize0, HEAP_ALIGN); /* heap size */
 

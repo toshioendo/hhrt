@@ -194,9 +194,9 @@ struct membuf {
 class swapper;
 
 // parent of swapper and heap
-class mempool {
+class memlayer {
  public:
-  mempool() {lower = NULL; swapped = 0;};
+  memlayer() {lower = NULL; swapped = 0;};
 
   virtual int swapOut() {};
   virtual int swapIn() {};
@@ -211,9 +211,9 @@ class mempool {
 };
 
 // swapper class. This is created per heap per memory hierarchy
-class swapper: public mempool {
+class swapper: public memlayer {
  public:
- swapper(): mempool() {
+ swapper(): memlayer() {
     align = 1; lower = NULL;
   }
 
@@ -291,7 +291,7 @@ class fileswapper: public swapper {
 };
 
 /*************/
-class heap: public mempool {
+class heap: public memlayer {
  public:
   heap(size_t size0);
   virtual int finalize();
