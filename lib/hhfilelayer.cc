@@ -313,7 +313,6 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   }
 
   /* alignment */
-  //size = ((size+align-1)/align)*align;
   size = roundup(size, align);
 
   size_t lrc = read(sfd, ptr, size);

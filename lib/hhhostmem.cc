@@ -275,7 +275,7 @@ int hostheap::checkSwapResSelf(int kind)
   return res;
 }
 
-// called by heap::checkSwapRes
+// called by heap::checkSwapRes during upper layer's swapping
 int hostheap::checkSwapResAsLower(int kind)
 {
   return HHSS_OK;
@@ -316,60 +316,6 @@ int hostheap::releaseSwapResAsLower(int kind)
   return 0;
 }
 
-#if 0
-int hostheap::releaseSwapRes()
-{
-  int kind = swapping_kind;
-
-  // Release resource information after swapping
-  if (kind == HHSW_IN) {
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    fsd->np_filein--;
-    if (fsd->np_filein < 0) {
-      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_filein = %d strange\n",
-	      name, HH_MYID, fsd->np_filein);
-    }
-  }
-  else if (kind == HHSW_OUT) {
-    HHL->host_use = 0;
-    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
-	    name, HH_MYID, Wtime_prt());
-
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    fsd->np_fileout--;
-    if (fsd->np_fileout < 0) {
-      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_fileout = %d strange\n",
-	      name, HH_MYID, fsd->np_fileout);
-    }
-  }
-  else {
-    fprintf(stderr, "[HH:%s::releaseSR@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
-    exit(1);
-  }
-  swapping_kind = HHSW_NONE;
-  return 0;
-}
-#endif
-
-static int copyD2H(void *hp, void *dp, size_t size, 
-		   cudaStream_t copystream, const char *aux)
-{
-  cudaError_t crc;
-#if 0
-  fprintf(stderr, "[%s@p%d] copyD2H(%p,%p,0x%lx)\n",
-	  aux, HH_MYID, hp, dp, size);
-#endif
-  crc = cudaMemcpyAsync(hp, dp, size, cudaMemcpyDeviceToHost, copystream);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[%s@p%d] ERROR: cudaMemcpyD2H(host %p, dev %p, size 0x%lx) failed!! crc=%d\n", 
-	    aux, HH_MYID, hp, dp, size, crc);
-    exit(1); 
-  } 
-  return 0;
-}
-
-
 // copy from contiguous region to contiguous region
 int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 {
@@ -383,48 +329,14 @@ int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
-#if 1
-    // hp <- copybuf <- buf
-    if (size <= copyunit) {
-      copyD2H(copybufs[0], buf, size, copystream, "HH:hostheap::write_s(s)");
-      cudaStreamSynchronize(copystream);
-      memcpy(hp, copybufs[0], size);
+    crc = cudaMemcpyAsync(hp, buf, size, cudaMemcpyDeviceToHost, copystream);
+    if (crc != cudaSuccess) {
+      fprintf(stderr, "[HH:%s::writeSeq@p%d] cudaMemcpy(%ldMiB) failed!!\n",
+	      name, HH_MYID, size>>20);
+      exit(1);
     }
-    else {
-      ssize_t cur = 0;
-      int bufid = 0;
-      // first
-      copyD2H(copybufs[0], buf, copyunit, copystream, "HH:hostheap::write_s(1)");
-      cudaStreamSynchronize(copystream);
-      for (cur = 0; cur < size; cur += copyunit) {
-	// look ahead
-	ssize_t nextunit = copyunit;
-	if (cur+copyunit+nextunit > size) nextunit = size-(cur+copyunit);
-	if (nextunit > 0) {
-	  copyD2H(copybufs[1-bufid], piadd(buf, cur+copyunit), nextunit,
-		  copystream, "HH:hostheap::write_s");
-	}
-
-	ssize_t unit = copyunit;
-	if (cur+unit > size) unit = size-cur;
-#if 0
-	fprintf(stderr, "[HH:hostheap::write_s@p%d] memcpy(%p,%p,%ld) cur=%lx, size=%lx\n",
-		HH_MYID, piadd(hp, cur), piadd(copybufs[bufid], cur), unit, cur, size);
-#endif
-	memcpy(piadd(hp, cur), copybufs[bufid], unit);
-
-	crc = cudaStreamSynchronize(copystream);
-	if (crc != cudaSuccess) {
-	  fprintf(stderr, "[HH:hostheap::write_s@p%d] cudaSync failed, crc=%ld\n",
-		  HH_MYID, crc);
-	}
-	bufid = 1-bufid;
-      }
-    }
-#else
-    copyD2H(hp, buf, size, copystream, "HH:hostheap::write_s");
+    //copyD2H(hp, buf, size, copystream, "HH:hostheap::write_s");
     cudaStreamSynchronize(copystream);
-#endif
   }
   else {
     memcpy(hp, buf, size);
@@ -442,8 +354,8 @@ int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
     cudaError_t crc;
     crc = cudaMemcpyAsync(buf, hp, size, cudaMemcpyHostToDevice, copystream);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:hostheap::read_s@p%d] cudaMemcpy(%ldMiB) failed!!\n",
-	      HH_MYID, size>>20);
+      fprintf(stderr, "[HH:%s::readSeq@p%d] cudaMemcpy(%ldMiB) failed!!\n",
+	      name, HH_MYID, size>>20);
       exit(1);
     }
     cudaStreamSynchronize(copystream);
