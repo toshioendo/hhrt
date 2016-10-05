@@ -425,3 +425,16 @@ int fileheap::reserveSwapResAsLower(int kind)
   }
   return 0;
 }
+
+int fileheap::releaseSwapResAsLower(int kind)
+{
+  if (kind == HHSW_IN) {
+    fsd->np_filein--;
+    assert(fsd->np_filein >= 0);
+  }
+  else if (kind == HHSW_OUT) {
+    fsd->np_fileout--;
+    assert(fsd->np_fileout >= 0);
+  }
+  return 0;
+}

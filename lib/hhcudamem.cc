@@ -181,6 +181,7 @@ int devheap::checkSwapResSelf(int kind)
 int devheap::reserveSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
+    assert(device->dhslot_users[HHL->hpid] < 0);
     device->dhslot_users[HHL->hpid] = HH_MYID;
     device->np_in++;
   }
@@ -188,8 +189,7 @@ int devheap::reserveSwapResSelf(int kind)
     device->np_out++;
   }
   else {
-    fprintf(stderr, "[HH:%s::reserveSR@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
+    assert(0);
     exit(1);
   }
 
@@ -197,10 +197,8 @@ int devheap::reserveSwapResSelf(int kind)
   return 0;
 }
 
-int devheap::releaseSwapRes()
+int devheap::releaseSwapResSelf(int kind)
 {
-  int kind = swapping_kind;
-
   // Release resource information after swapping
   if (kind == HHSW_IN) {
     device->np_in--;
@@ -215,19 +213,52 @@ int devheap::releaseSwapRes()
     assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
     assert(device->dhslot_users[HHL->hpid] == HH_MYID);
     device->dhslot_users[HHL->hpid] = -1;
+#ifdef HHLOG_SWAP
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
 	    name, HH_MYID, Wtime_prt(), HHL->hpid);
+#endif
   }
   else {
-    fprintf(stderr, "[HH:%s::releaseSR@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
+    assert(0);
+    exit(1);
+  }
+
+  //swapping_kind = HHSW_NONE;
+  return 0;
+}
+
+#if 0
+int devheap::releaseSwapRes()
+{
+  int kind = swapping_kind;
+  // Release resource information after swapping
+  if (kind == HHSW_IN) {
+    device->np_in--;
+  }
+  else if (kind == HHSW_OUT) {
+    device->np_out--;
+    if (device->np_out < 0) {
+      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_out = %d strange\n",
+	      name, HH_MYID, device->np_out);
+    }
+
+    assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
+    assert(device->dhslot_users[HHL->hpid] == HH_MYID);
+    device->dhslot_users[HHL->hpid] = -1;
+#ifdef HHLOG_SWAP
+    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
+	    name, HH_MYID, Wtime_prt(), HHL->hpid);
+#endif
+  }
+  else {
+    assert(0);
     exit(1);
   }
 
   swapping_kind = HHSW_NONE;
   return 0;
 }
-
+#endif
 
 /* Device memory related used API */
 

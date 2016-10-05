@@ -417,6 +417,20 @@ int heap::doSwap()
   return 0;
 }
 
+int heap::releaseSwapRes()
+{
+  int kind = swapping_kind;
+
+  releaseSwapResSelf(kind);
+  assert(lower != NULL);
+  lower->releaseSwapResAsLower(kind);
+
+  swapping_kind = HHSW_NONE; // swap finished
+
+  return 0;
+}
+
+
 int heap::swapOut()
 {
   double t0, t1, t2;
@@ -492,7 +506,6 @@ int heap::restoreHeap()
   fprintf(stderr, "HH:heap::restoreHeap should not called\n");
   exit(1);
 }
-
 
 int heap::swapIn()
 {

@@ -288,7 +288,7 @@ int hostheap::reserveSwapResSelf(int kind)
   }
   else if (kind == HHSW_OUT) {
   }
-  swapping_kind = kind; // remember the kind
+  //swapping_kind = kind; // remember the kind
   return 0;
 }
 
@@ -297,30 +297,26 @@ int hostheap::reserveSwapResAsLower(int kind)
   return 0;
 }
 
-
-#if 0
-int hostheap::reserveSwapRes(int kind)
+int hostheap::releaseSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
-    HHL->host_use = 1;
-
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    fsd->np_filein++;
+    HHL->host_use = 0;
+#ifdef HHLOG_SWAP
+    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
+	    name, HH_MYID, Wtime_prt());
+#endif
   }
   else if (kind == HHSW_OUT) {
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    fsd->np_fileout++;
   }
-  else {
-    fprintf(stderr, "[HH:%s::reserveSR@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
-    exit(1);
-  }
-  swapping_kind = kind; // remember the kind
   return 0;
 }
-#endif
 
+int hostheap::releaseSwapResAsLower(int kind)
+{
+  return 0;
+}
+
+#if 0
 int hostheap::releaseSwapRes()
 {
   int kind = swapping_kind;
@@ -354,7 +350,7 @@ int hostheap::releaseSwapRes()
   swapping_kind = HHSW_NONE;
   return 0;
 }
-
+#endif
 
 static int copyD2H(void *hp, void *dp, size_t size, 
 		   cudaStream_t copystream, const char *aux)

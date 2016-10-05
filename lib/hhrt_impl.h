@@ -82,9 +82,6 @@ static const char *hhp_names[] = {
 };
 
 enum {
-  //  HHD_SWAP_NONE = 0,
-  //  HHD_SO_ANY,
-  //  HHD_SI_ANY,
   HHSW_NONE = 0,
   HHSW_OUT,
   HHSW_IN,
@@ -223,7 +220,9 @@ class heap: public memlayer {
   virtual int swapIn();
   virtual int doSwap();
 
-  virtual int releaseSwapRes() {};
+  virtual int releaseSwapResSelf(int kind) {};
+  virtual int releaseSwapResAsLower(int kind) {};
+  virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -257,7 +256,9 @@ class devheap: public heap {
   virtual int reserveSwapResAsLower(int kind) {};
   //virtual int reserveSwapRes(int kind);
 
-  virtual int releaseSwapRes();
+  virtual int releaseSwapResSelf(int kind);
+  virtual int releaseSwapResAsLower(int kind) {};
+  //virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -285,7 +286,9 @@ class hostheap: public heap {
   virtual int reserveSwapResAsLower(int kind);
   //virtual int reserveSwapRes(int kind);
 
-  virtual int releaseSwapRes();
+  virtual int releaseSwapResSelf(int kind);
+  virtual int releaseSwapResAsLower(int kind);
+  //virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size);
@@ -326,9 +329,10 @@ class fileheap: public heap {
 
   virtual int reserveSwapResSelf(int kind) {};
   virtual int reserveSwapResAsLower(int kind);
-  //virtual int reserveSwapRes(int kind) {return -1;};
 
-  virtual int releaseSwapRes() {return -1;};
+  virtual int releaseSwapResSelf(int kind) {};
+  virtual int releaseSwapResAsLower(int kind);
+  //virtual int releaseSwapRes() {return -1;};
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size);
