@@ -178,7 +178,7 @@ int devheap::checkSwapResSelf(int kind)
   return res;
 }
 
-int devheap::reserveSwapRes(int kind)
+int devheap::reserveSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
     device->dhslot_users[HHL->hpid] = HH_MYID;
@@ -196,7 +196,6 @@ int devheap::reserveSwapRes(int kind)
   swapping_kind = kind; // remember the kind
   return 0;
 }
-
 
 int devheap::releaseSwapRes()
 {
@@ -228,6 +227,7 @@ int devheap::releaseSwapRes()
   swapping_kind = HHSW_NONE;
   return 0;
 }
+
 
 /* Device memory related used API */
 

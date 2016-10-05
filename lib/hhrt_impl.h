@@ -215,7 +215,9 @@ class heap: public memlayer {
   virtual int checkSwapResAsLower(int kind) {};
   virtual int checkSwapRes(int kind);
 
-  virtual int reserveSwapRes(int kind) {};
+  virtual int reserveSwapResSelf(int kind) {};
+  virtual int reserveSwapResAsLower(int kind) {};
+  virtual int reserveSwapRes(int kind);
 
   virtual int swapOut();
   virtual int swapIn();
@@ -251,7 +253,10 @@ class devheap: public heap {
   virtual int checkSwapResSelf(int kind);
   virtual int checkSwapResAsLower(int kind) {return HHSS_NONEED;};
 
-  virtual int reserveSwapRes(int kind);
+  virtual int reserveSwapResSelf(int kind);
+  virtual int reserveSwapResAsLower(int kind) {};
+  //virtual int reserveSwapRes(int kind);
+
   virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -276,7 +281,10 @@ class hostheap: public heap {
   virtual int checkSwapResSelf(int kind);
   virtual int checkSwapResAsLower(int kind);
 
-  virtual int reserveSwapRes(int kind);
+  virtual int reserveSwapResSelf(int kind);
+  virtual int reserveSwapResAsLower(int kind);
+  //virtual int reserveSwapRes(int kind);
+
   virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
@@ -316,7 +324,10 @@ class fileheap: public heap {
   virtual int checkSwapResSelf(int kind) {return HHSS_NONEED;};
   virtual int checkSwapResAsLower(int kind);
 
-  virtual int reserveSwapRes(int kind) {return -1;};
+  virtual int reserveSwapResSelf(int kind) {};
+  virtual int reserveSwapResAsLower(int kind);
+  //virtual int reserveSwapRes(int kind) {return -1;};
+
   virtual int releaseSwapRes() {return -1;};
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);

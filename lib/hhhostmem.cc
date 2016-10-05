@@ -281,6 +281,24 @@ int hostheap::checkSwapResAsLower(int kind)
   return HHSS_OK;
 }
 
+int hostheap::reserveSwapResSelf(int kind)
+{
+  if (kind == HHSW_IN) {
+    HHL->host_use = 1;
+  }
+  else if (kind == HHSW_OUT) {
+  }
+  swapping_kind = kind; // remember the kind
+  return 0;
+}
+
+int hostheap::reserveSwapResAsLower(int kind)
+{
+  return 0;
+}
+
+
+#if 0
 int hostheap::reserveSwapRes(int kind)
 {
   if (kind == HHSW_IN) {
@@ -301,7 +319,7 @@ int hostheap::reserveSwapRes(int kind)
   swapping_kind = kind; // remember the kind
   return 0;
 }
-
+#endif
 
 int hostheap::releaseSwapRes()
 {

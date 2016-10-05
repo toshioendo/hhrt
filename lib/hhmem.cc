@@ -388,6 +388,16 @@ int heap::checkSwapRes(int kind)
   return res;
 }
 
+int heap::reserveSwapRes(int kind)
+{
+  reserveSwapResSelf(kind);
+  assert(lower != NULL);
+  lower->reserveSwapResAsLower(kind);
+
+  swapping_kind = kind; // remember the kind for following doSwap()
+  return 0;
+}
+
 int heap::doSwap()
 {
   int kind = swapping_kind;
