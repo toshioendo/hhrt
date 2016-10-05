@@ -116,7 +116,7 @@ int HH_swapIfOk(int kind)
 }
 
 // This function assumes sched_ml is locked
-int HH_isSwapCompleted(int kind) // kind should be HHD_SI_ANY or HHD_SO_ANY
+int HH_isSwapCompleted(int kind) // kind should be HHSW_IN or HHSW_OUT
 {
 #ifdef USE_SWAP_THREAD
   if (HHL2->swapping_heap != NULL) {
@@ -143,13 +143,13 @@ int HH_swapOutIfOver()
 
   while (1) {
     HH_lockSched();
-    if (HH_isSwapCompleted(HHD_SO_ANY)) {
+    if (HH_isSwapCompleted(HHSW_OUT)) {
       HH_unlockSched();
       break;
     }
     HH_unlockSched();
 
-    HH_swapIfOk(HHD_SO_ANY);
+    HH_swapIfOk(HHSW_OUT);
 
 #ifdef USE_SWAP_THREAD
     HH_lockSched();
@@ -193,10 +193,10 @@ int HH_progressSched()
 
 
   if (HHL->pmode == HHP_BLOCKED) {
-    rc = HH_swapIfOk(HHD_SO_ANY);
+    rc = HH_swapIfOk(HHSW_OUT);
   }
   else if (HHL->pmode == HHP_RUNNABLE) {
-    rc = HH_swapIfOk(HHD_SI_ANY);
+    rc = HH_swapIfOk(HHSW_IN);
   }
 
   return rc; /* progress */
@@ -218,7 +218,7 @@ int HH_sleepForMemory()
     HH_progressSched();
 
     HH_lockSched();
-    if (HH_isSwapCompleted(HHD_SI_ANY)) {
+    if (HH_isSwapCompleted(HHSW_IN)) {
       HH_unlockSched();
       break;
     }
@@ -342,7 +342,7 @@ int HH_yield()
 #endif
 
   /* I may be swapped out if appropriate */
-  HH_swapIfOk(HHD_SO_ANY);
+  HH_swapIfOk(HHSW_OUT);
 
   HH_sleepForMemory();
 

@@ -60,8 +60,6 @@ extern "C" {
 #define cudaMallocHost HHcudaMallocHost
 #define cudaHostAlloc HHcudaHostAlloc
 
-#warning USE_SWAPHOST
-
 #endif
 
 #ifdef USE_MMAPSWAP

@@ -115,7 +115,6 @@ int devheap::allocHeap()
 /* allocate device heap for swapIn */
 int devheap::restoreHeap()
 {
-  //dev *d = HH_curdev();
   void *dp;
 
   assert(heapptr != NULL);
@@ -136,94 +135,78 @@ int devheap::restoreHeap()
 ////////////////////////
 
 // check resource availability before actual swapping
-int devheap::checkSwapRes(int kind0)
+// called by heap::checkSwapRes
+int devheap::checkSwapResSelf(int kind)
 {
-  int res;
-  int line = -100; // debug
+  int res = -1;
+  int line = -992;
 
-  res = heap::checkSwapRes(kind0);
-  if (res == HHSS_OK) {
-    // we need further check
-    if (kind0 == HHD_SO_ANY) {
-      if (device->np_out > 0) {
-	res = HHSS_EBUSY;  // someone is doing swapD2H
-	line = __LINE__;
-      }
-      else {
-	res = HHSS_OK;
-	line = __LINE__;
-      }
-    }
-    else if (kind0 == HHD_SI_ANY) {
-      if (device->np_in > 0) {
-	res =  HHSS_EBUSY; // someone is doing swapH2D
-	line = __LINE__;
-      }
-      else if (device->dhslot_users[HHL->hpid] >= 0) {
-	res = HHSS_EBUSY; // device heap slot is occupied
-	if (device->dhslot_users[HHL->hpid] == HH_MYID) {
-	  fprintf(stderr, "[HH:%s::checkSwapRes@p%d] I'm devslot's user, STRANGE?\n",
-		  name, HH_MYID);
-	  usleep(100*1000);
-	}
-	line = __LINE__;
-      }
-      else {
-	res = HHSS_OK;
-	line = __LINE__;
-      }
+  if (kind == HHSW_OUT) {
+    if (device->np_out > 0) {
+      res = HHSS_EBUSY;  // someone is doing swap
+      line = __LINE__;
     }
     else {
-      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
-	      name, HH_MYID, kind0);
-      exit(1);
+      res = HHSS_OK;
+      line = __LINE__;
     }
   }
-
-#if 0
-  if (res == HHSS_OK || rand() % 256 == 0) {
-    const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
-    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] result=%s (line=%d)\n",
-	    name, HH_MYID, strs[res], line);
+  else if (kind == HHSW_IN) {
+    if (device->np_in > 0) {
+      res =  HHSS_EBUSY; // someone is doing swap
+      line = __LINE__;
+    }
+    else if (device->dhslot_users[HHL->hpid] >= 0) {
+      res = HHSS_EBUSY; // device heap slot is occupied
+      if (device->dhslot_users[HHL->hpid] == HH_MYID) {
+	fprintf(stderr, "[HH:%s::checkSwapRes@p%d] I'm devslot's user, STRANGE?\n",
+		name, HH_MYID);
+	usleep(100*1000);
+      }
+      line = __LINE__;
+    }
+    else {
+      res = HHSS_OK;
+      line = __LINE__;
+    }
   }
-#endif
+  else {
+    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
+    exit(1);
+  }
   return res;
 }
 
-int devheap::reserveSwapRes(int kind0)
+int devheap::reserveSwapRes(int kind)
 {
-  if (kind0 == HHD_SI_ANY) {
+  if (kind == HHSW_IN) {
     device->dhslot_users[HHL->hpid] = HH_MYID;
     device->np_in++;
   }
-  else if (kind0 == HHD_SO_ANY) {
+  else if (kind == HHSW_OUT) {
     device->np_out++;
   }
   else {
     fprintf(stderr, "[HH:%s::reserveSR@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind0);
+	    name, HH_MYID, kind);
     exit(1);
   }
 
-  swap_kind = kind0; // remember the kind
+  swapping_kind = kind; // remember the kind
   return 0;
 }
 
-int devheap::doSwap()
-{
-  heap::doSwap();
-  return 0;
-}
 
 int devheap::releaseSwapRes()
 {
-  int kind = swap_kind;
+  int kind = swapping_kind;
 
   // Release resource information after swapping
-  if (kind == HHD_SI_ANY) {
+  if (kind == HHSW_IN) {
     device->np_in--;
   }
-  else if (kind == HHD_SO_ANY) {
+  else if (kind == HHSW_OUT) {
     device->np_out--;
     if (device->np_out < 0) {
       fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_out = %d strange\n",
@@ -242,7 +225,7 @@ int devheap::releaseSwapRes()
     exit(1);
   }
 
-  swap_kind = HHD_SWAP_NONE;
+  swapping_kind = HHSW_NONE;
   return 0;
 }
 

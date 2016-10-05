@@ -31,8 +31,6 @@ using namespace std;
 
 #define USE_SWAP_THREAD 1
 
-//#define USE_SHARED_HSC 1 // deprecated
-
 // each process occupies this size even if it does nothing
 #define DEVMEM_USED_BY_PROC (85L*1024*1024) // 74L
 
@@ -46,7 +44,8 @@ using namespace std;
 #define HHLOG_SWAP
 #define HHLOG_API
 
-#define HSC_SIZE (1L*1024*1024*1024) // host swapper chunk size
+//#define USE_SHARED_HSC 1 // deprecated
+//#define HSC_SIZE (1L*1024*1024*1024) // host swapper chunk size
 
 #ifdef USE_SHARED_HSC
 #define MAX_SHSC 32
@@ -83,50 +82,18 @@ static const char *hhp_names[] = {
 };
 
 enum {
-  HHD_NONE = 0,
-  //HHD_ON_DEV,
-  //HHD_ON_HOST,
-  //HHD_ON_FILE,
-
-  HHD_SO_ANY,
-  //HHD_SO_D2H,
-  //HHD_SO_H2F,
-  HHD_SI_ANY,
-  //HHD_SI_F2H,
-  //HHD_SI_H2D,
-  HHD_SWAP_NONE,
+  //  HHD_SWAP_NONE = 0,
+  //  HHD_SO_ANY,
+  //  HHD_SI_ANY,
+  HHSW_NONE = 0,
+  HHSW_OUT,
+  HHSW_IN,
 };
 
-static const char *hhd_names[] = {
+static const char *hhsw_names[] = {
   "NONE",
-  //"ON_DEV",
-  //"ON_HOST",
-  //"ON_FILE",
-
-  "SO_ANY",
-  //"SO_D2H",
-  //"SO_H2F",
-  "SI_ANY",
-  //"SI_F2H",
-  //"SI_H2D",
-  "S_NONE",
-  "XXX",
-  NULL,
-};
-
-static const char *hhd_snames[] = {
-  "INVALID0",
-  //"INVALID1",
-  //"INVALID2",
-  //"INVALID3",
-
-  "SO",
-  //"D2H",
-  //"H2F",
-  "SI",
-  //"F2H",
-  //"H2D",
-  "S_N",
+  "SWOUT",
+  "SWIN",
   "XXX",
   NULL,
 };
@@ -206,7 +173,6 @@ class memlayer {
 
   virtual int swapOut() {};
   virtual int swapIn() {};
-  //virtual int setSwapper(swapper *swapper0);
   virtual int addLower(heap *h);
   virtual int addUpper(heap *h);
   virtual int delLower(heap *h);
@@ -224,87 +190,6 @@ class memlayer {
 
 };
 
-#if 0 /////////////////////
-// swapper class. This is created per heap per memory hierarchy
-class swapper: public memlayer {
- public:
- swapper(): memlayer() {
-    align = 1; lower = NULL;
-  }
-
-  virtual int finalize() {};
-
-  virtual int write1(ssize_t offs, void *buf, int bufkind, size_t size) {};
-  virtual int read1(ssize_t offs, void *buf, int bufkind, size_t size) {};
-
-  virtual int allocBuf() {};
-  virtual int releaseBuf() {};
-
-  virtual int swapOut() {};
-  virtual int swapIn() {};
-
-  /* sequential writer */
-  size_t swcur;
-  size_t align;
-  virtual int beginSeqWrite();
-  virtual size_t allocSeq(size_t size);
-};
-
-class hostswapper: public swapper {
- public:
-  hostswapper();
-
-  virtual int finalize();
-
-  void *getNthChunk(int n);
-  int write_small(ssize_t offs, void *buf, int bufkind, size_t size);
-  virtual int write1(ssize_t offs, void *buf, int bufkind, size_t size);
-  int read_small(ssize_t offs, void *buf, int bufkind, size_t size);
-  virtual int read1(ssize_t offs, void *buf, int bufkind, size_t size);
-
-  virtual int allocBuf();
-  virtual int releaseBuf();
-
-  virtual int swapOut();
-  virtual int swapIn();
-
-  size_t copyunit;
-  void *copybufs[2];
-  cudaStream_t copystream;
-  int initing;
-
-  // host swapper chunks
-  list <void *> hscs;
-};
-
-class fileswapper: public swapper {
- public:
-  fileswapper(int id, fsdir *fsd0);
-
-  virtual int finalize();
-
-  int openSFileIfNotYet();
-
-  int write_small(ssize_t offs, void *buf, int bufkind, size_t size);
-  virtual int write1(ssize_t offs, void *buf, int bufkind, size_t size);
-  int read_small(ssize_t offs, void *buf, int bufkind, size_t size);
-  virtual int read1(ssize_t offs, void *buf, int bufkind, size_t size);
-
-  virtual int allocBuf() {};
-  virtual int releaseBuf() {};
-
-  virtual int swapOut();
-  virtual int swapIn();
-
-  size_t copyunit;
-  void *copybufs[2];
-  cudaStream_t copystreams[2];
-  int userid;
-  char sfname[256];
-  int sfd;
-  fsdir *fsd;
-};
-#endif///////////////////////
 
 /*************/
 class heap: public memlayer {
@@ -326,12 +211,16 @@ class heap: public memlayer {
   virtual int allocHeap();
   virtual int restoreHeap();
 
+  virtual int checkSwapResSelf(int kind) {};
+  virtual int checkSwapResAsLower(int kind) {};
+  virtual int checkSwapRes(int kind);
+
+  virtual int reserveSwapRes(int kind) {};
+
   virtual int swapOut();
   virtual int swapIn();
-
-  virtual int checkSwapRes(int kind);
-  virtual int reserveSwapRes(int kind) {};
   virtual int doSwap();
+
   virtual int releaseSwapRes() {};
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -347,7 +236,7 @@ class heap: public memlayer {
   size_t align;
   int expandable;
   int memkind; // HHM_*
-  int swap_kind;
+  int swapping_kind;
 };
 
 class devheap: public heap {
@@ -359,9 +248,10 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int checkSwapRes(int kind);
+  virtual int checkSwapResSelf(int kind);
+  virtual int checkSwapResAsLower(int kind) {return HHSS_NONEED;};
+
   virtual int reserveSwapRes(int kind);
-  virtual int doSwap();
   virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -383,9 +273,10 @@ class hostheap: public heap {
   virtual int releaseHeap();
   virtual int restoreHeap();
 
-  virtual int checkSwapRes(int kind);
+  virtual int checkSwapResSelf(int kind);
+  virtual int checkSwapResAsLower(int kind);
+
   virtual int reserveSwapRes(int kind);
-  virtual int doSwap();
   virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
@@ -422,9 +313,10 @@ class fileheap: public heap {
   virtual int releaseHeap() {return 0;};
   virtual int restoreHeap() {return 0;};
 
-  virtual int checkSwapRes(int kind) {return HHSS_NONEED;};
+  virtual int checkSwapResSelf(int kind) {return HHSS_NONEED;};
+  virtual int checkSwapResAsLower(int kind);
+
   virtual int reserveSwapRes(int kind) {return -1;};
-  virtual int doSwap() {return -1;};
   virtual int releaseSwapRes() {return -1;};
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);

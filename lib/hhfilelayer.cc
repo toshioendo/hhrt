@@ -143,7 +143,9 @@ int fileheap::finalize()
   for (i = 0; i < 2; i++) {
     cudaHostUnregister(copybufs[i]);
     free(copybufs[i]);
+#if 01
     cudaStreamDestroy(copystreams[i]);
+#endif
   }
   if (sfd != -1) {
     close(sfd);
@@ -383,4 +385,32 @@ int fileheap::swapIn()
   return -1;
 }
 
+int fileheap::checkSwapResAsLower(int kind)
+{
+  int res = -1;
 
+  if (kind == HHSW_OUT) {
+    if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
+      // someone is doing swapF2H or swapH2F
+      res = HHSS_EBUSY;
+    }
+    else {
+      res = HHSS_OK;
+    }
+  }
+  else if (kind == HHSW_IN) {
+    if (fsd->np_filein > 0) {
+      res = HHSS_EBUSY;
+    }
+    else {
+      /* I can start swapF2H */
+      res = HHSS_OK;
+    }
+  }
+  else {
+    fprintf(stderr, "[HH:%s::checkSwapResAsLower@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
+    exit(1);
+  }
+  return res;
+}

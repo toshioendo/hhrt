@@ -557,7 +557,7 @@ int mainloop()
     }
 
     /* bt-steps local computation */
-    HH_devLock(); /* this may improve overall performance */
+    //HH_devLock(); /* this may improve overall performance */
     st = Wtime();
     for (ii = 0; ii < ntinner; ii++) {
       
@@ -568,7 +568,7 @@ int mainloop()
       bufid = 1-bufid;
     }
     cudaDeviceSynchronize();
-    HH_devUnlock(); /* this may improve overall performance */
+    //HH_devUnlock(); /* this may improve overall performance */
     if (logflag) {
       et = Wtime();
       ms = (long)((et-st)*1000);

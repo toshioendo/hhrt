@@ -247,100 +247,68 @@ int HH_countHostUsers()
   return count++;
 }
 
-
-int hostheap::checkSwapRes(int kind0)
+// called by heap::checkSwapRes
+int hostheap::checkSwapResSelf(int kind)
 {
-  int res = 3;
-  int line = -200; // debug
+  int res = -1;
+  int line = -991; // debug
 
-  res = heap::checkSwapRes(kind0);
-  assert(res >= 0 && res < 3);
-  if (res == HHSS_OK) {
-    // we need further check
-    if (kind0 == HHD_SO_ANY) {
-      fsdir *fsd = ((fileheap*)lower)->fsd;
-      if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
-	// someone is doing swapF2H or swapH2F
-	res = HHSS_EBUSY;
-	line = __LINE__;
-      }
-      else {
-	res = HHSS_OK;
-	line = __LINE__;
-      }
-    }
-    else if (kind0 == HHD_SI_ANY) {
-      fsdir *fsd = ((fileheap*)lower)->fsd;
-      if (fsd->np_filein > 0) {
-	res = HHSS_EBUSY;
-	line = __LINE__;
-      }
-      else if (HH_countHostUsers() >= HHL2->conf.nlphost) {
+  if (kind == HHSW_OUT) {
+    res = HHSS_OK;
+    line = __LINE__;
+  }
+  else if (kind == HHSW_IN) {
+    if (HH_countHostUsers() >= HHL2->conf.nlphost) {
 #if 0
-	fprintf(stderr, "[HH:%s::checkSwapRes@p%d] hostusers=%d >= nlphost=%d\n",
-		name, HH_MYID, HH_countHostUsers(), HHL2->conf.nlphost);
-	usleep(10*1000);
+      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] hostusers=%d >= nlphost=%d\n",
+	      name, HH_MYID, HH_countHostUsers(), HHL2->conf.nlphost);
+      usleep(10*1000);
 #endif
-	res = HHSS_EBUSY;
-	line = __LINE__;
-      }
-      else {
-	/* I can start swapF2H */
-	res = HHSS_OK;
-	line = __LINE__;
-      }
+      res = HHSS_EBUSY;
+      line = __LINE__;
     }
     else {
-      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
-	      name, HH_MYID, kind0);
-      exit(1);
+      res = HHSS_OK;
+      line = __LINE__;
     }
   }
-
-#if 0
-  if (rand() % 256 == 0) {
-    const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
-    fprintf(stderr, "[checkSR] res=%d\n", res);
-    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] result=%s (line=%d)\n",
-	    name, HH_MYID, strs[res], line);
-  }
-#endif
   return res;
 }
 
-int hostheap::reserveSwapRes(int kind0)
+// called by heap::checkSwapRes
+int hostheap::checkSwapResAsLower(int kind)
 {
-  if (kind0 == HHD_SI_ANY) {
+  return HHSS_OK;
+}
+
+int hostheap::reserveSwapRes(int kind)
+{
+  if (kind == HHSW_IN) {
     HHL->host_use = 1;
 
     fsdir *fsd = ((fileheap*)lower)->fsd;
     fsd->np_filein++;
   }
-  else if (kind0 == HHD_SO_ANY) {
+  else if (kind == HHSW_OUT) {
     fsdir *fsd = ((fileheap*)lower)->fsd;
     fsd->np_fileout++;
   }
   else {
     fprintf(stderr, "[HH:%s::reserveSR@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind0);
+	    name, HH_MYID, kind);
     exit(1);
   }
-  swap_kind = kind0; // remember the kind
+  swapping_kind = kind; // remember the kind
   return 0;
 }
 
-int hostheap::doSwap()
-{
-  heap::doSwap();
-  return 0;
-}
 
 int hostheap::releaseSwapRes()
 {
-  int kind = swap_kind;
+  int kind = swapping_kind;
 
   // Release resource information after swapping
-  if (kind == HHD_SI_ANY) {
+  if (kind == HHSW_IN) {
     fsdir *fsd = ((fileheap*)lower)->fsd;
     fsd->np_filein--;
     if (fsd->np_filein < 0) {
@@ -348,7 +316,7 @@ int hostheap::releaseSwapRes()
 	      name, HH_MYID, fsd->np_filein);
     }
   }
-  else if (kind == HHD_SO_ANY) {
+  else if (kind == HHSW_OUT) {
     HHL->host_use = 0;
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
@@ -365,7 +333,7 @@ int hostheap::releaseSwapRes()
 	    name, HH_MYID, kind);
     exit(1);
   }
-  swap_kind = HHD_SWAP_NONE;
+  swapping_kind = HHSW_NONE;
   return 0;
 }
 
@@ -457,17 +425,6 @@ int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
 
   if (bufkind == HHM_DEV) {
-#if 0
-    cudaError_t crc;
-    memcpy(copybufs[0], hp, size);
-    crc = cudaMemcpyAsync(buf, copybufs[0], size, cudaMemcpyHostToDevice, copystream);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:hostheap::read_s@p%d] cudaMemcpy(%ldMiB) failed!!\n",
-	      HH_MYID, size>>20);
-      exit(1);
-    }
-    cudaStreamSynchronize(copystream);
-#else
     cudaError_t crc;
     crc = cudaMemcpyAsync(buf, hp, size, cudaMemcpyHostToDevice, copystream);
     if (crc != cudaSuccess) {
@@ -476,7 +433,6 @@ int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
       exit(1);
     }
     cudaStreamSynchronize(copystream);
-#endif
   }
   else {
     memcpy(buf, hp, size);
@@ -542,7 +498,7 @@ int hostmmapheap::restoreHeap()
 
 
 /************************************************/
-/* User level API */
+/* User API */
 
 int HH_madvise(void *p, size_t size, int kind)
 {

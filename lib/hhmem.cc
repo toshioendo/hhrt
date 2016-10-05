@@ -14,7 +14,7 @@ int HH_finalizeHeaps()
 {
   int ih;
   for (ih = 0; ih < HHL2->nheaps; ih++) {
-    HHL2->heaps[ih]->finalizeRec();
+    HHL2->heaps[ih]->finalize();
   }
 
   HH_lockSched();
@@ -114,7 +114,7 @@ heap::heap(size_t heapsize0) : memlayer()
     membufs.push_back(mbp);
   }
 
-  swap_kind = HHD_SWAP_NONE;
+  swapping_kind = HHSW_NONE;
   strcpy(name, "(HEAP)");
 
   return;
@@ -265,12 +265,12 @@ int heap::free(void *p)
 
   membuf *mbp = findMembuf(p);
   if (mbp == NULL) {
-    fprintf(stderr, "[heap::free@p%d] pointer %p is invalid\n",
-	    HH_MYID, p);
+    fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is invalid\n",
+	    name, HH_MYID, p);
     return -1;
   }
   if (mbp->kind == HHMADV_FREED) {
-    fprintf(stderr, "[%s::free@p%d] pointer %p is doubly freed\n",
+    fprintf(stderr, "[HH:hea@(%s)::free@p%d] pointer %p is doubly freed\n",
 	    name, HH_MYID, p);
     return -1;
   }
@@ -298,25 +298,29 @@ int heap::releaseHeap()
 /***********************/
 /* swapping facility (at basis class)*/
 
+
 int heap::checkSwapRes(int kind)
 {
-  int res = -123;
+  int res = HHSS_OK;
   int line = -200; // debug
 
   if (lower == NULL) {
     res = HHSS_NONEED;
     line == __LINE__;
+    goto out;
   }
-  else if (swap_kind != HHD_SWAP_NONE) {
+  else if (swapping_kind != HHSW_NONE) {
     // already swapping is ongoing (this happens in threaded swap)
     res = HHSS_EBUSY;
     line = __LINE__;
+    goto out;
   }
-  else if (kind == HHD_SO_ANY) {
+  else if (kind == HHSW_OUT) {
     if (swapped) {
       // swapping-out was already done
       res = HHSS_NONEED;
       line = __LINE__;
+      goto out;
     }
     else {
       // check upper hosts
@@ -332,20 +336,16 @@ int heap::checkSwapRes(int kind)
 	// there is a not-swapped upper host. we should wait
 	res = HHSS_EBUSY;
 	line = __LINE__;
-      }
-      else {
-	// It seems we can start swap, 
-	// but the decision may be overridden by child class
-	res = HHSS_OK;
-	line = __LINE__;
+	goto out;
       }
     }
   }
-  else if (kind == HHD_SI_ANY) {
+  else if (kind == HHSW_IN) {
     if (swapped == 0) {
       // swapping-in was already done
       res = HHSS_NONEED;
       line = __LINE__;
+      goto out;
     }
     else {
       // check lower host
@@ -354,12 +354,7 @@ int heap::checkSwapRes(int kind)
 	// we have to wait lower heap's swapping-in
 	res = HHSS_EBUSY;
 	line = __LINE__;
-      }
-      else {
-	// It seems we can start swap, 
-	// but the decision may be overridden by child class
-	res = HHSS_OK;
-	line = __LINE__;
+	goto out;
       }
     }
   }
@@ -369,11 +364,25 @@ int heap::checkSwapRes(int kind)
     exit(1);
   }
 
+  // we still need check
+  // class specific check
+  res = checkSwapResSelf(kind);
+  if (res != HHSS_OK) {
+    line = __LINE__;
+    goto out;
+  }
+
+  // class specific check of lower layer
+  assert(lower != NULL);
+  res = lower->checkSwapResAsLower(kind);
+  line = __LINE__;
+
+ out:
 #if 0
   if (rand() % 256 == 0) {
     const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
     fprintf(stderr, "[HH:heap(%s)::checkSwapRes@p%d] for %s result=%s (line=%d)\n",
-	    name, HH_MYID, hhd_names[kind], strs[res], line);
+	    name, HH_MYID, hhsw_names[kind], strs[res], line);
   }
 #endif
   return res;
@@ -381,20 +390,20 @@ int heap::checkSwapRes(int kind)
 
 int heap::doSwap()
 {
-  int kind = swap_kind;
-  HH_profBeginAction(hhd_snames[kind]);
-  if (kind == HHD_SO_ANY) {
+  int kind = swapping_kind;
+  HH_profBeginAction(hhsw_names[kind]);
+  if (kind == HHSW_OUT) {
     swapOut();
   }
-  else if (kind == HHD_SI_ANY) {
+  else if (kind == HHSW_IN) {
     swapIn();
   }
   else {
-    fprintf(stderr, "[HH:heap(%s)::doSwap@p%d] ERROR: kind [%s] unknown\n",
-	    name, HH_MYID, hhd_names[kind]);
+    fprintf(stderr, "[HH:heap(%s)::doSwap@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
     exit(1);
   }
-  HH_profEndAction(hhd_snames[kind]);
+  HH_profEndAction(hhsw_names[kind]);
   return 0;
 }
 
@@ -411,10 +420,6 @@ int heap::swapOut()
   }
 
   assert(lower != NULL);
-#if 0
-  lower->allocBuf();
-  lower->beginSeqWrite();
-#endif
 
 #if 1
   fprintf(stderr, "[HH:%s::swapOut@p%d] [%.2lf] start. heap region is [%p,%p)\n",
@@ -429,7 +434,6 @@ int heap::swapOut()
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
 	void *dp = offs2ptr(mbp->doffs);
-#if 1
 	void *sp = lower->alloc(mbp->size);
 #if 0
 	fprintf(stderr, "[HH:%s::swapOut@p%d] got pointer %p from %s\n",
@@ -437,10 +441,6 @@ int heap::swapOut()
 #endif
 	mbp->soffs = lower->ptr2offs(sp);
 	lower->writeSeq(mbp->soffs, dp, memkind, mbp->size);
-#else
-	mbp->soffs = lower->allocSeq(mbp->size);
-	lower->write1(mbp->soffs, dp, memkind, mbp->size);
-#endif
 
 	nmoved++;
 	smoved += mbp->size;
@@ -517,13 +517,9 @@ int heap::swapIn()
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
 	void *dp = offs2ptr(mbp->doffs);
-#if 1
 	lower->readSeq(mbp->soffs, dp, memkind, mbp->size);
 	void *sp = lower->offs2ptr(mbp->soffs);
 	lower->free(sp);
-#else
-	lower->read1(mbp->soffs, dp, memkind, mbp->size);
-#endif
 
 	mbp->soffs = (ssize_t)-1;
 
@@ -546,10 +542,6 @@ int heap::swapIn()
 	    name, HH_MYID, Wtime_conv_prt(t0), Wtime_conv_prt(t1),
 	    smoved>>20, (smoved+sskipped)>>20, (t1-t0)*1000.0, mbps);
   }
-#endif
-
-#if 0
-  lower->releaseBuf();
 #endif
 
   return 0;
