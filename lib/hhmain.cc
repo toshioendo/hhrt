@@ -268,7 +268,9 @@ static int initNode(int lsize, int size, hhconf *confp)
   HHS->nprocs = size;
   strcpy(HHS->hostname, hostname);
 
+#if 0
   HH_hsc_init_node();
+#endif
 
   HH_mutex_init(&HHS->sched_ml);
 
@@ -407,7 +409,9 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
     HHL->curfsdirid = lrank % confp->n_fileswap_dirs;
   }
 
+#if 0
   HH_hsc_init_proc();
+#endif
 
   // see also devheap::reserveRes()
   HHL->hpid = lrank % HHS->ndh_slots;
@@ -422,21 +426,25 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   }
 
   heap *h;
-#ifdef USE_SWAPHOST
+
+  HHL2->fileheap = NULL;
+  /* file layer (name is fileheap) */
+  if (HHL->curfsdirid >= 0) {
+    h = HH_fileheapCreate(HH_curfsdir());
+    /* h is referred by heaps[] and fileheap */
+    HHL2->heaps[HHL2->nheaps++] = h;
+    HHL2->fileheap = h;
+  }
+
+  /* even if the app does not use HHmalloc, */
+  /* hostheap is set up for the swapper */
   h = HH_hostheapCreate();
   /* h is referred by heaps[] and hostheap */
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->hostheap = h;
   HHL->host_use = 0;
-#else
-  HHL->host_use = 1;
-#endif
 
-#if 0 // Now this is done lazily. see HH_checkDev() in hhcuda.cc
-  h = HH_devheapCreate(HH_curdev());
-  HHL2->heaps[HHL2->nheaps++] = h;
-  HHL2->devheaps[HHL->curdevid] = h;
-#endif
+  // setting up device heap is done lazily
 
 #ifdef USE_SWAP_THREAD
   HHL2->swapping_heap = NULL;
@@ -662,10 +670,11 @@ int HHMPI_Finalize()
   MPI_Barrier(MPI_COMM_WORLD);
   ipsm_destroy();
 #endif
+#if 0
   if (lrank == 0) {
     HH_hsc_fin_node();
   }
-
+#endif
 
   MPI_Finalize();
 

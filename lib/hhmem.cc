@@ -28,15 +28,67 @@ int HH_finalizeHeaps()
 }
 
 // memlayer class 
-int memlayer::setSwapper(swapper *swapper0) 
+memlayer::memlayer()
 {
-    if (lower != NULL) {
-      fprintf(stderr, "[HH:memlayer@p%d] lower set twice, this is ERROR!\n",
-	      HH_MYID);
-      exit(1);
+  lower = NULL; 
+  for (int i = 0; i < MAX_UPPERS; i++) {
+    uppers[i] = NULL;
+  }
+  swapped = 1;
+}
+
+int memlayer::addLower(heap *h) 
+{
+  if (lower != NULL) {
+    fprintf(stderr, "[HH:%s::addLower@p%d] ERROR: lower set twice!\n",
+	    name, HH_MYID);
+    exit(1);
+  }
+  lower = h;
+  return 0;
+}
+
+int memlayer::delLower(heap *h) 
+{
+  if (lower != h) {
+    fprintf(stderr, "[HH:%s::delLower@p%d] ERROR: invalid layer (%s) specified!\n",
+	    name, HH_MYID, h->name);
+    exit(1);
+  }
+  lower = NULL;
+  return 0;
+}
+
+int memlayer::addUpper(heap *h)
+{
+  int i;
+  for (int i = 0; i < MAX_UPPERS; i++) {
+    if (uppers[i] == NULL) {
+      uppers[i] = h;
+      return 0;
     }
-    lower = swapper0;
-    return 0;
+  }
+
+  fprintf(stderr, "[HH:%s::addUpper@p%d] ERROR: too many upper layer (>=%d)\n",
+	  HH_MYID, name, MAX_UPPERS);
+  exit(1);
+  return -1;
+}
+
+int memlayer::delUpper(heap *h)
+{
+  int i;
+  for (int i = 0; i < MAX_UPPERS; i++) {
+    if (uppers[i] == h) {
+      uppers[i] = NULL;
+      return 0;
+    }
+  }
+
+  fprintf(stderr, "[HH:%s::delUpper@p%d] ERROR: invalid layer (%s) specified!\n",
+	  HH_MYID, name, h->name);
+  exit(1);
+  return -1;
 }
 
 int memlayer::finalizeRec()
@@ -63,7 +115,6 @@ heap::heap(size_t heapsize0) : memlayer()
   }
 
   swap_kind = HHD_SWAP_NONE;
-  lower = NULL;
   strcpy(name, "(HEAP)");
 
   return;
@@ -104,6 +155,11 @@ void* heap::alloc(size_t size0)
   int nfreed = 0;
   size_t freed = 0;
   int nretries = 0;
+
+  if (heapptr == NULL) {
+    fprintf(stderr, "[HH:%s::aloc@p%d] heapptr=%p invalid\n",
+	    name, HH_MYID, heapptr);
+  }
 
   assert(heapptr != NULL);
 
@@ -232,12 +288,114 @@ int heap::expandHeap(size_t reqsize)
   exit(1);
 }
 
-
-/***********************/
 int heap::releaseHeap()
 {
   fprintf(stderr, "heap::releaseHeap should not called\n");
   exit(1);
+}
+
+
+/***********************/
+/* swapping facility (at basis class)*/
+
+int heap::checkSwapRes(int kind)
+{
+  int res = -123;
+  int line = -200; // debug
+
+  if (lower == NULL) {
+    res = HHSS_NONEED;
+    line == __LINE__;
+  }
+  else if (swap_kind != HHD_SWAP_NONE) {
+    // already swapping is ongoing (this happens in threaded swap)
+    res = HHSS_EBUSY;
+    line = __LINE__;
+  }
+  else if (kind == HHD_SO_ANY) {
+    if (swapped) {
+      // swapping-out was already done
+      res = HHSS_NONEED;
+      line = __LINE__;
+    }
+    else {
+      // check upper hosts
+      int ih;
+      for (ih = 0; ih < MAX_UPPERS; ih++) {
+	heap *h = uppers[ih];
+	if (h != NULL && h->swapped == 0) {
+	  break;
+	}
+      }
+
+      if (ih < MAX_UPPERS) {
+	// there is a not-swapped upper host. we should wait
+	res = HHSS_EBUSY;
+	line = __LINE__;
+      }
+      else {
+	// It seems we can start swap, 
+	// but the decision may be overridden by child class
+	res = HHSS_OK;
+	line = __LINE__;
+      }
+    }
+  }
+  else if (kind == HHD_SI_ANY) {
+    if (swapped == 0) {
+      // swapping-in was already done
+      res = HHSS_NONEED;
+      line = __LINE__;
+    }
+    else {
+      // check lower host
+      heap *h = lower;
+      if (heapptr != NULL && h != NULL && h->swapped) {
+	// we have to wait lower heap's swapping-in
+	res = HHSS_EBUSY;
+	line = __LINE__;
+      }
+      else {
+	// It seems we can start swap, 
+	// but the decision may be overridden by child class
+	res = HHSS_OK;
+	line = __LINE__;
+      }
+    }
+  }
+  else {
+    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
+    exit(1);
+  }
+
+#if 0
+  if (rand() % 256 == 0) {
+    const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
+    fprintf(stderr, "[HH:heap(%s)::checkSwapRes@p%d] for %s result=%s (line=%d)\n",
+	    name, HH_MYID, hhd_names[kind], strs[res], line);
+  }
+#endif
+  return res;
+}
+
+int heap::doSwap()
+{
+  int kind = swap_kind;
+  HH_profBeginAction(hhd_snames[kind]);
+  if (kind == HHD_SO_ANY) {
+    swapOut();
+  }
+  else if (kind == HHD_SI_ANY) {
+    swapIn();
+  }
+  else {
+    fprintf(stderr, "[HH:heap(%s)::doSwap@p%d] ERROR: kind [%s] unknown\n",
+	    name, HH_MYID, hhd_names[kind]);
+    exit(1);
+  }
+  HH_profEndAction(hhd_snames[kind]);
+  return 0;
 }
 
 int heap::swapOut()
@@ -253,9 +411,10 @@ int heap::swapOut()
   }
 
   assert(lower != NULL);
+#if 0
   lower->allocBuf();
   lower->beginSeqWrite();
-  swapped = 1;
+#endif
 
 #if 1
   fprintf(stderr, "[HH:%s::swapOut@p%d] [%.2lf] start. heap region is [%p,%p)\n",
@@ -270,9 +429,18 @@ int heap::swapOut()
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
 	void *dp = offs2ptr(mbp->doffs);
+#if 1
+	void *sp = lower->alloc(mbp->size);
+#if 0
+	fprintf(stderr, "[HH:%s::swapOut@p%d] got pointer %p from %s\n",
+		name, HH_MYID, sp, lower->name);
+#endif
+	mbp->soffs = lower->ptr2offs(sp);
+	lower->writeSeq(mbp->soffs, dp, memkind, mbp->size);
+#else
 	mbp->soffs = lower->allocSeq(mbp->size);
-
 	lower->write1(mbp->soffs, dp, memkind, mbp->size);
+#endif
 
 	nmoved++;
 	smoved += mbp->size;
@@ -297,6 +465,7 @@ int heap::swapOut()
   }
 #endif
 
+  swapped = 1;
   releaseHeap();
 
   return 0;
@@ -323,8 +492,9 @@ int heap::swapIn()
 
   if (heapptr == NULL) { // firstswapin
     allocHeap();
+    swapped = 0;
 #ifdef HHLOG_SWAP
-    fprintf(stderr, "[HH:%s::swapIn@p%d] allocHeap() for first swapin\n",
+    fprintf(stderr, "[HH:%s::swapIn@p%d] allocHeap() called for first swapin. swapIn finished immediately\n",
 	    name, HH_MYID);
 #endif
     return 0;
@@ -335,6 +505,7 @@ int heap::swapIn()
   }
   
   assert(heapptr != NULL);
+  swapped = 0;
   restoreHeap();
 
   t0 = Wtime();
@@ -346,7 +517,13 @@ int heap::swapIn()
       membuf *mbp = *it;
       if (mbp->kind == HHMADV_NORMAL) {
 	void *dp = offs2ptr(mbp->doffs);
+#if 1
+	lower->readSeq(mbp->soffs, dp, memkind, mbp->size);
+	void *sp = lower->offs2ptr(mbp->soffs);
+	lower->free(sp);
+#else
 	lower->read1(mbp->soffs, dp, memkind, mbp->size);
+#endif
 
 	mbp->soffs = (ssize_t)-1;
 
@@ -371,8 +548,9 @@ int heap::swapIn()
   }
 #endif
 
+#if 0
   lower->releaseBuf();
-  swapped = 0;
+#endif
 
   return 0;
 }
@@ -409,8 +587,8 @@ int heap::madvise(void *p, size_t size, int kind)
 
 int heap::dump()
 {
-  fprintf(stderr, "[HH:%s::dump@p%d]\n",
-	  name, HH_MYID);
+  fprintf(stderr, "[HH:%s::dump@p%d] heapptr=%p\n",
+	  name, HH_MYID, heapptr);
   list<membuf *>::iterator it;
   for (it = membufs.begin(); it != membufs.end(); it++) {
     /* scan all buffers in queue */
@@ -434,19 +612,5 @@ int heap::dump()
 	    kind);
   }
   return 0;
-}
-
-/* swapper class */
-int swapper::beginSeqWrite()
-{
-  swcur = 0;
-  return 0;
-}
-
-size_t swapper::allocSeq(size_t size)
-{
-  size_t cur = swcur;
-  swcur += roundup(size, align);
-  return cur;
 }
 

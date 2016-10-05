@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
 #include <string.h>
 #include "hhrt_impl.h"
 
@@ -17,15 +18,10 @@ heap *HH_devheapCreate(dev *d)
   h = (heap *)dh;
   /* make memory hierarchy for devheap */
 
-  swapper *s1;
-  s1 = (swapper*)(new hostswapper());
-  h->setSwapper(s1);
+  assert(HHL2->hostheap != NULL);
+  h->addLower(HHL2->hostheap);
+  HHL2->hostheap->addUpper(h);
 
-  swapper *s2 = NULL;
-  {
-    s2 = new fileswapper(0, HH_curfsdir());
-    s1->setSwapper(s2);
-  }
   return h;
 }
 
@@ -185,6 +181,47 @@ int devheap::checkSwapRes(int kind0)
 {
   int res;
   int line = -100; // debug
+
+#if 1
+  res = heap::checkSwapRes(kind0);
+  if (res == HHSS_OK) {
+    // we need further check
+    if (kind0 == HHD_SO_ANY) {
+      if (device->np_out > 0) {
+	res = HHSS_EBUSY;  // someone is doing swapD2H
+	line = __LINE__;
+      }
+      else {
+	res = HHSS_OK;
+	line = __LINE__;
+      }
+    }
+    else if (kind0 == HHD_SI_ANY) {
+      if (device->np_in > 0) {
+	res =  HHSS_EBUSY; // someone is doing swapH2D
+	line = __LINE__;
+      }
+      else if (device->dhslot_users[HHL->hpid] >= 0) {
+	res = HHSS_EBUSY; // device heap slot is occupied
+	if (device->dhslot_users[HHL->hpid] == HH_MYID) {
+	  fprintf(stderr, "[HH:%s::checkSwapRes@p%d] I'm devslot's user, STRANGE?\n",
+		  name, HH_MYID);
+	  usleep(100*1000);
+	}
+	line = __LINE__;
+      }
+      else {
+	res = HHSS_OK;
+	line = __LINE__;
+      }
+    }
+    else {
+      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
+	      name, HH_MYID, kind0);
+      exit(1);
+    }
+  }
+#else
   int kind = inferSwapMode(kind0);
 
   if (swap_kind != HHD_SWAP_NONE) {
@@ -225,7 +262,7 @@ int devheap::checkSwapRes(int kind0)
     }
   }
   else if (kind == HHD_SO_H2F) {
-    fsdir *fsd = ((fileswapper*)lower->lower)->fsd;
+    fsdir *fsd = ((fileheap*)lower->lower)->fsd;
     if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
       // someone is doing swapF2H or swapH2F
       res = HHSS_EBUSY;
@@ -237,7 +274,7 @@ int devheap::checkSwapRes(int kind0)
     }
   }
   else if (kind == HHD_SI_F2H) {
-    fsdir *fsd = ((fileswapper*)lower->lower)->fsd;
+    fsdir *fsd = ((fileheap*)lower->lower)->fsd;
     if (fsd->np_filein > 0) {
       // someone is doing swapF2H or swapH2F
       res = HHSS_EBUSY;
@@ -253,9 +290,10 @@ int devheap::checkSwapRes(int kind0)
 	    name, HH_MYID, kind);
     exit(1);
   }
+#endif
 
 #if 0
-  if (rand() % 256 == 0) {
+  if (res == HHSS_OK || rand() % 256 == 0) {
     const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
     fprintf(stderr, "[HH:%s::checkSwapRes@p%d] result=%s (line=%d)\n",
 	    name, HH_MYID, strs[res], line);
@@ -266,6 +304,22 @@ int devheap::checkSwapRes(int kind0)
 
 int devheap::reserveSwapRes(int kind0)
 {
+#if 1
+  if (kind0 == HHD_SI_ANY) {
+    device->dhslot_users[HHL->hpid] = HH_MYID;
+    device->np_in++;
+  }
+  else if (kind0 == HHD_SO_ANY) {
+    device->np_out++;
+  }
+  else {
+    fprintf(stderr, "[HH:%s::reserveSR@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind0);
+    exit(1);
+  }
+
+  swap_kind = kind0; // remember the kind
+#else
   int kind = inferSwapMode(kind0);
   swap_kind = kind; // remember the kind
 
@@ -284,11 +338,15 @@ int devheap::reserveSwapRes(int kind0)
   else {
     // do nothing
   }
+#endif
   return 0;
 }
 
 int devheap::doSwap()
 {
+#if 1
+  heap::doSwap();
+#else
   int kind = swap_kind;
   HH_profBeginAction(hhd_snames[kind]);
 
@@ -323,6 +381,7 @@ int devheap::doSwap()
   }
  out:
   HH_profEndAction(hhd_snames[kind]);
+#endif
   return 0;
 }
 
@@ -331,10 +390,10 @@ int devheap::releaseSwapRes()
   int kind = swap_kind;
 
   // Release resource information after swapping
-  if (kind == HHD_SI_H2D) {
+  if (kind == HHD_SI_ANY) {
     device->np_in--;
   }
-  else if (kind == HHD_SO_D2H) {
+  else if (kind == HHD_SO_ANY) {
     device->np_out--;
     if (device->np_out < 0) {
       fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_out = %d strange\n",
@@ -347,11 +406,10 @@ int devheap::releaseSwapRes()
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
 	    name, HH_MYID, Wtime_prt(), HHL->hpid);
   }
-  else if (kind == HHD_SI_F2H) {
-    // reserve is done by hostheap. is it OK?
-  }
   else {
-    // do nothing
+    fprintf(stderr, "[HH:%s::releaseSR@p%d] ERROR: kind %d unknown\n",
+	    name, HH_MYID, kind);
+    exit(1);
   }
 
   swap_kind = HHD_SWAP_NONE;

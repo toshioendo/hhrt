@@ -14,12 +14,13 @@ using namespace std;
 
 #define MAX_LDEVS 16  /* max #GPUs per node */
 #define MAX_LSIZE 256 /* max #procs per node */
-#define MAX_HEAPS (MAX_LDEVS+1) /* max # of heaps per proc */
+#define MAX_HEAPS (MAX_LDEVS+2) /* max # of heaps per proc */
 #define MAX_DH_SLOTS 8 /* HH_DH_SLOTS (env var) cannot exceed this */
 #define HOSTNAMELEN 64
 #define CONFSTRLEN 128
 #define HEAP_ALIGN (size_t)(1024*1024)
 #define MAX_FILESWAP_DIRS 8
+#define MAX_UPPERS 16 /* max upper memory layers per layer */
 
 #define HH_IPSM_KEY ((key_t)0x1234)
 
@@ -30,13 +31,16 @@ using namespace std;
 
 #define USE_SWAP_THREAD 1
 
-//#define USE_SHARED_HSC 1 // buggy
+//#define USE_SHARED_HSC 1 // deprecated
 
 // each process occupies this size even if it does nothing
 #define DEVMEM_USED_BY_PROC (85L*1024*1024) // 74L
 
 #define HOSTHEAP_PTR ((void*)0x700000000000)
 #define HOSTHEAP_STEP (1L*1024*1024*1024)
+
+#define FILEHEAP_STEP (256L*1024*1024)
+#define FILEHEAP_PTR ((void*)512) // the pointer is not accessed
 
 #define HHLOG_SCHED
 #define HHLOG_SWAP
@@ -60,6 +64,7 @@ enum {
   HHM_HOST = 0,
   HHM_PINNED,
   HHM_DEV,
+  HHM_FILE,
 };
 
 
@@ -191,25 +196,35 @@ struct membuf {
   ssize_t soffs; /* offset of swapepd out buffer */
 };
 
-class swapper;
+//class swapper;
+class heap;
 
 // parent of swapper and heap
 class memlayer {
  public:
-  memlayer() {lower = NULL; swapped = 0;};
+  memlayer();
 
   virtual int swapOut() {};
   virtual int swapIn() {};
-  virtual int setSwapper(swapper *swapper0);
+  //virtual int setSwapper(swapper *swapper0);
+  virtual int addLower(heap *h);
+  virtual int addUpper(heap *h);
+  virtual int delLower(heap *h);
+  virtual int delUpper(heap *h);
   virtual int finalize() {};
   virtual int finalizeRec(); // recursive finalize
 
-  swapper *lower;
+  // description of memory layer tree
+  //swapper *lower;
+  heap *lower;
+  heap *uppers[MAX_UPPERS];
+
   int swapped;
   char name[16]; /* for debug */
 
 };
 
+#if 0 /////////////////////
 // swapper class. This is created per heap per memory hierarchy
 class swapper: public memlayer {
  public:
@@ -289,6 +304,7 @@ class fileswapper: public swapper {
   int sfd;
   fsdir *fsd;
 };
+#endif///////////////////////
 
 /*************/
 class heap: public memlayer {
@@ -314,10 +330,13 @@ class heap: public memlayer {
   virtual int swapIn();
 
   virtual int inferSwapMode(int kind) {};
-  virtual int checkSwapRes(int kind) {};
+  virtual int checkSwapRes(int kind);
   virtual int reserveSwapRes(int kind) {};
-  virtual int doSwap() {};
+  virtual int doSwap();
   virtual int releaseSwapRes() {};
+
+  virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
+  virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
 
   virtual int madvise(void *p, size_t size, int kind);
 
@@ -347,6 +366,9 @@ class devheap: public heap {
   virtual int doSwap();
   virtual int releaseSwapRes();
 
+  virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
+  virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
+
   void *allocDevMem(size_t heapsize);
   void *hp_baseptr;
   dev *device;
@@ -369,9 +391,17 @@ class hostheap: public heap {
   virtual int doSwap();
   virtual int releaseSwapRes();
 
+  virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
+  virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size);
+
   virtual void *allocCapacity(size_t offset, size_t size);
+
   int swapfd;
   int mmapflags;
+
+  size_t copyunit;
+  void *copybufs[2];
+  cudaStream_t copystream;
 };
 
 class hostmmapheap: public hostheap {
@@ -382,6 +412,44 @@ class hostmmapheap: public hostheap {
 
   fsdir *fsd;
 };
+
+class fileheap: public heap {
+ public:
+  fileheap(int id, fsdir *fsd0);
+
+  virtual int finalize();
+
+  virtual int expandHeap(size_t reqsize);
+
+  virtual int allocHeap() {return 0;};
+  virtual int releaseHeap() {return 0;};
+  virtual int restoreHeap() {return 0;};
+
+  virtual int inferSwapMode(int kind) {return 0;};
+  virtual int checkSwapRes(int kind) {return HHSS_NONEED;};
+  virtual int reserveSwapRes(int kind) {return -1;};
+  virtual int doSwap() {return -1;};
+  virtual int releaseSwapRes() {return -1;};
+
+  virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
+  virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size);
+
+  int openSFileIfNotYet();
+  int write_small(ssize_t offs, void *buf, int bufkind, size_t size);
+  int read_small(ssize_t offs, void *buf, int bufkind, size_t size);
+
+  virtual int swapOut();
+  virtual int swapIn();
+
+  size_t copyunit;
+  void *copybufs[2];
+  cudaStream_t copystreams[2];
+  int userid;
+  char sfname[256];
+  int sfd;
+  fsdir *fsd;
+};
+
 
 #define HHRF_SEND (1 << 0)
 #define HHRF_RECV (1 << 1)
@@ -442,12 +510,11 @@ struct proc2 {
   hhconf conf;
 
   int nheaps;
-  heap *heaps[MAX_HEAPS];
+  heap *heaps[MAX_HEAPS]; // list of all heap structures
 
   heap *devheaps[MAX_LDEVS];
-#ifdef USE_SWAPHOST
   heap *hostheap;
-#endif
+  heap *fileheap;
 
 #ifdef USE_SWAP_THREAD
   pthread_t swap_tid;
@@ -503,37 +570,27 @@ extern struct shdata *HHS;
 
 /************************************************/
 /* internal functions */
-int HH_default_devid(int lrank);
 dev *HH_curdev();
 heap *HH_curdevheap();
 fsdir *HH_curfsdir();
 int HH_mutex_init(pthread_mutex_t *ml);
-
-int HH_makeSFileName(fsdir *fsd, int id, char sfname[256]);
-int HH_openSFile(char sfname[256]);
+void HHstacktrace();
 
 
 /****************************************/
 /* hhmem.cc: memory management */
-int HH_swapInH2D();
-int HH_swapInF2H();
-int HH_startSwapInF2H();
-int HH_tryfinSwapInF2H();
-int HH_swapOutD2H();
-int HH_swapOutH2F();
-int HH_startSwapOutH2F();
-int HH_tryfinSwapOutH2F();
+int HH_finalizeHeaps();
+
+/* hhXXXmem.cc: each file layer */
+heap *HH_devheapCreate(dev *d);
+heap *HH_hostheapCreate();
+heap *HH_fileheapCreate(fsdir *fsd);
 
 int HH_addHostMemStat(int kind, ssize_t incr);
 int HH_printHostMemStat();
 
-/****************************************/
-/* hhheap.cc: heap structures */
-heap *HH_devheapCreate(dev *d);
-#ifdef USE_SWAPHOST
-heap *HH_hostheapCreate();
-#endif
-int HH_finalizeHeaps();
+int HH_makeSFileName(fsdir *fsd, int id, char sfname[256]);
+int HH_openSFile(char sfname[256]);
 
 /****************************************/
 /* hhsched.cc: scheduling */
@@ -541,21 +598,13 @@ int HH_lockSched();
 int HH_unlockSched();
 
 int HH_progressSched();
+int HH_sleepForMemory();
+int HH_swapOutIfOver();
+
 int HH_enterAPI(const char *str);
 int HH_exitAPI();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();
-
-int HH_sleepForMemory();
-int HH_swapInIfOk();
-int HH_swapOutIfBetter();
-int HH_swapOutIfOver();
-
-int HH_hsc_init_node();
-int HH_hsc_init_proc();
-int HH_hsc_fin_node();
-void *HH_hsc_alloc(int id);
-int HH_hsc_free(void *p);
 
 /****************************************/
 /* hhcuda.cc: for CUDA */
@@ -568,7 +617,6 @@ int HH_profBeginAction(const char *str);
 int HH_profEndAction(const char *str);
 
 
-void HHstacktrace();
 
 /* aux definitions */
 static double Wtime()

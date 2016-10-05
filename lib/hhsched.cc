@@ -91,37 +91,10 @@ int HH_tryfinSwap()
 #endif
 
 /************************************************************/
-int HH_swapInIfOk()
+int HH_swapIfOk(int kind)
 {
   for (int ih = 0; ih < HHL2->nheaps; ih++) {
     heap *h = HHL2->heaps[ih];
-    int kind = HHD_SI_ANY;
-    if (h->checkSwapRes(kind) == HHSS_OK) {
-      HH_lockSched();
-      if (h->checkSwapRes(kind) == HHSS_OK) {
-	HH_unlockSched();
-	// can proceed swap
-#ifdef USE_SWAP_THREAD
-	HH_startSwapHeap(h, kind);
-#else
-	HH_swapHeap(h, kind);
-#endif
-	return 1;
-      }
-
-      HH_unlockSched();
-    }
-  }
-
-  return 0; // nothing done
-}
-
-/* swapOut may be called in this function */
-int HH_swapOutIfBetter()
-{
-  for (int ih = 0; ih < HHL2->nheaps; ih++) {
-    heap *h = HHL2->heaps[ih];
-    int kind = HHD_SO_ANY;
     if (h->checkSwapRes(kind) == HHSS_OK) {
       HH_lockSched();
       if (h->checkSwapRes(kind) == HHSS_OK) {
@@ -176,7 +149,7 @@ int HH_swapOutIfOver()
     }
     HH_unlockSched();
 
-    HH_swapOutIfBetter();
+    HH_swapIfOk(HHD_SO_ANY);
 
 #ifdef USE_SWAP_THREAD
     HH_lockSched();
@@ -220,10 +193,10 @@ int HH_progressSched()
 
 
   if (HHL->pmode == HHP_BLOCKED) {
-    rc = HH_swapOutIfBetter();
+    rc = HH_swapIfOk(HHD_SO_ANY);
   }
   else if (HHL->pmode == HHP_RUNNABLE) {
-    rc = HH_swapInIfOk();
+    rc = HH_swapIfOk(HHD_SI_ANY);
   }
 
   return rc; /* progress */
@@ -369,7 +342,7 @@ int HH_yield()
 #endif
 
   /* I may be swapped out if appropriate */
-  HH_swapOutIfBetter();
+  HH_swapIfOk(HHD_SO_ANY);
 
   HH_sleepForMemory();
 

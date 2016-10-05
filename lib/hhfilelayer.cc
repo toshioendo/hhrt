@@ -11,7 +11,14 @@
 
 /* File layer management */
 
-/*** fileswapper ******/
+heap *HH_fileheapCreate(fsdir *fsd)
+{
+  heap *h;
+  h = new fileheap(1, fsd);
+  return h;
+}
+
+/*** fileheap ******/
 
 int HH_makeSFileName(fsdir *fsd, int id, char sfname[256])
 {
@@ -41,13 +48,13 @@ int HH_openSFile(char sfname[256])
   int sfd;
   sfd = open(sfname, O_CREAT | O_RDWR | O_DIRECT, 0700);
   if (sfd == -1) {
-    fprintf(stderr, "[HH:fileswapper::openSFile@p%d] ERROR in open(%s)\n",
+    fprintf(stderr, "[HH_openSFile@p%d] ERROR in open(%s)\n",
 	    HH_MYID, sfname);
     exit(1);
   }
 
 #ifdef HHLOG_SWAP
-  fprintf(stderr, "[HH:fileswapper::openSFile@p%d(L%d)] created a file %s\n",
+  fprintf(stderr, "[HH_openSFile@p%d(L%d)] created a file %s\n",
 	  HH_MYID, HHL->lrank, sfname);
 #endif
 
@@ -62,7 +69,7 @@ int HH_openSFile(char sfname[256])
 #else
 
 #ifdef HHLOG_SWAP
-  fprintf(stderr, "[HH:fileswapper::openSFile@p%d(L%d)] the file %s will be REMAINED. BE CAREFUL.\n",
+  fprintf(stderr, "[HH_openSFile@p%d(L%d)] the file %s will be REMAINED. BE CAREFUL.\n",
 	  HH_MYID, HHL->lrank, sfname);
 #endif
 
@@ -71,7 +78,7 @@ int HH_openSFile(char sfname[256])
 }
 
 // file open is delayed
-int fileswapper::openSFileIfNotYet()
+int fileheap::openSFileIfNotYet()
 {
   if (sfd != -1) return 0;
 
@@ -89,14 +96,19 @@ int fileswapper::openSFileIfNotYet()
   return 0;
 }
 
-fileswapper::fileswapper(int id, fsdir *fsd0) : swapper()
+fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
 {
   int rc;
   cudaError_t crc;
 
-  sprintf(name, "fileswapper");
+  sprintf(name, "fileheap");
 
-  align = 512;
+  expandable = 1;
+  swapped = 0;
+
+  heapptr = FILEHEAP_PTR;
+  align = 512L;
+  memkind = HHM_FILE;
 
   userid = id;
   sfd = -1; // open swapfile later
@@ -109,14 +121,14 @@ fileswapper::fileswapper(int id, fsdir *fsd0) : swapper()
     copybufs[i] = valloc(copyunit);
     crc = cudaHostRegister(copybufs[i], copyunit, 0 /*cudaHostRegisterPortable*/);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:fileswapper::init@p%d] cudaHostRegister(%ldMiB) failed (rc=%d)\n",
+      fprintf(stderr, "[HH:fileheap::init@p%d] cudaHostRegister(%ldMiB) failed (rc=%d)\n",
 	      HH_MYID, copyunit>>20, crc);
       exit(1);
     }
 
     crc = cudaStreamCreate(&copystreams[i]);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:fileswapper::init@p%d] cudaStreamCreate failed (rc=%d)\n",
+      fprintf(stderr, "[HH:fileheap::init@p%d] cudaStreamCreate failed (rc=%d)\n",
 	      HH_MYID, crc);
       exit(1);
     }
@@ -125,7 +137,7 @@ fileswapper::fileswapper(int id, fsdir *fsd0) : swapper()
   return;
 }
 
-int fileswapper::finalize()
+int fileheap::finalize()
 {
   int i;
   for (i = 0; i < 2; i++) {
@@ -137,19 +149,48 @@ int fileswapper::finalize()
     close(sfd);
   }
 
+  heap::finalize();
+
   return 0;
 }
 
-int fileswapper::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
+int fileheap::expandHeap(size_t reqsize)
+{
+  size_t addsize;
+  void *p;
+  void *mapp;
+  if (reqsize > FILEHEAP_STEP) {
+    addsize = roundup(reqsize, FILEHEAP_STEP);
+  }
+  else {
+    addsize = FILEHEAP_STEP;
+  }
+
+  /* expand succeeded */
+  /* make a single large free area */
+  membuf *mbp = new membuf(heapsize, addsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
+
+#if 1  
+  fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
+	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
+#endif
+  heapsize += addsize;
+  
+  return 0;
+}
+
+
+int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
 {
   void *ptr;
 #if 0
-  fprintf(stderr, "[HH:fileswapper::write1@p%d] start (align=%ld)\n",
-	  HH_MYID, align);
+  fprintf(stderr, "[HH:fileheap::write_small@p%d] start (offs=%ld, size=%ld, align=%ld)\n",
+	  HH_MYID, offs, size, align);
 #endif
 
   if ((offs % align) != 0) {
-    fprintf(stderr, "[HH:fileswapper::write1@p%d] offs=0x%lx not supported. to be fixed!\n",
+    fprintf(stderr, "[HH:fileheap::write_small@p%d] offs=0x%lx not supported. to be fixed!\n",
 	    HH_MYID, offs);
     return 0;
   }
@@ -158,7 +199,7 @@ int fileswapper::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
     cudaError_t crc;
     crc = cudaMemcpyAsync(copybufs[0], buf, size, cudaMemcpyDeviceToHost, copystreams[0]);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:fileswapper::write1@p%d] cudaMemcpy failed\n",
+      fprintf(stderr, "[HH:fileheap::write_small@p%d] cudaMemcpy failed\n",
 	      HH_MYID);
       exit(1);
     }
@@ -167,7 +208,7 @@ int fileswapper::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   }
   else if ((size_t)buf % align != 0) {
 #if 1
-    fprintf(stderr, "[HH:fileswapper::write1@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
+    fprintf(stderr, "[HH:fileheap::write_small@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
 	    HH_MYID, buf, size);
 #endif
     memcpy(copybufs[0], buf, size);
@@ -180,7 +221,7 @@ int fileswapper::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   /* seek the swap file */
   off_t orc = lseek(sfd, offs, SEEK_SET);
   if (orc != offs) {
-    fprintf(stderr, "[HH:fileswapper::write1@p%d] ERROR lseek(0x%lx) -> %ld curious!\n",
+    fprintf(stderr, "[HH:fileheap::write_small@p%d] ERROR lseek(0x%lx) -> %ld curious!\n",
 	    HH_MYID, offs, orc);
     exit(1);
   }
@@ -191,20 +232,25 @@ int fileswapper::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
 
   size_t lrc = write(sfd, ptr, size);
   if (lrc != size) {
-    fprintf(stderr, "[HH:fileswapper::write1@p%d] ERROR write(%d,%p,0x%lx) -> %ld curious! (offs=0x%lx, errno=%d)\n",
+    fprintf(stderr, "[HH:fileheap::write_small@p%d] ERROR write(%d,%p,0x%lx) -> %ld curious! (offs=0x%lx, errno=%d)\n",
 	    HH_MYID, sfd, ptr, size, lrc, offs, errno);
     exit(1);
   }
 #if 0
-  fprintf(stderr, "[HH:fileswapper::write1@p%d] OK lseek(0x%lx) and write(%d,%p,0x%lx) (align=%ld)\n",
+  fprintf(stderr, "[HH:fileheap::write_small@p%d] OK lseek(0x%lx) and write(%d,%p,0x%lx) (align=%ld)\n",
 	  HH_MYID, offs, sfd, ptr, size, align);
 #endif
   return 0;
 }
 
-int fileswapper::write1(ssize_t offs, void *buf, int bufkind, size_t size)
+int fileheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 {
   openSFileIfNotYet();
+
+#if 0
+  fprintf(stderr, "[HH:fileheap::writeSeq@p%d] start (offs=0x%lx, buf=%p, size=%ld, align=%ld)\n",
+	  HH_MYID, offs, buf, size, align);
+#endif
 
   size_t cur;
   void *p = buf;
@@ -214,7 +260,7 @@ int fileswapper::write1(ssize_t offs, void *buf, int bufkind, size_t size)
       // Refrain writing if someone is reading
       while (fsd->np_filein > 0) {
 #if 0
-	fprintf(stderr, "[HH:fileswapper::write1@p%d] suspend writing since np_filein=%d\n",
+	fprintf(stderr, "[HH:fileheap::writeSeq@p%d] suspend writing since np_filein=%d\n",
 		HH_MYID, fsd->np_filein);
 #endif
 	usleep(10*1000);
@@ -232,11 +278,11 @@ int fileswapper::write1(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
-int fileswapper::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
+int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
 {
   void *ptr;
 #if 0
-  fprintf(stderr, "[HH:fileswapper::read_s@p%d] start (align=%ld)\n",
+  fprintf(stderr, "[HH:fileheap::read_s@p%d] start (align=%ld)\n",
 	  HH_MYID, align);
 #endif
 
@@ -251,7 +297,7 @@ int fileswapper::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   }
 
   if ((offs % align) != 0) {
-    fprintf(stderr, "[HH:fileswapper::read_s@p%d] offs=0x%lx not supported. to be fixed!\n",
+    fprintf(stderr, "[HH:fileheap::read_s@p%d] offs=0x%lx not supported. to be fixed!\n",
 	    HH_MYID, offs);
     return 0;
   }
@@ -259,7 +305,7 @@ int fileswapper::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   /* seek the swap file */
   off_t orc = lseek(sfd, offs, SEEK_SET);
   if (orc != offs) {
-    fprintf(stderr, "[HH:fileswapper::read_s@p%d] ERROR lseek(0x%lx) -> %ld curious!\n",
+    fprintf(stderr, "[HH:fileheap::read_s@p%d] ERROR lseek(0x%lx) -> %ld curious!\n",
 	    HH_MYID, offs, orc);
     exit(1);
   }
@@ -270,7 +316,7 @@ int fileswapper::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
 
   size_t lrc = read(sfd, ptr, size);
   if (lrc != size) {
-    fprintf(stderr, "[HH:fileswapper::read_s@p%d] ERROR read(%d,%p,0x%lx) -> %ld curious! (errno=%d)\n",
+    fprintf(stderr, "[HH:fileheap::read_s@p%d] ERROR read(%d,%p,0x%lx) -> %ld curious! (errno=%d)\n",
 	    HH_MYID, sfd, ptr, size, lrc, errno);
     exit(1);
   }
@@ -279,7 +325,7 @@ int fileswapper::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
     cudaError_t crc;
     crc = cudaMemcpyAsync(buf, copybufs[0], size, cudaMemcpyHostToDevice, copystreams[0]);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:fileswapper::read_s@p%d] cudaMemcpy failed\n",
+      fprintf(stderr, "[HH:fileheap::read_s@p%d] cudaMemcpy failed\n",
 	      HH_MYID);
       exit(1);
     }
@@ -287,21 +333,21 @@ int fileswapper::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   }
   else if ((size_t)buf % align != 0) {
 #if 1
-    fprintf(stderr, "[HH:fileswapper::read_s@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
+    fprintf(stderr, "[HH:fileheap::read_s@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
 	    HH_MYID, buf, size);
 #endif
     memcpy(buf, copybufs[0], size);
   }
 
 #if 0
-  fprintf(stderr, "[HH:fileswapper::read_s@p%d] OK (align=%ld)\n",
+  fprintf(stderr, "[HH:fileheap::read_s@p%d] OK (align=%ld)\n",
 	  HH_MYID, align);
 #endif
 
   return 0;
 }
 
-int fileswapper::read1(ssize_t offs, void *buf, int bufkind, size_t size)
+int fileheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 {
   openSFileIfNotYet();
 
@@ -321,17 +367,17 @@ int fileswapper::read1(ssize_t offs, void *buf, int bufkind, size_t size)
 
 
 /* */
-int fileswapper::swapOut()
+int fileheap::swapOut()
 {
-  fprintf(stderr, "[HH:fileswapper::swapOut@p%d] ERROR: This should not be called\n",
+  fprintf(stderr, "[HH:fileheap::swapOut@p%d] ERROR: This should not be called\n",
 	  HH_MYID);
   exit(1);
   return -1;
 }
 
-int fileswapper::swapIn()
+int fileheap::swapIn()
 {
-  fprintf(stderr, "[HH:fileswapper::swapIn@p%d] ERROR: This should not be called\n",
+  fprintf(stderr, "[HH:fileheap::swapIn@p%d] ERROR: This should not be called\n",
 	  HH_MYID);
   exit(1);
   return -1;
