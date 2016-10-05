@@ -84,31 +84,31 @@ static const char *hhp_names[] = {
 
 enum {
   HHD_NONE = 0,
-  HHD_ON_DEV,
-  HHD_ON_HOST,
-  HHD_ON_FILE,
+  //HHD_ON_DEV,
+  //HHD_ON_HOST,
+  //HHD_ON_FILE,
 
   HHD_SO_ANY,
-  HHD_SO_D2H,
-  HHD_SO_H2F,
+  //HHD_SO_D2H,
+  //HHD_SO_H2F,
   HHD_SI_ANY,
-  HHD_SI_F2H,
-  HHD_SI_H2D,
+  //HHD_SI_F2H,
+  //HHD_SI_H2D,
   HHD_SWAP_NONE,
 };
 
 static const char *hhd_names[] = {
   "NONE",
-  "ON_DEV",
-  "ON_HOST",
-  "ON_FILE",
+  //"ON_DEV",
+  //"ON_HOST",
+  //"ON_FILE",
 
   "SO_ANY",
-  "SO_D2H",
-  "SO_H2F",
+  //"SO_D2H",
+  //"SO_H2F",
   "SI_ANY",
-  "SI_F2H",
-  "SI_H2D",
+  //"SI_F2H",
+  //"SI_H2D",
   "S_NONE",
   "XXX",
   NULL,
@@ -116,16 +116,16 @@ static const char *hhd_names[] = {
 
 static const char *hhd_snames[] = {
   "INVALID0",
-  "INVALID1",
-  "INVALID2",
-  "INVALID3",
+  //"INVALID1",
+  //"INVALID2",
+  //"INVALID3",
 
   "SO",
-  "D2H",
-  "H2F",
+  //"D2H",
+  //"H2F",
   "SI",
-  "F2H",
-  "H2D",
+  //"F2H",
+  //"H2D",
   "S_N",
   "XXX",
   NULL,
@@ -329,7 +329,6 @@ class heap: public memlayer {
   virtual int swapOut();
   virtual int swapIn();
 
-  virtual int inferSwapMode(int kind) {};
   virtual int checkSwapRes(int kind);
   virtual int reserveSwapRes(int kind) {};
   virtual int doSwap();
@@ -360,7 +359,6 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int inferSwapMode(int kind);
   virtual int checkSwapRes(int kind);
   virtual int reserveSwapRes(int kind);
   virtual int doSwap();
@@ -385,7 +383,6 @@ class hostheap: public heap {
   virtual int releaseHeap();
   virtual int restoreHeap();
 
-  virtual int inferSwapMode(int kind);
   virtual int checkSwapRes(int kind);
   virtual int reserveSwapRes(int kind);
   virtual int doSwap();
@@ -425,7 +422,6 @@ class fileheap: public heap {
   virtual int releaseHeap() {return 0;};
   virtual int restoreHeap() {return 0;};
 
-  virtual int inferSwapMode(int kind) {return 0;};
   virtual int checkSwapRes(int kind) {return HHSS_NONEED;};
   virtual int reserveSwapRes(int kind) {return -1;};
   virtual int doSwap() {return -1;};

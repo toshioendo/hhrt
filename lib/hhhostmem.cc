@@ -247,50 +247,12 @@ int HH_countHostUsers()
   return count++;
 }
 
-int hostheap::inferSwapMode(int kind0)
-{
-  int res_kind;
-  if (kind0 == HHD_SO_ANY) {
-    if (HHL2->conf.nlphost >= HHS->nlprocs) {
-      // no need to use swapping-out
-      res_kind = HHD_SWAP_NONE;
-    }
-    else if (lower != NULL && swapped == 0) {
-      res_kind = HHD_SO_H2F;
-    }
-    else {
-      res_kind = HHD_SWAP_NONE; // nothing requried
-    }
-  }
-  else if (kind0 == HHD_SI_ANY) {
-    if (heapptr != NULL && swapped == 0) {
-      res_kind = HHD_SWAP_NONE; // nothing requried
-    }
-    else {
-      assert(lower != NULL);
-      res_kind = HHD_SI_F2H;
-    }
-  }
-  else {
-    res_kind = kind0;
-  }
-
-#if 0
-  if (res_kind != kind0) {
-    fprintf(stderr, "[HH:%s::inferSwapMode@p%d] swap_kind inferred %s -> %s\n",
-	    name, HH_MYID, hhd_names[kind0], hhd_names[res_kind]);
-    usleep(10000);
-  }
-#endif
-  return res_kind;
-}
 
 int hostheap::checkSwapRes(int kind0)
 {
   int res = 3;
   int line = -200; // debug
 
-#if 1
   res = heap::checkSwapRes(kind0);
   assert(res >= 0 && res < 3);
   if (res == HHSS_OK) {
@@ -334,74 +296,6 @@ int hostheap::checkSwapRes(int kind0)
       exit(1);
     }
   }
-#else
-  int kind = inferSwapMode(kind0);
-
-  if (swap_kind != HHD_SWAP_NONE) {
-    // already swapping is ongoing (this happens in threaded swap)
-    res = HHSS_EBUSY;
-    line = __LINE__;
-  }
-  else if (kind == HHD_SWAP_NONE) {
-    res = HHSS_NONEED;
-    line = __LINE__;
-  }
-  else if (kind == HHD_SO_D2H) {
-    res = HHSS_OK;
-    line = __LINE__;
-    assert(0);
-  }
-  else if (kind == HHD_SI_H2D) {
-    res = HHSS_OK;
-    line = __LINE__;
-    assert(0);
-  }
-  else if (kind == HHD_SO_H2F) {
-    if (lower == NULL) {
-      res = HHSS_OK;
-      line = __LINE__;
-      assert(0);
-    }
-    
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
-      // someone is doing swapF2H or swapH2F
-      res = HHSS_EBUSY;
-      line = __LINE__;
-    }
-    else {
-      res = HHSS_OK;
-      line = __LINE__;
-    }
-  }
-  else if (kind == HHD_SI_F2H) {
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    if (fsd->np_filein > 0) {
-      res = HHSS_EBUSY;
-      line = __LINE__;
-    }
-    else if (HH_countHostUsers() >= HHL2->conf.nlphost) {
-#if 0
-      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] hostusers=%d >= nlphost=%d\n",
-	      name, HH_MYID, HH_countHostUsers(), HHL2->conf.nlphost);
-      usleep(10*1000);
-#endif
-      res = HHSS_EBUSY;
-      line = __LINE__;
-    }
-    else {
-      /* I can start swapF2H */
-      res = HHSS_OK;
-      line = __LINE__;
-    }
-  }
-  else {
-    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
-    exit(1);
-  }
-#endif
-
 
 #if 0
   if (rand() % 256 == 0) {
@@ -416,7 +310,6 @@ int hostheap::checkSwapRes(int kind0)
 
 int hostheap::reserveSwapRes(int kind0)
 {
-#if 1
   if (kind0 == HHD_SI_ANY) {
     HHL->host_use = 1;
 
@@ -433,68 +326,12 @@ int hostheap::reserveSwapRes(int kind0)
     exit(1);
   }
   swap_kind = kind0; // remember the kind
-#else
-  int kind = inferSwapMode(kind0);
-  swap_kind = kind; // remember the kind
-  
-  // Reserve resource information before swapping
-  // This must be called after last checkSwapRes(), without releasing schedule lock
-  if (kind == HHD_SI_H2D) {
-    // do nothing
-  }
-  else if (kind == HHD_SI_F2H) {
-    HHL->host_use = 1;
-
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    fsd->np_filein++;
-  }
-  else if (kind == HHD_SO_H2F) {
-    fsdir *fsd = ((fileheap*)lower)->fsd;
-    fsd->np_fileout++;
-  }
-  else {
-    // do nothing
-  }
-#endif
   return 0;
 }
 
 int hostheap::doSwap()
 {
-#if 1
   heap::doSwap();
-#else
-  int kind = swap_kind;
-  HH_profBeginAction(hhd_snames[kind]);
-
-  if (kind == HHD_SO_D2H) {
-    goto out;
-  }
-  else if (kind == HHD_SI_H2D) {
-    goto out;
-  }
-  else if (kind == HHD_SO_H2F) {
-    if (lower == NULL) {
-      goto out;
-    }
-    
-    swapOut();
-  }
-  else if (kind == HHD_SI_F2H) {
-    if (lower == NULL) {
-      goto out;
-    }
-
-    swapIn();
-  }
-  else {
-    fprintf(stderr, "[HH:%s::swap@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
-    exit(1);
-  }
- out:
-  HH_profEndAction(hhd_snames[kind]);
-#endif
   return 0;
 }
 
@@ -620,7 +457,7 @@ int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
 
   if (bufkind == HHM_DEV) {
-#if 1
+#if 0
     cudaError_t crc;
     memcpy(copybufs[0], hp, size);
     crc = cudaMemcpyAsync(buf, copybufs[0], size, cudaMemcpyHostToDevice, copystream);

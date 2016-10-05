@@ -134,47 +134,6 @@ int devheap::restoreHeap()
 }
 
 ////////////////////////
-int devheap::inferSwapMode(int kind0)
-{
-  int res_kind;
-  if (kind0 == HHD_SO_ANY) {
-    if (HHS->nlprocs <= HHS->ndh_slots) {
-      res_kind = HHD_SWAP_NONE;
-    }
-    else if (swapped == 0) {
-      res_kind = HHD_SO_D2H;
-    }
-    else if (lower->lower != NULL && lower->swapped == 0) {
-      res_kind = HHD_SO_H2F;
-    }
-    else {
-      res_kind = HHD_SWAP_NONE;
-    }
-  }
-  else if (kind0 == HHD_SI_ANY) {
-    if (heapptr != NULL && swapped == 0) {
-      res_kind = HHD_SWAP_NONE;
-    }
-    else if (lower->swapped == 0) {
-      res_kind = HHD_SI_H2D;
-    }
-    else {
-      assert(lower->lower != NULL);
-      res_kind = HHD_SI_F2H;
-    }
-  }
-  else {
-    res_kind = kind0;
-  }
-
-#if 0
-  if (res_kind != kind0) {
-    fprintf(stderr, "[HH:%s::inferSwapMode@p%d] swap_kind inferred %s -> %s\n",
-	    name, HH_MYID, hhd_names[kind0], hhd_names[res_kind]);
-  }
-#endif
-  return res_kind;
-}
 
 // check resource availability before actual swapping
 int devheap::checkSwapRes(int kind0)
@@ -182,7 +141,6 @@ int devheap::checkSwapRes(int kind0)
   int res;
   int line = -100; // debug
 
-#if 1
   res = heap::checkSwapRes(kind0);
   if (res == HHSS_OK) {
     // we need further check
@@ -221,76 +179,6 @@ int devheap::checkSwapRes(int kind0)
       exit(1);
     }
   }
-#else
-  int kind = inferSwapMode(kind0);
-
-  if (swap_kind != HHD_SWAP_NONE) {
-    // already swapping is ongoing (this happens in threaded swap)
-    res = HHSS_EBUSY;
-    line = __LINE__;
-  }
-  else if (kind == HHD_SWAP_NONE) {
-    res = HHSS_NONEED;
-    line = __LINE__;
-  }
-  else if (kind == HHD_SO_D2H) {
-    if (device->np_out > 0) {
-      res = HHSS_EBUSY;  // someone is doing swapD2H
-      line = __LINE__;
-    }
-    else {
-      res = HHSS_OK;
-      line = __LINE__;
-    }
-  }
-  else if (kind == HHD_SI_H2D) {
-    if (device->np_in > 0) {
-      res =  HHSS_EBUSY; // someone is doing swapH2D
-      line = __LINE__;
-    }
-    else if (device->dhslot_users[HHL->hpid] >= 0) {
-      res = HHSS_EBUSY; // device heap slot is occupied
-      if (device->dhslot_users[HHL->hpid] == HH_MYID) {
-	fprintf(stderr, "[HH:%s::checkSwapRes@p%d] I'm devslot's user, STRANGE?\n",
-		name, HH_MYID);
-      }
-      line = __LINE__;
-    }
-    else {
-      res = HHSS_OK;
-      line = __LINE__;
-    }
-  }
-  else if (kind == HHD_SO_H2F) {
-    fsdir *fsd = ((fileheap*)lower->lower)->fsd;
-    if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
-      // someone is doing swapF2H or swapH2F
-      res = HHSS_EBUSY;
-      line = __LINE__;
-    }
-    else {
-      res = HHSS_OK;
-      line = __LINE__;
-    }
-  }
-  else if (kind == HHD_SI_F2H) {
-    fsdir *fsd = ((fileheap*)lower->lower)->fsd;
-    if (fsd->np_filein > 0) {
-      // someone is doing swapF2H or swapH2F
-      res = HHSS_EBUSY;
-      line = __LINE__;
-    }
-    else {
-      res = HHSS_OK;
-      line = __LINE__;
-    }
-  }
-  else {
-    fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ERROR: kind %d unknown\n",
-	    name, HH_MYID, kind);
-    exit(1);
-  }
-#endif
 
 #if 0
   if (res == HHSS_OK || rand() % 256 == 0) {
@@ -304,7 +192,6 @@ int devheap::checkSwapRes(int kind0)
 
 int devheap::reserveSwapRes(int kind0)
 {
-#if 1
   if (kind0 == HHD_SI_ANY) {
     device->dhslot_users[HHL->hpid] = HH_MYID;
     device->np_in++;
@@ -319,69 +206,12 @@ int devheap::reserveSwapRes(int kind0)
   }
 
   swap_kind = kind0; // remember the kind
-#else
-  int kind = inferSwapMode(kind0);
-  swap_kind = kind; // remember the kind
-
-  // Reserve resource information before swapping
-  // This is called after last checkSwapRes(), without releasing schedule lock
-  if (kind == HHD_SI_H2D) {
-    device->dhslot_users[HHL->hpid] = HH_MYID;
-    device->np_in++;
-  }
-  else if (kind == HHD_SO_D2H) {
-    device->np_out++;
-  }
-  else if (kind == HHD_SI_F2H) {
-    // reserve is done by hostheap. is it OK?
-  }
-  else {
-    // do nothing
-  }
-#endif
   return 0;
 }
 
 int devheap::doSwap()
 {
-#if 1
   heap::doSwap();
-#else
-  int kind = swap_kind;
-  HH_profBeginAction(hhd_snames[kind]);
-
-  if (kind == HHD_SO_D2H) {
-    swapOut();
-  }
-  else if (kind == HHD_SI_H2D) {
-    swapIn();
-  }
-  else if (kind == HHD_SO_H2F) {
-    if (lower == NULL || lower->lower == NULL) {
-      fprintf(stderr, "[HH:%s::swap(H2F)@p%d] SKIP\n",
-	      name, HH_MYID);
-      goto out;
-    }
-    
-    lower->swapOut();
-  }
-  else if (kind == HHD_SI_F2H) {
-    if (lower == NULL || lower->lower == NULL) {
-      fprintf(stderr, "[HH:%s::swap(F2H)@p%d] SKIP\n",
-	      name, HH_MYID);
-      goto out;
-    }
-    
-    lower->swapIn();
-  }
-  else {
-    fprintf(stderr, "[HH:devheap::swap@p%d] ERROR: kind %d unknown\n",
-	    HH_MYID, kind);
-    exit(1);
-  }
- out:
-  HH_profEndAction(hhd_snames[kind]);
-#endif
   return 0;
 }
 
