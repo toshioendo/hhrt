@@ -11,6 +11,43 @@
 
 /* File layer management */
 
+int HH_fileInitNode(hhconf *confp)
+{
+  int i;
+  /* init swap directories */
+  for (i = 0; i < confp->n_fileswap_dirs; i++) {
+    fsdir *fsd = &HHS->fsdirs[i];
+    strcpy(fsd->dirname, confp->fileswap_dirs[i]);
+    fsd->np_filein = 0;
+    fsd->np_fileout = 0;
+  }
+
+  return 0;
+}
+
+int HH_fileInitProc()
+{
+  // default fsdir id
+  if (HHL2->conf.n_fileswap_dirs == 0) {
+    HHL->curfsdirid = -1;
+  }
+  else {
+    HHL->curfsdirid = HHL->lrank % HHL2->conf.n_fileswap_dirs;
+  }
+  return 0;
+}
+
+fsdir *HH_curfsdir()
+{
+  if (HHL->curfsdirid < 0) {
+    fprintf(stderr, 
+	    "[HH_curfsdir@p%d] ERROR: curfsdirid is not set\n",
+	    HH_MYID);
+    exit(1);
+  }
+  return &HHS->fsdirs[HHL->curfsdirid];
+}
+
 heap *HH_fileheapCreate(fsdir *fsd)
 {
   heap *h;

@@ -158,20 +158,16 @@ int HH_cudaInitNode(hhconf *confp)
 int HH_cudaInitProc()
 {
   HHL->curdevid = -1;
+
+  // see also devheap::reserveRes()
+  HHL->hpid = HHL->lrank % HHS->ndh_slots;
+
+  for (int id = 0; id < MAX_LDEVS; id++) {
+    HHL2->devheaps[id] = NULL;
+  }
+
   // We do no substantial work here
   // Instead, process init per GPU is lazily done in HH_checkDev()
-#if 0
-  {
-    // default device id
-    // TODO: this should be lazy
-    cudaError_t crc;
-    crc = cudaGetDevice(&HHL->curdevid);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
-      HHL->curdevid = 0;
-    }
-  }
-#endif
   return 0;
 }
 
@@ -181,21 +177,14 @@ int HH_checkDev()
 {
   if (HHL->curdevid < 0) {
     cudaError_t crc;
-#if 1
     // get device no
     crc = cudaGetDevice(&HHL->curdevid);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
       HHL->curdevid = 0;
     }
-#else
-    fprintf(stderr, 
-	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
-	    HH_MYID, HHL->curdevid);
-    exit(1);
-#endif
   }
-  if (HHL->curdevid >= MAX_LDEVS) {
+    if (HHL->curdevid >= MAX_LDEVS) {
     fprintf(stderr, 
 	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
 	    HH_MYID, HHL->curdevid);

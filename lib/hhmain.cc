@@ -18,17 +18,6 @@ proc *HHL;
 proc2 hhl2s;
 proc2 *HHL2 = &hhl2s;
 
-fsdir *HH_curfsdir()
-{
-  if (HHL->curfsdirid < 0) {
-    fprintf(stderr, 
-	    "[HH_curfsdir@p%d] ERROR: curfsdirid is not set\n",
-	    HH_MYID);
-    exit(1);
-  }
-  return &HHS->fsdirs[HHL->curfsdirid];
-}
-
 int HH_mutex_init(pthread_mutex_t *ml)
 {
   int rc;
@@ -128,7 +117,6 @@ long getLP(char *p)
 /* Called only by leader (lrank=0) process */
 static int initNode(int lsize, int size, hhconf *confp)
 {
-  int ndevs; // # of physical devices
   int i;
 
   /* for debug print */
@@ -171,15 +159,8 @@ static int initNode(int lsize, int size, hhconf *confp)
   // CUDA related initialization
   HH_cudaInitNode(confp);  
 
-  /* init swap directories */
-  {
-    for (i = 0; i < confp->n_fileswap_dirs; i++) {
-      fsdir *fsd = &HHS->fsdirs[i];
-      strcpy(fsd->dirname, confp->fileswap_dirs[i]);
-      fsd->np_filein = 0;
-      fsd->np_fileout = 0;
-    }
-  }
+  // Initialize file layer
+  HH_fileInitNode(confp);
 
   /* Now HHS is made public */
   ipsm_share();
@@ -252,6 +233,9 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   HH_cudaInitProc();
 
+#if 1
+  HH_fileInitProc();
+#else
   // default fsdir id
   if (confp->n_fileswap_dirs == 0) {
     HHL->curfsdirid = -1;
@@ -259,23 +243,18 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   else {
     HHL->curfsdirid = lrank % confp->n_fileswap_dirs;
   }
-
-  // see also devheap::reserveRes()
-  HHL->hpid = lrank % HHS->ndh_slots;
+#endif
 
   // setup heap structures
   HHL2->nheaps = 0;
   for (int id = 0; id < MAX_HEAPS; id++) {
     HHL2->heaps[id] = NULL;
   }
-  for (int id = 0; id < MAX_LDEVS; id++) {
-    HHL2->devheaps[id] = NULL;
-  }
 
   heap *h;
 
-  HHL2->fileheap = NULL;
   /* file layer (name is fileheap) */
+  HHL2->fileheap = NULL;
   if (HHL->curfsdirid >= 0) {
     h = HH_fileheapCreate(HH_curfsdir());
     /* h is referred by heaps[] and fileheap */
@@ -283,15 +262,14 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
     HHL2->fileheap = h;
   }
 
+  /* host memory layer */
   /* even if the app does not use HHmalloc, */
-  /* hostheap is set up for the swapper */
+  /* hostheap is set up as the swap buffer */
   h = HH_hostheapCreate();
   /* h is referred by heaps[] and hostheap */
   HHL2->heaps[HHL2->nheaps++] = h;
   HHL2->hostheap = h;
   HHL->host_use = 0;
-
-  // setting up device heap is done lazily
 
 #ifdef USE_SWAP_THREAD
   HHL2->swapping_heap = NULL;

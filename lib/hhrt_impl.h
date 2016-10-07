@@ -459,7 +459,6 @@ extern struct shdata *HHS;
 
 /************************************************/
 /* internal functions */
-fsdir *HH_curfsdir();
 int HH_mutex_init(pthread_mutex_t *ml);
 void HHstacktrace();
 
@@ -468,13 +467,16 @@ void HHstacktrace();
 /* hhmem.cc: memory management */
 int HH_finalizeHeaps();
 
-/* hhXXXmem.cc: each file layer */
-heap *HH_devheapCreate(dev *d);
-heap *HH_hostheapCreate();
-heap *HH_fileheapCreate(fsdir *fsd);
-
+/* hhhostmem.cc: host memory layer */
 int HH_addHostMemStat(int kind, ssize_t incr);
 int HH_printHostMemStat();
+heap *HH_hostheapCreate();
+
+/* hhfilelayer.cc: file layer */
+int HH_fileInitNode(hhconf *confp);
+int HH_fileInitProc();
+fsdir *HH_curfsdir();
+heap *HH_fileheapCreate(fsdir *fsd);
 
 int HH_makeSFileName(fsdir *fsd, int id, char sfname[256]);
 int HH_openSFile(char sfname[256]);
@@ -500,6 +502,9 @@ heap *HH_curdevheap();
 int HH_cudaInitNode(hhconf *confp);
 int HH_cudaInitProc();
 int HH_checkDev();
+
+/* hhcudamem.cc: CUDA device memory layer */
+heap *HH_devheapCreate(dev *d);
 
 /* hhaux.c */
 int HH_profInit();
