@@ -7,6 +7,8 @@
 
 /* CUDA device memory management */
 
+#ifdef USE_CUDA
+
 heap *HH_devheapCreate(dev *d)
 {
   devheap *dh;
@@ -51,8 +53,8 @@ int devheap::finalize()
   heap::finalize();
 
   HH_lockSched();
-  if (device->dhslot_users[HHL->hpid] == HH_MYID) {
-    device->dhslot_users[HHL->hpid] = -1;
+  if (device->dhslot_users[HHL->cuda.hpid] == HH_MYID) {
+    device->dhslot_users[HHL->cuda.hpid] = -1;
   }
   HH_unlockSched();
 
@@ -73,7 +75,7 @@ void *devheap::allocDevMem(size_t heapsize)
   cudaError_t crc;
   void *dp;
 
-  assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
+  assert(HHL->cuda.hpid >= 0 && HHL->cuda.hpid < HHS->cuda.ndh_slots);
   if (hp_baseptr == NULL) {
     if (HHL->lrank == 0) {
       hp_baseptr = d->hp_baseptr0;
@@ -88,7 +90,7 @@ void *devheap::allocDevMem(size_t heapsize)
     }
   }
 
-  dp = piadd(hp_baseptr, d->default_heapsize*HHL->hpid);
+  dp = piadd(hp_baseptr, d->default_heapsize*HHL->cuda.hpid);
   return dp;
 }
 
@@ -156,9 +158,9 @@ int devheap::checkSwapResSelf(int kind, int *pline)
       res =  HHSS_EBUSY; // someone is doing swap
       line = __LINE__;
     }
-    else if (device->dhslot_users[HHL->hpid] >= 0) {
+    else if (device->dhslot_users[HHL->cuda.hpid] >= 0) {
       res = HHSS_EBUSY; // device heap slot is occupied
-      if (device->dhslot_users[HHL->hpid] == HH_MYID) {
+      if (device->dhslot_users[HHL->cuda.hpid] == HH_MYID) {
 	fprintf(stderr, "[HH:%s::checkSwapRes@p%d] I'm devslot's user, STRANGE?\n",
 		name, HH_MYID);
 	usleep(100*1000);
@@ -185,15 +187,15 @@ int devheap::checkSwapResSelf(int kind, int *pline)
 int devheap::reserveSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
-    if (device->dhslot_users[HHL->hpid] >= 0) {
+    if (device->dhslot_users[HHL->cuda.hpid] >= 0) {
       fprintf(stderr, "[HH:%s::reserveSwapRes@p%d] devslot[%d]'s user = %d, STRANGE?\n",
-	      name, HH_MYID, HHL->hpid, device->dhslot_users[HHL->hpid]);
+	      name, HH_MYID, HHL->cuda.hpid, device->dhslot_users[HHL->cuda.hpid]);
     }
-    assert(device->dhslot_users[HHL->hpid] < 0);
-    device->dhslot_users[HHL->hpid] = HH_MYID;
+    assert(device->dhslot_users[HHL->cuda.hpid] < 0);
+    device->dhslot_users[HHL->cuda.hpid] = HH_MYID;
 #if 1
     fprintf(stderr, "[HH:%s::reserveSwapRes@p%d] [%.2lf] I reserved devslot[%d]\n",
-	    name, HH_MYID, Wtime_prt(), HHL->hpid);
+	    name, HH_MYID, Wtime_prt(), HHL->cuda.hpid);
 #endif
     device->np_in++;
   }
@@ -222,12 +224,12 @@ int devheap::releaseSwapResSelf(int kind)
 	      name, HH_MYID, device->np_out);
     }
 
-    assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
-    assert(device->dhslot_users[HHL->hpid] == HH_MYID);
-    device->dhslot_users[HHL->hpid] = -1;
+    assert(HHL->cuda.hpid >= 0 && HHL->cuda.hpid < HHS->cuda.ndh_slots);
+    assert(device->dhslot_users[HHL->cuda.hpid] == HH_MYID);
+    device->dhslot_users[HHL->cuda.hpid] = -1;
 #ifdef HHLOG_SWAP
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
-	    name, HH_MYID, Wtime_prt(), HHL->hpid);
+	    name, HH_MYID, Wtime_prt(), HHL->cuda.hpid);
 #endif
   }
   else {
@@ -240,3 +242,4 @@ int devheap::releaseSwapResSelf(int kind)
 }
 
 
+#endif // USE_CUDA

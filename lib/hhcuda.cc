@@ -4,32 +4,34 @@
 #include <string.h>
 #include "hhrt_impl.h"
 
+#ifdef USE_CUDA
+
 /* CUDA interface */
 
 dev *HH_curdev()
 {
-  if (HHL->curdevid < 0) {
+  if (HHL->cuda.curdevid < 0) {
     fprintf(stderr, 
-	    "[HH_curdev@p%d] ERROR: curdevid is not set\n",
+	    "[HH_curdev@p%d] ERROR: cuda.curdevid is not set\n",
 	    HH_MYID);
     exit(1);
   }
-  return &HHS->devs[HHL->curdevid];
+  return &HHS->cuda.devs[HHL->cuda.curdevid];
 }
 
 heap *HH_curdevheap()
 {
-  if (HHL->curdevid < 0) {
+  if (HHL->cuda.curdevid < 0) {
     fprintf(stderr, 
-	    "[HH_curdevheap@p%d] ERROR: curdevid is not set\n",
+	    "[HH_curdevheap@p%d] ERROR: cuda.curdevid is not set\n",
 	    HH_MYID);
     exit(1);
   }
-  heap *h = HHL2->devheaps[HHL->curdevid];
+  heap *h = HHL2->devheaps[HHL->cuda.curdevid];
   if (h == NULL) {
     fprintf(stderr, 
 	    "[HH_curdevheap@p%d] ERROR: devid %d is not initialized\n",
-	    HH_MYID, HHL->curdevid);
+	    HH_MYID, HHL->cuda.curdevid);
     exit(1);
   }
   return h;
@@ -47,7 +49,7 @@ static int initSharedDevmem(dev *d)
   }
   
   size_t heapsize = d->default_heapsize;
-  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndh_slots);
+  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->cuda.ndh_slots);
   if (crc != cudaSuccess) {
     fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
 	    HHS->hostname, devid, heapsize>>20);
@@ -71,7 +73,7 @@ static int initSharedDevmem(dev *d)
 static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
 {
   cudaError_t crc;
-  dev *d = &HHS->devs[i];
+  dev *d = &HHS->cuda.devs[i];
 
   d->devid = i;
   HH_mutex_init(&d->ml);
@@ -96,7 +98,7 @@ static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
 #else
   avail -= DEVMEM_USED_BY_PROC * lsize;
 #endif
-  d->default_heapsize = avail / HHS->ndh_slots;
+  d->default_heapsize = avail / HHS->cuda.ndh_slots;
   d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
   
 #if 1
@@ -108,7 +110,7 @@ static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
 
   int ih;
   /* setup heap slots on device */
-  for (ih = 0; ih < HHS->ndh_slots; ih++) {
+  for (ih = 0; ih < HHS->cuda.ndh_slots; ih++) {
     d->dhslot_users[ih] = -1;
   }
   
@@ -134,15 +136,15 @@ int HH_cudaInitNode(hhconf *confp)
     exit(1);
   }
   assert(ndevs <= MAX_LDEVS);
-  HHS->ndevs = ndevs;
+  HHS->cuda.ndevs = ndevs;
 
 #if 1
   fprintf(stderr, "[HH:initNode@%s] I have %d visible devices\n",
 	  HHS->hostname, ndevs);
 #endif
 
-  HHS->ndh_slots = confp->dh_slots;
-  if (HHS->ndh_slots > lsize) HHS->ndh_slots = lsize;
+  HHS->cuda.ndh_slots = confp->dh_slots;
+  if (HHS->cuda.ndh_slots > lsize) HHS->cuda.ndh_slots = lsize;
 
   crc = cudaGetDevice(&mydevid);
   
@@ -157,10 +159,10 @@ int HH_cudaInitNode(hhconf *confp)
 
 int HH_cudaInitProc()
 {
-  HHL->curdevid = -1;
+  HHL->cuda.curdevid = -1;
 
   // see also devheap::reserveRes()
-  HHL->hpid = HHL->lrank % HHS->ndh_slots;
+  HHL->cuda.hpid = HHL->lrank % HHS->cuda.ndh_slots;
 
   for (int id = 0; id < MAX_LDEVS; id++) {
     HHL2->devheaps[id] = NULL;
@@ -175,29 +177,29 @@ int HH_cudaInitProc()
 // This may be blocked
 int HH_cudaCheckDev()
 {
-  if (HHL->curdevid < 0) {
+  if (HHL->cuda.curdevid < 0) {
     cudaError_t crc;
     // get device no
-    crc = cudaGetDevice(&HHL->curdevid);
+    crc = cudaGetDevice(&HHL->cuda.curdevid);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
-      HHL->curdevid = 0;
+      HHL->cuda.curdevid = 0;
     }
   }
-    if (HHL->curdevid >= MAX_LDEVS) {
+    if (HHL->cuda.curdevid >= HHS->cuda.ndevs) {
     fprintf(stderr, 
-	    "[HH_cudaCheckDev@p%d] ERROR: curdevid %d is invalid\n",
-	    HH_MYID, HHL->curdevid);
+	    "[HH_cudaCheckDev@p%d] ERROR: cuda.curdevid %d is invalid\n",
+	    HH_MYID, HHL->cuda.curdevid);
     exit(1);
   }
-  heap *h = HHL2->devheaps[HHL->curdevid];
+  heap *h = HHL2->devheaps[HHL->cuda.curdevid];
 
   if (h != NULL) {
     // device heap is already initialized. Do nothing
 #if 0
     fprintf(stderr, 
 	    "[HH_cudaCheckDev@p%d] devid %d is already initialized.\n",
-	    HH_MYID, HHL->curdevid);
+	    HH_MYID, HHL->cuda.curdevid);
 #endif
     return 0;
   }
@@ -206,7 +208,7 @@ int HH_cudaCheckDev()
 #ifdef HHLOG_SCHED
   fprintf(stderr, 
 	  "[HH_cudaCheckDev@p%d] [%.2lf] First use of devid %d. initialize...\n",
-	  HH_MYID, st, HHL->curdevid);
+	  HH_MYID, st, HHL->cuda.curdevid);
 #endif
 
   // swap out existing heaps
@@ -222,7 +224,7 @@ int HH_cudaCheckDev()
   h = HH_devheapCreate(HH_curdev());
   assert(HHL2->nheaps < MAX_HEAPS-1);
   HHL2->heaps[HHL2->nheaps++] = h;
-  HHL2->devheaps[HHL->curdevid] = h;
+  HHL2->devheaps[HHL->cuda.curdevid] = h;
 
   // blocked until heaps are accessible
   HH_sleepForMemory();
@@ -382,12 +384,18 @@ int HH_devSetMode(int mode)
 
 cudaError_t HHcudaSetDevice(int devid)
 {
-  HHL->curdevid = devid;
-
   cudaError_t crc = cudaSetDevice(devid);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HHcudaSetDevice@p%d] cudaSetDevice(%d) FAILED!!!\n");
+    return crc;
+  }
 
+  assert(devid >= 0 && HHS->cuda.ndevs);
+  HHL->cuda.curdevid = devid;
   HH_cudaCheckDev(); // init heap for new device if not
 
   return crc;
 }
 
+
+#endif // USE_CUDA

@@ -148,9 +148,10 @@ static int initNode(int lsize, int size, hhconf *confp)
 
   HH_mutex_init(&HHS->sched_ml);
 
+#ifdef USE_CUDA
   // CUDA related initialization
   HH_cudaInitNode(confp);  
-
+#endif
   // Initialize file layer
   HH_fileInitNode(confp);
 
@@ -222,20 +223,10 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   sprintf(HHL->msg, "[HH:initProc@p%d] no msg", HH_MYID);
 
   HH_profInit();
-
+#ifdef USE_CUDA
   HH_cudaInitProc();
-
-#if 1
-  HH_fileInitProc();
-#else
-  // default fsdir id
-  if (confp->n_fileswap_dirs == 0) {
-    HHL->curfsdirid = -1;
-  }
-  else {
-    HHL->curfsdirid = lrank % confp->n_fileswap_dirs;
-  }
 #endif
+  HH_fileInitProc();
 
   // setup heap structures
   HHL2->nheaps = 0;

@@ -18,8 +18,8 @@ hhview: hhview.o ipsm.o
 %.o : %.cc $(HDRS)
 	$(CXX) $(CFLAGS) -c $< -o $*.o
 
-%.o : %.cu $(HDRS)
-	nvcc $(NVFLAGS) -c $< -o $*.o
+#%.o : %.cu $(HDRS)
+#	nvcc $(NVFLAGS) -c $< -o $*.o
 
 clean:
 	rm -f *.o

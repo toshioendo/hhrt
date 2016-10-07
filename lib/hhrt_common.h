@@ -2,9 +2,11 @@
 #define HHRT_COMMON_H
 
 #include <mpi.h>
-#include <cuda_runtime.h>
 #include <pthread.h>
 #include <sys/time.h>
+#ifdef USE_CUDA
+#include <cuda_runtime.h>
+#endif
 #include <assert.h>
 
 #ifdef __cplusplus
@@ -95,6 +97,7 @@ int HHMPI_Comm_split(MPI_Comm comm, int color, int key,
 		     MPI_Comm *newcomm);
 
 
+#ifdef USE_CUDA
 /**************************************************/
 /* CUDA compatible interface */
 cudaError_t HHcudaMalloc(void **pp, size_t size);
@@ -130,7 +133,7 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
 			      enum cudaMemcpyKind kind,
 			      cudaStream_t stream 
 			      );
-
+#endif
 
 /**************/
 #ifdef USE_SWAPHOST
@@ -141,8 +144,10 @@ void HHfree(void *p);
 void *HHmemalign(size_t boundary, size_t size);
 void *HHvalloc(size_t size);
 
+#ifdef USE_CUDA
 cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags);
 cudaError_t HHcudaMallocHost(void ** pp, size_t size);
+#endif
 
 #endif
 

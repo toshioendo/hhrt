@@ -37,6 +37,7 @@ extern "C" {
 #define MPI_Comm_split HHMPI_Comm_split
 
 /**************************************************/
+#ifdef USE_CUDA
 /* CUDA interface */
 
 /* Tricks in order to users' reduce programming costs */
@@ -49,6 +50,8 @@ extern "C" {
 #define cudaMemcpyAsync HHcudaMemcpyAsync
 #define cudaMemcpy2D HHcudaMemcpy2D
 #define cudaMemcpy2DAsync HHcudaMemcpy2DAsync
+
+#endif /* USE_CUDA */
 
 #ifdef USE_SWAPHOST
 #define malloc HHmalloc

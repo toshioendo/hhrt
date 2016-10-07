@@ -111,6 +111,7 @@ static const char *hhst_names[] = {
   NULL,
 };
 
+#ifdef USE_CUDA
 /* (physical) GPU device */
 /* Shared by multiple processes, so this should have flat and relocatable structure */
 struct dev {
@@ -128,6 +129,7 @@ struct dev {
 
   int dhslot_users[MAX_DH_SLOTS];
 };
+#endif
 
 // info about fileswap dir */
 struct fsdir {
@@ -226,6 +228,7 @@ class heap: public memlayer {
   int swapping_kind;
 };
 
+#ifdef USE_CUDA
 class devheap: public heap {
  public:
   devheap(size_t size0, dev *device0);
@@ -251,6 +254,7 @@ class devheap: public heap {
   void *hp_baseptr;
   dev *device;
 };
+#endif
 
 class hostheap: public heap {
  public:
@@ -282,7 +286,9 @@ class hostheap: public heap {
 
   size_t copyunit;
   void *copybufs[2];
+#ifdef USE_CUDA
   cudaStream_t copystream;
+#endif
 };
 
 class hostmmapheap: public hostheap {
@@ -328,7 +334,9 @@ class fileheap: public heap {
 
   size_t copyunit;
   void *copybufs[2];
+#ifdef USE_CUDA
   cudaStream_t copystreams[2];
+#endif
   int userid;
   char sfname[256];
   int sfd;
@@ -377,11 +385,14 @@ struct proc {
   int curfsdirid; /* fileswap dir id now this process is using (constant) */
   int pmode; /* process mode: HHP_* */
   int devmode; /* device usage mode: specified by HH_devSetMode */
-
-  int curdevid; /* CUDA device id now this process is using */
-  int hpid; /* CUDA heap slot id on device */
-
   int in_api; /* 0: usual, >=1: in API */
+
+#ifdef USE_CUDA
+  struct {
+    int curdevid; /* CUDA device id now this process is using */
+    int hpid; /* CUDA heap slot id on device */
+  } cuda;
+#endif
 
   int host_use;
   /* statistics */
@@ -403,8 +414,9 @@ struct proc2 {
   heap *hostheap;
   heap *fileheap;
 
-  heap *devheaps[MAX_LDEVS];
-
+#ifdef USE_CUDA
+  heap *devheaps[MAX_LDEVS]; // CUDA
+#endif
 #ifdef USE_SWAP_THREAD
   pthread_t swap_tid;
   heap *swapping_heap;
@@ -433,12 +445,17 @@ struct proc2 {
 struct shdata {
   int nprocs;
   int nlprocs;
-  int ndevs; /* # of physical devs */
-  int ndh_slots; /* # of dev heap slots */
 
   pthread_mutex_t sched_ml;
 
-  struct dev devs[MAX_LDEVS]; /* physical device */
+#ifdef USE_CUDA
+  struct {
+    int ndevs; /* # of physical devs */
+    int ndh_slots; /* # of dev heap slots */
+    struct dev devs[MAX_LDEVS]; /* physical device */
+  } cuda;
+#endif
+
   struct fsdir fsdirs[MAX_FILESWAP_DIRS];
   struct proc lprocs[MAX_LSIZE];
   char hostname[HOSTNAMELEN];
@@ -491,6 +508,7 @@ int HH_exitAPI();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();
 
+#ifdef USE_CUDA
 // hhcuda.cc: for CUDA
 dev *HH_curdev();
 heap *HH_curdevheap();
@@ -500,6 +518,7 @@ int HH_cudaCheckDev();
 
 // hhcudamem.cc: CUDA device memory layer
 heap *HH_devheapCreate(dev *d);
+#endif
 
 // hhaux.c
 int HH_profInit();
