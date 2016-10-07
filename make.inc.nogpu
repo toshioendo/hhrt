@@ -1,0 +1,12 @@
+CONFIG=
+
+CC = mpicc
+CXX = mpicxx
+MPIDIR=/home/endo/local/mpich-3.2
+
+LD = mpicxx
+
+CFLAGS = -O -g $(CONFIG) -I$(MPIDIR)/include
+# -O
+
+LDFLAGS = -lpthread -lm 
