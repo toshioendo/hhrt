@@ -6,6 +6,18 @@
 
 /* CUDA interface */
 
+dev *HH_curdev()
+{
+  if (HHL->curdevid < 0) {
+    fprintf(stderr, 
+	    "[HH_curdev@p%d] ERROR: curdevid is not set\n",
+	    HH_MYID);
+    exit(1);
+  }
+  return &HHS->devs[HHL->curdevid];
+}
+
+
 static int initSharedDevmem(dev *d)
 {
   cudaError_t crc;
@@ -126,6 +138,21 @@ int HH_cudaInitNode(hhconf *confp)
   return 0;
 }
 
+int HH_cudaInitProc()
+{
+  HHL->curdevid = -1;
+  {
+    // default device id
+    // TODO: this should be lazy
+    cudaError_t crc;
+    crc = cudaGetDevice(&HHL->curdevid);
+    if (crc != cudaSuccess) {
+      fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
+      HHL->curdevid = 0;
+    }
+  }
+  return 0;
+}
 
 // Start using device structure if this process uses it for first time
 // This may be blocked
@@ -233,7 +260,7 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
 
 
 /*****************************************************/
-
+// will be obsolete
 int HH_devLock()
 {
   dev *d = HH_curdev();
@@ -241,6 +268,7 @@ int HH_devLock()
   return 0;
 }
 
+// will be obsolete
 int HH_devUnlock()
 {
   dev *d = HH_curdev();
@@ -248,6 +276,7 @@ int HH_devUnlock()
   return 0;
 }
 
+// will be obsolete
 int HH_devSetMode(int mode)
 {
   HH_checkDev();

@@ -18,35 +18,6 @@ proc *HHL;
 proc2 hhl2s;
 proc2 *HHL2 = &hhl2s;
 
-dev *HH_curdev()
-{
-  if (HHL->curdevid < 0) {
-    fprintf(stderr, 
-	    "[HH_curdev@p%d] ERROR: curdevid is not set\n",
-	    HH_MYID);
-    exit(1);
-  }
-  return &HHS->devs[HHL->curdevid];
-}
-
-heap *HH_curdevheap()
-{
-  if (HHL->curdevid < 0) {
-    fprintf(stderr, 
-	    "[HH_curdevheap@p%d] ERROR: curdevid is not set\n",
-	    HH_MYID);
-    exit(1);
-  }
-  heap *h = HHL2->devheaps[HHL->curdevid];
-  if (h == NULL) {
-    fprintf(stderr, 
-	    "[HH_curdevheap@p%d] ERROR: devid %d is not initialized\n",
-	    HH_MYID, HHL->curdevid);
-    exit(1);
-  }
-  return h;
-}
-
 fsdir *HH_curfsdir()
 {
   if (HHL->curfsdirid < 0) {
@@ -159,7 +130,6 @@ static int initNode(int lsize, int size, hhconf *confp)
 {
   int ndevs; // # of physical devices
   int i;
-  cudaError_t crc;
 
   /* for debug print */
   char hostname[HOSTNAMELEN];
@@ -202,42 +172,8 @@ static int initNode(int lsize, int size, hhconf *confp)
   sleep(2);
 #endif
 
-#if 1
   // CUDA related initialization
   HH_cudaInitNode(confp);  
-#else
-
-
-  ndevs = -1;
-  crc = cudaGetDeviceCount(&ndevs);
-  if (crc != cudaSuccess || ndevs < 0 || ndevs > MAX_LDEVS) {
-    fprintf(stderr, "[HH:initNode@%s] cudaGetDeviceCount ERROR. rc=%d, ndevs=%d\n",
-	    HHS->hostname, crc, ndevs);
-    exit(1);
-  }
-  assert(ndevs <= MAX_LDEVS);
-  HHS->ndevs = ndevs;
-
-#if 1
-  fprintf(stderr, "[HH:initNode@%s] I have %d visible devices\n",
-	  HHS->hostname, ndevs);
-#endif
-
-  HHS->ndh_slots = confp->dh_slots;
-  if (HHS->ndh_slots > lsize) HHS->ndh_slots = lsize;
-
-  /* init device structures */
-  {
-    int mydevid;
-    crc = cudaGetDevice(&mydevid);
-    
-    for (i = 0; i < ndevs; i++) {
-      initDev(i, lsize, size, confp);
-    }
-    
-    crc = cudaSetDevice(mydevid); // restore
-  }
-#endif
 
   /* init swap directories */
   {
@@ -318,6 +254,9 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   HH_profInit();
 
+#if 1
+  HH_cudaInitProc();
+#else
   HHL->curdevid = -1;
   {
     // default device id
@@ -329,6 +268,8 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
       HHL->curdevid = 0;
     }
   }
+#endif
+
   // default fsdir id
   if (confp->n_fileswap_dirs == 0) {
     HHL->curfsdirid = -1;

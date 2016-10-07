@@ -484,8 +484,6 @@ extern struct shdata *HHS;
 
 /************************************************/
 /* internal functions */
-dev *HH_curdev();
-heap *HH_curdevheap();
 fsdir *HH_curfsdir();
 int HH_mutex_init(pthread_mutex_t *ml);
 void HHstacktrace();
@@ -522,8 +520,13 @@ int HH_exitGComm();
 
 /****************************************/
 /* hhcuda.cc: for CUDA */
+dev *HH_curdev();
 int HH_cudaInitNode(hhconf *confp);
+int HH_cudaInitProc();
 int HH_checkDev();
+
+/* hhcudamem.cc */
+heap *HH_curdevheap();
 
 /* hhaux.c */
 int HH_profInit();

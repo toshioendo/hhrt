@@ -7,6 +7,24 @@
 
 /* CUDA device memory management */
 
+heap *HH_curdevheap()
+{
+  if (HHL->curdevid < 0) {
+    fprintf(stderr, 
+	    "[HH_curdevheap@p%d] ERROR: curdevid is not set\n",
+	    HH_MYID);
+    exit(1);
+  }
+  heap *h = HHL2->devheaps[HHL->curdevid];
+  if (h == NULL) {
+    fprintf(stderr, 
+	    "[HH_curdevheap@p%d] ERROR: devid %d is not initialized\n",
+	    HH_MYID, HHL->curdevid);
+    exit(1);
+  }
+  return h;
+}
+
 heap *HH_devheapCreate(dev *d)
 {
   devheap *dh;
