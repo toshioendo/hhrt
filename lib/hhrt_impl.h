@@ -45,10 +45,6 @@ using namespace std;
 #define HH_MYID (HHL->rank)
 
 enum {
-  HHTAG_BARRIER = 29000,
-};
-
-enum {
   HHM_HOST = 0,
   HHM_PINNED,
   HHM_DEV,
@@ -150,7 +146,7 @@ struct membuf {
   ssize_t doffs; /* offset is used instead of address */
   size_t size;
   size_t usersize; // valid if used by user. alignup(usersize) == size
-  int kind; /* HHMADV* */
+  int kind; /* HHM_* */
 
   ssize_t soffs; /* offset of swapepd out buffer */
 };
@@ -162,14 +158,10 @@ class memlayer {
  public:
   memlayer();
 
-  virtual int swapOut() {};
-  virtual int swapIn() {};
   virtual int addLower(heap *h);
   virtual int addUpper(heap *h);
   virtual int delLower(heap *h);
   virtual int delUpper(heap *h);
-  virtual int finalize() {};
-  //virtual int finalizeRec(); // recursive finalize
 
   // description of memory layer tree
   heap *lower;

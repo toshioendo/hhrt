@@ -91,19 +91,6 @@ int memlayer::delUpper(heap *h)
   return -1;
 }
 
-#if 0
-int memlayer::finalizeRec()
-{
-  if (lower != NULL) {
-    /* recursive finalize */
-    lower->finalizeRec();
-  }
-
-  finalize();
-  return 0;
-}
-#endif
-
 // heap class
 
 heap::heap(size_t heapsize0) : memlayer()
