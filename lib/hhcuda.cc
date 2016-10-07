@@ -167,13 +167,13 @@ int HH_cudaInitProc()
   }
 
   // We do no substantial work here
-  // Instead, process init per GPU is lazily done in HH_checkDev()
+  // Instead, process init per GPU is lazily done in HH_cudaCheckDev()
   return 0;
 }
 
 // Start using device structure if this process uses it for first time
 // This may be blocked
-int HH_checkDev()
+int HH_cudaCheckDev()
 {
   if (HHL->curdevid < 0) {
     cudaError_t crc;
@@ -186,7 +186,7 @@ int HH_checkDev()
   }
     if (HHL->curdevid >= MAX_LDEVS) {
     fprintf(stderr, 
-	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
+	    "[HH_cudaCheckDev@p%d] ERROR: curdevid %d is invalid\n",
 	    HH_MYID, HHL->curdevid);
     exit(1);
   }
@@ -196,7 +196,7 @@ int HH_checkDev()
     // device heap is already initialized. Do nothing
 #if 0
     fprintf(stderr, 
-	    "[HH_checkDev@p%d] devid %d is already initialized.\n",
+	    "[HH_cudaCheckDev@p%d] devid %d is already initialized.\n",
 	    HH_MYID, HHL->curdevid);
 #endif
     return 0;
@@ -205,7 +205,7 @@ int HH_checkDev()
   double st = Wtime_prt(), et;
 #ifdef HHLOG_SCHED
   fprintf(stderr, 
-	  "[HH_checkDev@p%d] [%.2lf] First use of devid %d. initialize...\n",
+	  "[HH_cudaCheckDev@p%d] [%.2lf] First use of devid %d. initialize...\n",
 	  HH_MYID, st, HHL->curdevid);
 #endif
 
@@ -214,7 +214,7 @@ int HH_checkDev()
 
 #ifdef HHLOG_SCHED
   fprintf(stderr, 
-	  "[HH_checkDev@p%d] After swapOutIfOver\n",
+	  "[HH_cudaCheckDev@p%d] After swapOutIfOver\n",
 	  HH_MYID);
 #endif
 
@@ -230,7 +230,7 @@ int HH_checkDev()
   et = Wtime_prt();
 #ifdef HHLOG_SCHED
   fprintf(stderr, 
-	  "[HH_checkDev@p%d] [%.2lf] now process restarts. checkDev %.2lfsec\n",
+	  "[HH_cudaCheckDev@p%d] [%.2lf] now process restarts. checkDev %.2lfsec\n",
 	  HH_MYID, et, et-st);
   //HH_printHostMemStat();
 #endif
@@ -246,7 +246,7 @@ cudaError_t HHcudaMemcpy(void * dst,
 		       enum cudaMemcpyKind kind 
 		       )
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
   return cudaMemcpy(dst, src, count, kind);
 }
 
@@ -257,7 +257,7 @@ cudaError_t HHcudaMemcpyAsync(void * dst,
 			    cudaStream_t stream 
 			    )
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
   return cudaMemcpyAsync(dst, src, count, kind, stream);
 }
 
@@ -270,7 +270,7 @@ cudaError_t HHcudaMemcpy2D(void * dst,
 			 enum cudaMemcpyKind kind 
 			 )
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
   return cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind);
 }
 
@@ -285,7 +285,7 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
 			      cudaStream_t stream 
 			      )
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
   return cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
 }
 
@@ -294,7 +294,7 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
 
 cudaError_t HHcudaMalloc(void **pp, size_t size)
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
 
   void *p = NULL;
 
@@ -308,7 +308,7 @@ cudaError_t HHcudaMalloc(void **pp, size_t size)
 
 cudaError_t HHcudaFree(void *p)
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
 
   if (p == NULL) return cudaSuccess;
 
@@ -323,7 +323,7 @@ cudaError_t HHcudaFree(void *p)
 #ifdef USE_SWAPHOST
 cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags)
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
 
   void *p;
   if (HH_MYID == 0) {
@@ -337,7 +337,7 @@ cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags)
 
 cudaError_t HHcudaMallocHost(void ** pp, size_t size)
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
 
   return HHcudaHostAlloc(pp, size, cudaHostAllocDefault);
 }
@@ -363,7 +363,7 @@ int HH_devUnlock()
 // will be obsolete
 int HH_devSetMode(int mode)
 {
-  HH_checkDev();
+  HH_cudaCheckDev();
 
   assert(HHL->pmode == HHP_RUNNING);
   int prevmode = HHL->devmode;
@@ -386,7 +386,7 @@ cudaError_t HHcudaSetDevice(int devid)
 
   cudaError_t crc = cudaSetDevice(devid);
 
-  HH_checkDev(); // init heap for new device if not
+  HH_cudaCheckDev(); // init heap for new device if not
 
   return crc;
 }

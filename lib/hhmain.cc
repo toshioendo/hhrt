@@ -148,14 +148,6 @@ static int initNode(int lsize, int size, hhconf *confp)
 
   HH_mutex_init(&HHS->sched_ml);
 
-#ifdef USE_CUDA_MPS
-  // start MPS server
-  // this must be done before any CUDA API calls
-  fprintf(stderr, "[HH:initNode@%s] Starting MPS...\n", HHS->hostname);
-  system("nvidia-cuda-mps-control -d 2>&1 > /dev/null");
-  sleep(2);
-#endif
-
   // CUDA related initialization
   HH_cudaInitNode(confp);  
 
@@ -414,13 +406,11 @@ void HHsighandler(int sn, siginfo_t *si, void *sc)
   exit(1);
 }
 
-
-int HHMPI_Init(int *argcp, char ***argvp)
+// Initialize HHRT
+int HH_init()
 {
   int rank, size;
   int lrank, lsize;
-
-  MPI_Init(argcp, argvp);
 
 #if 1
   {
@@ -472,7 +462,8 @@ int HHMPI_Init(int *argcp, char ***argvp)
   return 0;
 }
 
-int HHMPI_Finalize()
+// Finalize HHRT
+int HH_finalize()
 {
   int rank = HHL->rank;
   int lrank = HHL->lrank;
@@ -484,20 +475,24 @@ int HHMPI_Finalize()
 
   HH_finalizeHeaps();
 
-#ifdef USE_CUDA_MPS
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (lrank == 0) {
-    system("killall nvidia-cuda-mps-control");
-  }
-#endif
-
 #ifndef EAGER_ICS_DESTROY
   MPI_Barrier(MPI_COMM_WORLD);
   ipsm_destroy();
 #endif
 
-  MPI_Finalize();
-
   return 0;
 }
 
+int HHMPI_Init(int *argcp, char ***argvp)
+{
+  MPI_Init(argcp, argvp);
+  HH_init();
+  return 0;
+}
+
+int HHMPI_Finalize()
+{
+  HH_finalize();
+  MPI_Finalize();
+  return 0;
+}

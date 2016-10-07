@@ -24,8 +24,6 @@ using namespace std;
 
 #define HH_IPSM_KEY ((key_t)0x1234)
 
-//#define USE_CUDA_MPS 1 // usually do not select this
-
 // If you use hhview for debug, disable this
 #define EAGER_IPSM_DESTROY 1
 
@@ -171,7 +169,7 @@ class memlayer {
   virtual int delLower(heap *h);
   virtual int delUpper(heap *h);
   virtual int finalize() {};
-  virtual int finalizeRec(); // recursive finalize
+  //virtual int finalizeRec(); // recursive finalize
 
   // description of memory layer tree
   heap *lower;
@@ -203,6 +201,7 @@ class heap: public memlayer {
   virtual int allocHeap();
   virtual int restoreHeap();
 
+  // scheduling swap
   virtual int checkSwapResSelf(int kind, int *pline) {};
   virtual int checkSwapResAsLower(int kind, int *pline) {};
   virtual int checkSwapRes(int kind);
@@ -344,7 +343,7 @@ class fileheap: public heap {
   fsdir *fsd;
 };
 
-
+// reqfin::mode
 #define HHRF_SEND (1 << 0)
 #define HHRF_RECV (1 << 1)
 
@@ -383,11 +382,12 @@ struct proc {
   int rank;
   int lrank;
   int pid;
-  int curdevid; /* device id now this process is using */
   int curfsdirid; /* fileswap dir id now this process is using (constant) */
   int pmode; /* process mode: HHP_* */
   int devmode; /* device usage mode: specified by HH_devSetMode */
-  int hpid; /* heap slot id on device */
+
+  int curdevid; /* CUDA device id now this process is using */
+  int hpid; /* CUDA heap slot id on device */
 
   int in_api; /* 0: usual, >=1: in API */
 
@@ -408,9 +408,10 @@ struct proc2 {
   int nheaps;
   heap *heaps[MAX_HEAPS]; // list of all heap structures
 
-  heap *devheaps[MAX_LDEVS];
   heap *hostheap;
   heap *fileheap;
+
+  heap *devheaps[MAX_LDEVS];
 
 #ifdef USE_SWAP_THREAD
   pthread_t swap_tid;
@@ -453,26 +454,30 @@ struct shdata {
   double stime; // start time. mainly used for profiling and debug print
 };
 
+/************************************************/
+// Global variables
 extern struct proc *HHL;
 extern struct proc2 *HHL2;
 extern struct shdata *HHS;
 
 /************************************************/
-/* internal functions */
+// Function declaration
+// hhmain.cc
+int HH_init();
+int HH_finalize();
+
 int HH_mutex_init(pthread_mutex_t *ml);
 void HHstacktrace();
 
-
-/****************************************/
-/* hhmem.cc: memory management */
+// hhmem.cc: memory management
 int HH_finalizeHeaps();
 
-/* hhhostmem.cc: host memory layer */
+// hhhostmem.cc: host memory layer
 int HH_addHostMemStat(int kind, ssize_t incr);
 int HH_printHostMemStat();
 heap *HH_hostheapCreate();
 
-/* hhfilelayer.cc: file layer */
+// hhfilelayer.cc: file layer
 int HH_fileInitNode(hhconf *confp);
 int HH_fileInitProc();
 fsdir *HH_curfsdir();
@@ -481,8 +486,7 @@ heap *HH_fileheapCreate(fsdir *fsd);
 int HH_makeSFileName(fsdir *fsd, int id, char sfname[256]);
 int HH_openSFile(char sfname[256]);
 
-/****************************************/
-/* hhsched.cc: scheduling */
+// hhsched.cc: scheduling
 int HH_lockSched();
 int HH_unlockSched();
 
@@ -495,25 +499,24 @@ int HH_exitAPI();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();
 
-/****************************************/
-/* hhcuda.cc: for CUDA */
+// hhcuda.cc: for CUDA
 dev *HH_curdev();
 heap *HH_curdevheap();
 int HH_cudaInitNode(hhconf *confp);
 int HH_cudaInitProc();
-int HH_checkDev();
+int HH_cudaCheckDev();
 
-/* hhcudamem.cc: CUDA device memory layer */
+// hhcudamem.cc: CUDA device memory layer
 heap *HH_devheapCreate(dev *d);
 
-/* hhaux.c */
+// hhaux.c
 int HH_profInit();
 int HH_profSetMode(const char *str);
 int HH_profBeginAction(const char *str);
 int HH_profEndAction(const char *str);
 
 
-
+/************************************************/
 /* aux definitions */
 static double Wtime()
 {

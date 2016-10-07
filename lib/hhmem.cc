@@ -91,6 +91,7 @@ int memlayer::delUpper(heap *h)
   return -1;
 }
 
+#if 0
 int memlayer::finalizeRec()
 {
   if (lower != NULL) {
@@ -101,6 +102,7 @@ int memlayer::finalizeRec()
   finalize();
   return 0;
 }
+#endif
 
 // heap class
 
