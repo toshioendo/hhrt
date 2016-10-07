@@ -7,24 +7,6 @@
 
 /* CUDA device memory management */
 
-heap *HH_curdevheap()
-{
-  if (HHL->curdevid < 0) {
-    fprintf(stderr, 
-	    "[HH_curdevheap@p%d] ERROR: curdevid is not set\n",
-	    HH_MYID);
-    exit(1);
-  }
-  heap *h = HHL2->devheaps[HHL->curdevid];
-  if (h == NULL) {
-    fprintf(stderr, 
-	    "[HH_curdevheap@p%d] ERROR: devid %d is not initialized\n",
-	    HH_MYID, HHL->curdevid);
-    exit(1);
-  }
-  return h;
-}
-
 heap *HH_devheapCreate(dev *d)
 {
   devheap *dh;
@@ -257,56 +239,4 @@ int devheap::releaseSwapResSelf(int kind)
   return 0;
 }
 
-/* Device memory related used API */
 
-/* Wrappers of cudaMalloc/cudaFree */
-cudaError_t HHcudaMalloc(void **pp, size_t size)
-{
-  HH_checkDev();
-
-  void *p = NULL;
-
-  if (HHL->devmode == HHDEV_NORMAL) {
-  }
-
-  p = HH_curdevheap()->alloc(size);
-  *pp = p;
-  return cudaSuccess;
-}
-
-cudaError_t HHcudaFree(void *p)
-{
-  HH_checkDev();
-
-  if (p == NULL) return cudaSuccess;
-
-  int rc;
-  rc = HH_curdevheap()->free(p);
-  if (rc != 0) {
-    return cudaErrorInvalidDevicePointer;
-  }
-  return cudaSuccess;
-}
-
-#ifdef USE_SWAPHOST
-cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags)
-{
-  HH_checkDev();
-
-  void *p;
-  if (HH_MYID == 0) {
-    fprintf(stderr, "[HHcudaHostAlloc@p%d] WARNING: normal malloc is used now\n",
-	    HH_MYID);
-  }
-  p = HHL2->hostheap->alloc(size);
-  *pp = p;
-  return cudaSuccess;
-}
-
-cudaError_t HHcudaMallocHost(void ** pp, size_t size)
-{
-  HH_checkDev();
-
-  return HHcudaHostAlloc(pp, size, cudaHostAllocDefault);
-}
-#endif

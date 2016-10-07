@@ -17,6 +17,23 @@ dev *HH_curdev()
   return &HHS->devs[HHL->curdevid];
 }
 
+heap *HH_curdevheap()
+{
+  if (HHL->curdevid < 0) {
+    fprintf(stderr, 
+	    "[HH_curdevheap@p%d] ERROR: curdevid is not set\n",
+	    HH_MYID);
+    exit(1);
+  }
+  heap *h = HHL2->devheaps[HHL->curdevid];
+  if (h == NULL) {
+    fprintf(stderr, 
+	    "[HH_curdevheap@p%d] ERROR: devid %d is not initialized\n",
+	    HH_MYID, HHL->curdevid);
+    exit(1);
+  }
+  return h;
+}
 
 static int initSharedDevmem(dev *d)
 {
@@ -141,6 +158,9 @@ int HH_cudaInitNode(hhconf *confp)
 int HH_cudaInitProc()
 {
   HHL->curdevid = -1;
+  // We do no substantial work here
+  // Instead, process init per GPU is lazily done in HH_checkDev()
+#if 0
   {
     // default device id
     // TODO: this should be lazy
@@ -151,6 +171,7 @@ int HH_cudaInitProc()
       HHL->curdevid = 0;
     }
   }
+#endif
   return 0;
 }
 
@@ -161,6 +182,13 @@ int HH_checkDev()
   if (HHL->curdevid < 0) {
     cudaError_t crc;
 #if 1
+    // get device no
+    crc = cudaGetDevice(&HHL->curdevid);
+    if (crc != cudaSuccess) {
+      fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
+      HHL->curdevid = 0;
+    }
+#else
     fprintf(stderr, 
 	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
 	    HH_MYID, HHL->curdevid);
@@ -186,16 +214,20 @@ int HH_checkDev()
   }
 
   double st = Wtime_prt(), et;
+#ifdef HHLOG_SCHED
   fprintf(stderr, 
 	  "[HH_checkDev@p%d] [%.2lf] First use of devid %d. initialize...\n",
 	  HH_MYID, st, HHL->curdevid);
+#endif
 
   // swap out existing heaps
   HH_swapOutIfOver();
 
+#ifdef HHLOG_SCHED
   fprintf(stderr, 
 	  "[HH_checkDev@p%d] After swapOutIfOver\n",
 	  HH_MYID);
+#endif
 
   // create heap structure for current GPU
   h = HH_devheapCreate(HH_curdev());
@@ -207,12 +239,12 @@ int HH_checkDev()
   HH_sleepForMemory();
 
   et = Wtime_prt();
+#ifdef HHLOG_SCHED
   fprintf(stderr, 
 	  "[HH_checkDev@p%d] [%.2lf] now process restarts. checkDev %.2lfsec\n",
 	  HH_MYID, et, et-st);
-
-  HH_printHostMemStat();
-
+  //HH_printHostMemStat();
+#endif
 
   return 0;
 }
@@ -268,6 +300,59 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
   return cudaMemcpy2DAsync(dst, dpitch, src, spitch, width, height, kind, stream);
 }
 
+/* Device memory related used API */
+/* Wrappers of cudaMalloc/cudaFree */
+
+cudaError_t HHcudaMalloc(void **pp, size_t size)
+{
+  HH_checkDev();
+
+  void *p = NULL;
+
+  if (HHL->devmode == HHDEV_NORMAL) {
+  }
+
+  p = HH_curdevheap()->alloc(size);
+  *pp = p;
+  return cudaSuccess;
+}
+
+cudaError_t HHcudaFree(void *p)
+{
+  HH_checkDev();
+
+  if (p == NULL) return cudaSuccess;
+
+  int rc;
+  rc = HH_curdevheap()->free(p);
+  if (rc != 0) {
+    return cudaErrorInvalidDevicePointer;
+  }
+  return cudaSuccess;
+}
+
+#ifdef USE_SWAPHOST
+cudaError_t HHcudaHostAlloc(void ** pp, size_t size, unsigned int flags)
+{
+  HH_checkDev();
+
+  void *p;
+  if (HH_MYID == 0) {
+    fprintf(stderr, "[HHcudaHostAlloc@p%d] WARNING: normal malloc is used now\n",
+	    HH_MYID);
+  }
+  p = HHL2->hostheap->alloc(size);
+  *pp = p;
+  return cudaSuccess;
+}
+
+cudaError_t HHcudaMallocHost(void ** pp, size_t size)
+{
+  HH_checkDev();
+
+  return HHcudaHostAlloc(pp, size, cudaHostAllocDefault);
+}
+#endif
 
 /*****************************************************/
 // will be obsolete

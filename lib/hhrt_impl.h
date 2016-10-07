@@ -521,12 +521,10 @@ int HH_exitGComm();
 /****************************************/
 /* hhcuda.cc: for CUDA */
 dev *HH_curdev();
+heap *HH_curdevheap();
 int HH_cudaInitNode(hhconf *confp);
 int HH_cudaInitProc();
 int HH_checkDev();
-
-/* hhcudamem.cc */
-heap *HH_curdevheap();
 
 /* hhaux.c */
 int HH_profInit();
