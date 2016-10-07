@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  /****************/
  loop:
+  /****************/
   int i, j;
 
   fprintf(out, "HHVIEW@%s [%.2lf]\n", hostname, Wtime_prt());
@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
       hmsums[j] += HHL->hmstat.used[j];
     }
     fprintf(out, "\n");
+    fprintf(out, "    msg: %s\n", HHL->msg);
   }	  
 
   pthread_mutex_unlock(&HHS->sched_ml);

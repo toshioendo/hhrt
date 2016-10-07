@@ -302,7 +302,8 @@ int heap::releaseHeap()
 int heap::checkSwapRes(int kind)
 {
   int res = HHSS_OK;
-  int line = -200; // debug
+  int line = -999; // debug
+  int line2 = -9999;
 
   if (lower == NULL) {
     res = HHSS_NONEED;
@@ -350,7 +351,7 @@ int heap::checkSwapRes(int kind)
     else {
       // check lower host
       heap *h = lower;
-      if (heapptr != NULL && h != NULL && h->swapped) {
+      if (h != NULL && h->swapped) {
 	// we have to wait lower heap's swapping-in
 	res = HHSS_EBUSY;
 	line = __LINE__;
@@ -366,23 +367,34 @@ int heap::checkSwapRes(int kind)
 
   // we still need check
   // class specific check
-  res = checkSwapResSelf(kind);
+  res = checkSwapResSelf(kind, &line2);
   if (res != HHSS_OK) {
-    line = __LINE__;
+    //line = __LINE__;
+    line = 10000+line2;
     goto out;
   }
 
   // class specific check of lower layer
   assert(lower != NULL);
-  res = lower->checkSwapResAsLower(kind);
-  line = __LINE__;
+  res = lower->checkSwapResAsLower(kind, &line2);
+  if (res != HHSS_OK) {
+    line = 20000+line2;
+  }
+  else {
+    line = __LINE__;
+  }
 
  out:
+#if 1
+  // visible from hhview tool
+  sprintf(HHL->msg, "[HH:heap(%s)::checkSwapRes@p%d] [%.2lf] for %s result=%s (line=%d)",
+    name, HH_MYID, Wtime_prt(), hhsw_names[kind], hhss_names[res], line);
+#endif  
+
 #if 0
-  if (rand() % 256 == 0) {
-    const char *strs[] = {"OK", "EBUSY", "NONEED", "XXX"};
+  if (res == HHSS_OK /*|| rand() % 1024 == 0*/) {
     fprintf(stderr, "[HH:heap(%s)::checkSwapRes@p%d] for %s result=%s (line=%d)\n",
-	    name, HH_MYID, hhsw_names[kind], strs[res], line);
+	    name, HH_MYID, hhsw_names[kind], hhss_names[res], line);
   }
 #endif
   return res;

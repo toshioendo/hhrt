@@ -387,6 +387,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   for (i = 0; i < HHST_MAX; i++) {
     HHL->hmstat.used[i] = 0;
   }
+  sprintf(HHL->msg, "[HH:initProc@p%d] no msg", HH_MYID);
 
   HH_profInit();
 

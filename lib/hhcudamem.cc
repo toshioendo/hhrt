@@ -136,7 +136,7 @@ int devheap::restoreHeap()
 
 // check resource availability before actual swapping
 // called by heap::checkSwapRes
-int devheap::checkSwapResSelf(int kind)
+int devheap::checkSwapResSelf(int kind, int *pline)
 {
   int res = -1;
   int line = -992;
@@ -175,14 +175,26 @@ int devheap::checkSwapResSelf(int kind)
 	    name, HH_MYID, kind);
     exit(1);
   }
+  
+  if (pline != NULL) {
+    *pline = line; // debug info
+  }
   return res;
 }
 
 int devheap::reserveSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
+    if (device->dhslot_users[HHL->hpid] >= 0) {
+      fprintf(stderr, "[HH:%s::reserveSwapRes@p%d] devslot[%d]'s user = %d, STRANGE?\n",
+	      name, HH_MYID, HHL->hpid, device->dhslot_users[HHL->hpid]);
+    }
     assert(device->dhslot_users[HHL->hpid] < 0);
     device->dhslot_users[HHL->hpid] = HH_MYID;
+#if 1
+    fprintf(stderr, "[HH:%s::reserveSwapRes@p%d] [%.2lf] I reserved devslot[%d]\n",
+	    name, HH_MYID, Wtime_prt(), HHL->hpid);
+#endif
     device->np_in++;
   }
   else if (kind == HHSW_OUT) {
@@ -226,39 +238,6 @@ int devheap::releaseSwapResSelf(int kind)
   //swapping_kind = HHSW_NONE;
   return 0;
 }
-
-#if 0
-int devheap::releaseSwapRes()
-{
-  int kind = swapping_kind;
-  // Release resource information after swapping
-  if (kind == HHSW_IN) {
-    device->np_in--;
-  }
-  else if (kind == HHSW_OUT) {
-    device->np_out--;
-    if (device->np_out < 0) {
-      fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] np_out = %d strange\n",
-	      name, HH_MYID, device->np_out);
-    }
-
-    assert(HHL->hpid >= 0 && HHL->hpid < HHS->ndh_slots);
-    assert(device->dhslot_users[HHL->hpid] == HH_MYID);
-    device->dhslot_users[HHL->hpid] = -1;
-#ifdef HHLOG_SWAP
-    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
-	    name, HH_MYID, Wtime_prt(), HHL->hpid);
-#endif
-  }
-  else {
-    assert(0);
-    exit(1);
-  }
-
-  swapping_kind = HHSW_NONE;
-  return 0;
-}
-#endif
 
 /* Device memory related used API */
 

@@ -248,7 +248,7 @@ int HH_countHostUsers()
 }
 
 // called by heap::checkSwapRes
-int hostheap::checkSwapResSelf(int kind)
+int hostheap::checkSwapResSelf(int kind, int *pline)
 {
   int res = -1;
   int line = -991; // debug
@@ -272,11 +272,15 @@ int hostheap::checkSwapResSelf(int kind)
       line = __LINE__;
     }
   }
+
+  if (pline != NULL) {
+    *pline = line; // debug info
+  }
   return res;
 }
 
 // called by heap::checkSwapRes during upper layer's swapping
-int hostheap::checkSwapResAsLower(int kind)
+int hostheap::checkSwapResAsLower(int kind, int *pline)
 {
   return HHSS_OK;
 }
@@ -300,13 +304,13 @@ int hostheap::reserveSwapResAsLower(int kind)
 int hostheap::releaseSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
+  }
+  else if (kind == HHSW_OUT) {
     HHL->host_use = 0;
 #ifdef HHLOG_SWAP
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
 #endif
-  }
-  else if (kind == HHSW_OUT) {
   }
   return 0;
 }

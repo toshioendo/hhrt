@@ -102,6 +102,14 @@ enum {
   HHSS_NONEED, // no need for swapping
 };
 
+static const char *hhss_names[] = {
+  "OK",
+  "EBUSY",
+  "NONEED",
+  "XXX",
+  NULL,
+};
+
 /* host memory statistics */
 enum {
   HHST_HOSTHEAP = 0,
@@ -208,8 +216,8 @@ class heap: public memlayer {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int checkSwapResSelf(int kind) {};
-  virtual int checkSwapResAsLower(int kind) {};
+  virtual int checkSwapResSelf(int kind, int *pline) {};
+  virtual int checkSwapResAsLower(int kind, int *pline) {};
   virtual int checkSwapRes(int kind);
 
   virtual int reserveSwapResSelf(int kind) {};
@@ -249,8 +257,8 @@ class devheap: public heap {
   virtual int allocHeap();
   virtual int restoreHeap();
 
-  virtual int checkSwapResSelf(int kind);
-  virtual int checkSwapResAsLower(int kind) {return HHSS_NONEED;};
+  virtual int checkSwapResSelf(int kind, int *pline);
+  virtual int checkSwapResAsLower(int kind, int *pline) {return HHSS_NONEED;};
 
   virtual int reserveSwapResSelf(int kind);
   virtual int reserveSwapResAsLower(int kind) {};
@@ -279,8 +287,8 @@ class hostheap: public heap {
   virtual int releaseHeap();
   virtual int restoreHeap();
 
-  virtual int checkSwapResSelf(int kind);
-  virtual int checkSwapResAsLower(int kind);
+  virtual int checkSwapResSelf(int kind, int *pline);
+  virtual int checkSwapResAsLower(int kind, int *pline);
 
   virtual int reserveSwapResSelf(int kind);
   virtual int reserveSwapResAsLower(int kind);
@@ -324,8 +332,8 @@ class fileheap: public heap {
   virtual int releaseHeap() {return 0;};
   virtual int restoreHeap() {return 0;};
 
-  virtual int checkSwapResSelf(int kind) {return HHSS_NONEED;};
-  virtual int checkSwapResAsLower(int kind);
+  virtual int checkSwapResSelf(int kind, int *pline) {return HHSS_NONEED;};
+  virtual int checkSwapResAsLower(int kind, int *pline);
 
   virtual int reserveSwapResSelf(int kind) {};
   virtual int reserveSwapResAsLower(int kind);
@@ -405,7 +413,9 @@ struct proc {
   struct {
     ssize_t used[HHST_MAX];
   } hmstat;
-  
+
+  // debug
+  char msg[1024];
 };
 
 /* Process information, Private structure */
@@ -440,6 +450,7 @@ struct proc2 {
     char act[64];
     double actst;
   } prof;
+
 };
 
 /* Info about a node */

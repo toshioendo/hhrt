@@ -384,32 +384,41 @@ int fileheap::swapIn()
   return -1;
 }
 
-int fileheap::checkSwapResAsLower(int kind)
+int fileheap::checkSwapResAsLower(int kind, int *pline)
 {
   int res = -1;
+  int line;
 
   if (kind == HHSW_OUT) {
     if (fsd->np_filein > 0 || fsd->np_fileout > 0) {
       // someone is doing swapF2H or swapH2F
       res = HHSS_EBUSY;
+      line = __LINE__;
     }
     else {
       res = HHSS_OK;
+      line = __LINE__;
     }
   }
   else if (kind == HHSW_IN) {
     if (fsd->np_filein > 0) {
       res = HHSS_EBUSY;
+      line = __LINE__;
     }
     else {
       /* I can start swapF2H */
       res = HHSS_OK;
+      line = __LINE__;
     }
   }
   else {
     fprintf(stderr, "[HH:%s::checkSwapResAsLower@p%d] ERROR: kind %d unknown\n",
 	    name, HH_MYID, kind);
     exit(1);
+  }
+
+  if (pline != NULL) {
+    *pline = line; // debug info
   }
   return res;
 }
