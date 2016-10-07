@@ -85,7 +85,7 @@ hostheap::hostheap() : heap(0L)
   for (i = 0; i < 2; i++) {
     crc = cudaHostAlloc(&copybufs[i], copyunit, cudaHostAllocDefault);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:hostswapper::init@p%d] cudaHostAlloc(%ldMiB) failed (rc=%d)\n",
+      fprintf(stderr, "[HH:hostheap::init@p%d] cudaHostAlloc(%ldMiB) failed (rc=%d)\n",
 	      HH_MYID, copyunit>>20, crc);
       exit(1);
     }
@@ -93,7 +93,7 @@ hostheap::hostheap() : heap(0L)
 
   crc = cudaStreamCreate(&copystream);
   if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:hostswapper::init@p%d] cudaStreamCreate failed (rc=%d)\n",
+    fprintf(stderr, "[HH:hostheap::init@p%d] cudaStreamCreate failed (rc=%d)\n",
 	    HH_MYID, crc);
     exit(1);
   }
@@ -377,7 +377,7 @@ int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 // hostmmapheap class (child class of hostheap)
 // Similar to host heap, but the entire heap is mmaped to a file
 // Swapping is done automatically by OS, so this does not have
-// a underlying swapper explicitly
+// a underlying layer explicitly
 hostmmapheap::hostmmapheap(fsdir *fsd0) : hostheap()
 {
   strcpy(name, "hostmmapheap");

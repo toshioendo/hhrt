@@ -44,15 +44,6 @@ using namespace std;
 #define HHLOG_SWAP
 #define HHLOG_API
 
-//#define USE_SHARED_HSC 1 // deprecated
-//#define HSC_SIZE (1L*1024*1024*1024) // host swapper chunk size
-
-#ifdef USE_SHARED_HSC
-#define MAX_SHSC 32
-#define SHSC_KEY(i) (HH_IPSM_KEY+1+(i))
-#define SHSC_PTR0 ((void*)0x780000000000)
-#endif
-
 #define HH_MYID (HHL->rank)
 
 enum {
@@ -113,7 +104,6 @@ static const char *hhss_names[] = {
 /* host memory statistics */
 enum {
   HHST_HOSTHEAP = 0,
-  HHST_HOSTSWAPPER,
   HHST_MPIBUFCOPY,
   HHST_ETC,
   //
@@ -122,7 +112,6 @@ enum {
 
 static const char *hhst_names[] = {
   "HOSTHEAP",
-  "HOSTSWAPPER",
   "MPIBUFCOPY",
   "ETC",
   NULL,
@@ -168,10 +157,9 @@ struct membuf {
   ssize_t soffs; /* offset of swapepd out buffer */
 };
 
-//class swapper;
 class heap;
 
-// parent of swapper and heap
+// parent of heap
 class memlayer {
  public:
   memlayer();
@@ -186,7 +174,6 @@ class memlayer {
   virtual int finalizeRec(); // recursive finalize
 
   // description of memory layer tree
-  //swapper *lower;
   heap *lower;
   heap *uppers[MAX_UPPERS];
 
@@ -262,11 +249,9 @@ class devheap: public heap {
 
   virtual int reserveSwapResSelf(int kind);
   virtual int reserveSwapResAsLower(int kind) {};
-  //virtual int reserveSwapRes(int kind);
 
   virtual int releaseSwapResSelf(int kind);
   virtual int releaseSwapResAsLower(int kind) {};
-  //virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
@@ -292,11 +277,9 @@ class hostheap: public heap {
 
   virtual int reserveSwapResSelf(int kind);
   virtual int reserveSwapResAsLower(int kind);
-  //virtual int reserveSwapRes(int kind);
 
   virtual int releaseSwapResSelf(int kind);
   virtual int releaseSwapResAsLower(int kind);
-  //virtual int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size);
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size);
@@ -386,7 +369,7 @@ struct hhconf {
   size_t devmem;
   int dh_slots; /* # of heap slots in a GPU */
   int maxrp; /* max runnable processes per device */
-  int nlphost; /* if lrank < nlphost, host swapper is forcibly used */
+  int nlphost; /* # of local procs that can share host memory simultaneously */
   int n_fileswap_dirs;
   char fileswap_dirs[MAX_FILESWAP_DIRS][CONFSTRLEN];
   int use_prof;
@@ -437,10 +420,8 @@ struct proc2 {
   std::map<MPI_Request, reqfin> reqfins;
 
   char api_str[64];
-#ifdef USE_SHARED_HSC
-  void *shsc_ptrs[MAX_SHSC];
-#elif defined USE_MMAPSWAP
-  int hswfd; // mmap fd for host swapper buffer
+#ifdef USE_MMAPSWAP
+  int hswfd; // mmap fd for host swapped buffer
 #endif
 
   struct {
@@ -468,12 +449,6 @@ struct shdata {
   struct fsdir fsdirs[MAX_FILESWAP_DIRS];
   struct proc lprocs[MAX_LSIZE];
   char hostname[HOSTNAMELEN];
-
-#ifdef USE_SHARED_HSC
-  int nshsc;
-  int shsc_users[MAX_SHSC];
-  pthread_mutex_t shsc_ml;
-#endif
 
   double stime; // start time. mainly used for profiling and debug print
 };

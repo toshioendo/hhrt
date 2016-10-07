@@ -17,9 +17,9 @@ extern "C" {
 /* configure */
 #define USE_SWAPHOST
 
-//#define USE_MMAPSWAP // testing. use mmaped host buffer, instead of fileswapper
+//#define USE_MMAPSWAP // testing. use mmaped host buffer, instead of fileheap
 
-#define HHRT_VERSION 300
+#define HHRT_VERSION 400
 
 #  define HH(X) HH##X
 
