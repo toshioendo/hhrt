@@ -153,86 +153,6 @@ long getLP(char *p)
   return lv;
 }
 
-static int initSharedDevmem(dev *d)
-{
-  cudaError_t crc;
-  int devid = d->devid;
-  crc = cudaSetDevice(devid);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaSetDevice for heap failed!\n",
-	    HHS->hostname, devid);
-    exit(1);
-  }
-  
-  size_t heapsize = d->default_heapsize;
-  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndh_slots);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
-	    HHS->hostname, devid, heapsize>>20);
-    exit(1);
-  }
-
-  crc = cudaIpcGetMemHandle(&d->hp_handle, d->hp_baseptr0);
-  if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaIpcGetMemhandle for heap failed!\n",
-	    HHS->hostname, devid);
-    exit(1);
-  }
-#if 1
-  fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] exporting pointer %p\n",
-	  HHS->hostname, devid, d->hp_baseptr0);
-#endif
-  return 0;
-}
-
-int initDev(int i, int lsize, int size, hhconf *confp)
-{
-  cudaError_t crc;
-  dev *d = &HHS->devs[i];
-
-  d->devid = i;
-  HH_mutex_init(&d->ml);
-  HH_mutex_init(&d->userml);
-  if (confp->devmem > 0) {
-    d->memsize = confp->devmem;
-  }
-  else {
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, i);
-    d->memsize = prop.totalGlobalMem;
-#if 0
-    fprintf(stderr, "[HHRT] dev %d: memsize=%ld\n",
-	    i, d->memsize);
-#endif
-  }
-  
-  /* determine device heap size */
-  size_t avail = d->memsize - d->memsize/64L;
-#ifdef USE_CUDA_MPS
-  avail -= DEVMEM_USED_BY_PROC * 1;
-#else
-  avail -= DEVMEM_USED_BY_PROC * lsize;
-#endif
-  d->default_heapsize = avail / HHS->ndh_slots;
-  d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
-  
-#if 1
-  fprintf(stderr, "[HH:initDev@%s:dev%d] memsize=%ld -> default_heapsize=%ld\n",
-	  HHS->hostname, i, d->memsize, d->default_heapsize);
-#endif
-
-  initSharedDevmem(d);
-
-  int ih;
-  /* setup heap slots on device */
-  for (ih = 0; ih < HHS->ndh_slots; ih++) {
-    d->dhslot_users[ih] = -1;
-  }
-  
-  d->np_in = 0;
-  d->np_out = 0;
-  return 0;
-}
 
 /* Called only by leader (lrank=0) process */
 static int initNode(int lsize, int size, hhconf *confp)
@@ -282,6 +202,12 @@ static int initNode(int lsize, int size, hhconf *confp)
   sleep(2);
 #endif
 
+#if 1
+  // CUDA related initialization
+  HH_cudaInitNode(confp);  
+#else
+
+
   ndevs = -1;
   crc = cudaGetDeviceCount(&ndevs);
   if (crc != cudaSuccess || ndevs < 0 || ndevs > MAX_LDEVS) {
@@ -311,6 +237,7 @@ static int initNode(int lsize, int size, hhconf *confp)
     
     crc = cudaSetDevice(mydevid); // restore
   }
+#endif
 
   /* init swap directories */
   {

@@ -522,6 +522,7 @@ int HH_exitGComm();
 
 /****************************************/
 /* hhcuda.cc: for CUDA */
+int HH_cudaInitNode(hhconf *confp);
 int HH_checkDev();
 
 /* hhaux.c */

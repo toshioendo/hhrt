@@ -6,7 +6,128 @@
 
 /* CUDA interface */
 
-// Initialize device structure if it is used for first time
+static int initSharedDevmem(dev *d)
+{
+  cudaError_t crc;
+  int devid = d->devid;
+  crc = cudaSetDevice(devid);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaSetDevice for heap failed!\n",
+	    HHS->hostname, devid);
+    exit(1);
+  }
+  
+  size_t heapsize = d->default_heapsize;
+  crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->ndh_slots);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaMalloc(%ldMiB) for heap failed!\n",
+	    HHS->hostname, devid, heapsize>>20);
+    exit(1);
+  }
+
+  crc = cudaIpcGetMemHandle(&d->hp_handle, d->hp_baseptr0);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaIpcGetMemhandle for heap failed!\n",
+	    HHS->hostname, devid);
+    exit(1);
+  }
+#if 1
+  fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] exporting pointer %p\n",
+	  HHS->hostname, devid, d->hp_baseptr0);
+#endif
+  return 0;
+}
+
+
+static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
+{
+  cudaError_t crc;
+  dev *d = &HHS->devs[i];
+
+  d->devid = i;
+  HH_mutex_init(&d->ml);
+  HH_mutex_init(&d->userml);
+  if (confp->devmem > 0) {
+    d->memsize = confp->devmem;
+  }
+  else {
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, i);
+    d->memsize = prop.totalGlobalMem;
+#if 0
+    fprintf(stderr, "[HHRT] dev %d: memsize=%ld\n",
+	    i, d->memsize);
+#endif
+  }
+  
+  /* determine device heap size */
+  size_t avail = d->memsize - d->memsize/64L;
+#ifdef USE_CUDA_MPS
+  avail -= DEVMEM_USED_BY_PROC * 1;
+#else
+  avail -= DEVMEM_USED_BY_PROC * lsize;
+#endif
+  d->default_heapsize = avail / HHS->ndh_slots;
+  d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
+  
+#if 1
+  fprintf(stderr, "[HH:initDev@%s:dev%d] memsize=%ld -> default_heapsize=%ld\n",
+	  HHS->hostname, i, d->memsize, d->default_heapsize);
+#endif
+
+  initSharedDevmem(d);
+
+  int ih;
+  /* setup heap slots on device */
+  for (ih = 0; ih < HHS->ndh_slots; ih++) {
+    d->dhslot_users[ih] = -1;
+  }
+  
+  d->np_in = 0;
+  d->np_out = 0;
+  return 0;
+}
+
+// Init CUDA device structures for GPUs on this node
+// Called only by leader (local rank=0) process on the node 
+int HH_cudaInitNode(hhconf *confp)
+{
+  int mydevid;
+  cudaError_t crc;
+  int ndevs;
+  int lsize = HHS->nlprocs;
+
+  ndevs = -1;
+  crc = cudaGetDeviceCount(&ndevs);
+  if (crc != cudaSuccess || ndevs < 0 || ndevs > MAX_LDEVS) {
+    fprintf(stderr, "[HH:initNode@%s] cudaGetDeviceCount ERROR. rc=%d, ndevs=%d\n",
+	    HHS->hostname, crc, ndevs);
+    exit(1);
+  }
+  assert(ndevs <= MAX_LDEVS);
+  HHS->ndevs = ndevs;
+
+#if 1
+  fprintf(stderr, "[HH:initNode@%s] I have %d visible devices\n",
+	  HHS->hostname, ndevs);
+#endif
+
+  HHS->ndh_slots = confp->dh_slots;
+  if (HHS->ndh_slots > lsize) HHS->ndh_slots = lsize;
+
+  crc = cudaGetDevice(&mydevid);
+  
+  for (int i = 0; i < ndevs; i++) {
+    initDev(i, lsize, /*size,*/ confp);
+  }
+  
+  crc = cudaSetDevice(mydevid); // restore
+
+  return 0;
+}
+
+
+// Start using device structure if this process uses it for first time
 // This may be blocked
 int HH_checkDev()
 {
