@@ -158,10 +158,6 @@ static int initNode(int lsize, int size, hhconf *confp)
   HHS->nprocs = size;
   strcpy(HHS->hostname, hostname);
 
-#if 0
-  HH_hsc_init_node();
-#endif
-
   HH_mutex_init(&HHS->sched_ml);
 
 #ifdef USE_CUDA_MPS
@@ -254,21 +250,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   HH_profInit();
 
-#if 1
   HH_cudaInitProc();
-#else
-  HHL->curdevid = -1;
-  {
-    // default device id
-    // TODO: this should be lazy
-    cudaError_t crc;
-    crc = cudaGetDevice(&HHL->curdevid);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:inic_proc@p%d] cudaGetDevice failed. ignored\n", HH_MYID);
-      HHL->curdevid = 0;
-    }
-  }
-#endif
 
   // default fsdir id
   if (confp->n_fileswap_dirs == 0) {
@@ -277,10 +259,6 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   else {
     HHL->curfsdirid = lrank % confp->n_fileswap_dirs;
   }
-
-#if 0
-  HH_hsc_init_proc();
-#endif
 
   // see also devheap::reserveRes()
   HHL->hpid = lrank % HHS->ndh_slots;
@@ -538,11 +516,6 @@ int HHMPI_Finalize()
 #ifndef EAGER_ICS_DESTROY
   MPI_Barrier(MPI_COMM_WORLD);
   ipsm_destroy();
-#endif
-#if 0
-  if (lrank == 0) {
-    HH_hsc_fin_node();
-  }
 #endif
 
   MPI_Finalize();

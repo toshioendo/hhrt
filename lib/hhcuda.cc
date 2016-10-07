@@ -158,7 +158,16 @@ int HH_cudaInitProc()
 // This may be blocked
 int HH_checkDev()
 {
-  if (HHL->curdevid < 0 || HHL->curdevid >= MAX_LDEVS) {
+  if (HHL->curdevid < 0) {
+    cudaError_t crc;
+#if 1
+    fprintf(stderr, 
+	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
+	    HH_MYID, HHL->curdevid);
+    exit(1);
+#endif
+  }
+  if (HHL->curdevid >= MAX_LDEVS) {
     fprintf(stderr, 
 	    "[HH_checkDev@p%d] ERROR: curdevid %d is invalid\n",
 	    HH_MYID, HHL->curdevid);
@@ -208,6 +217,7 @@ int HH_checkDev()
   return 0;
 }
 
+/*********************** wrappers of user API ***************/
 
 cudaError_t HHcudaMemcpy(void * dst,
 		       const void * src,
