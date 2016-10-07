@@ -191,15 +191,30 @@ int setup_comminfo()
   cip->ridxz = bufz-bt;
 
   /* setup buffers */
+  size_t sum = 0L;
   for (i = 0; i < 8; i++) {
     cudaError_t crc;
+    int bpy;
+    int bpz;
     cip = &comminfo[i];
-    cip->bufsize = bufx * cip->county * cip->countz * sizeof(REAL);
-    crc = cudaMallocHost((void**)&cip->sbuf, cip->bufsize);
-    if (crc != cudaSuccess) {perror("cudaMallocHost");exit(1);}
-    crc = cudaMallocHost((void**)&cip->rbuf, cip->bufsize);
-    if (crc != cudaSuccess) {perror("cudaMallocHost");exit(1);}
+    bpy = myy+cip->poffy;
+    bpz = myz+cip->poffz;
+    if (bpy >= 0 && bpy < npy && bpz >= 0 && bpz < npz) {
+      cip->bufsize = bufx * cip->county * cip->countz * sizeof(REAL);
+      crc = cudaMallocHost((void**)&cip->sbuf, cip->bufsize);
+      if (crc != cudaSuccess) {perror("cudaMallocHost");exit(1);}
+      sum += cip->bufsize;
+      crc = cudaMallocHost((void**)&cip->rbuf, cip->bufsize);
+      if (crc != cudaSuccess) {perror("cudaMallocHost");exit(1);}
+      sum += cip->bufsize;
+    }
+    else {
+      cip->sbuf = NULL;
+      cip->rbuf = NULL;
+    }
   }
+  fprintf(stderr, "Process %d allocated %ldMiB for MPI buffer\n",
+	  myid, sum >> 20L);
   return 0;
 }
 

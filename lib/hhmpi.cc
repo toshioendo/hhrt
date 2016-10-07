@@ -5,18 +5,6 @@
 #include <mpi.h>
 #include "hhrt_impl.h"
 
-#if 0
-int HHMPI_Init(int *argcp, char ***argvp)
-{
-  /* do nothing */
-  return 0;
-}
-
-int HHMPI_Finalize()
-{
-  return 0;
-}
-#endif
 
 #if defined USE_SWAPHOST
 
@@ -193,6 +181,10 @@ int HH_reqfin_finalize(reqfin *finp)
       MPI_Type_size(finp->recv.ctype, &tsize);
       bsize = (size_t)tsize*finp->recv.csize;
       memcpy(finp->recv.orgptr, finp->recv.cptr, bsize);
+#if 1
+      free(finp->recv.cptr);
+      HH_addHostMemStat(HHST_MPIBUFCOPY, -finp->recv.csize);
+#endif
     }
   }
 
@@ -211,6 +203,14 @@ int HH_req_finalize(MPI_Request req)
     reqfin fin = HHL2->reqfins[req];
     HH_reqfin_finalize(&fin);
     HHL2->reqfins.erase(req);
+  }
+  else {
+    fprintf(stderr, "[HH_req_finalize@p%d] No request structure for req=%ld finalized, is it OK?\n",
+	    HH_MYID, (long)req);
+    std::map<MPI_Request, reqfin>::iterator iter = HHL2->reqfins.begin();
+    for (; iter != HHL2->reqfins.end(); iter++) {
+      fprintf(stderr, "   req=%ld in map\n", (long)iter->first);
+    }
   }
   return 0;
 }
@@ -305,6 +305,10 @@ int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
   if (HHL->in_api == 0) {
     double t0 = Wtime(), t1;
     /* request finalizer */
+#if 0
+    fprintf(stderr, "[HHMPI_Waitall@p%d] calling HH_req_finalize() for %d reqs\n",
+	    HH_MYID, n);
+#endif
     for (int i = 0; i < n; i++) {
       HH_req_finalize(reqs[i]);
       reqs[i] = bakreqs[i];
@@ -330,10 +334,15 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   reqfin fin; /* task to be done later */
   fin.mode = 0;
   HH_reqfin_setup_send(&fin, buf, count, datatype, comm);
-  HHL2->reqfins[*reqp] = fin;
 
   MPI_Isend(fin.send.cptr, fin.send.csize, fin.send.ctype, 
 	    dest, tag, comm, reqp);
+
+  HHL2->reqfins[*reqp] = fin;
+#if 0
+  fprintf(stderr, "[HHMPI_Isend@p%d] added req=%ld\n",
+	  HH_MYID, (long)(*reqp));
+#endif
 
   return 0;
 }
@@ -344,10 +353,15 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   reqfin fin; /* task to be done later */
   fin.mode = 0;
   HH_reqfin_setup_recv(&fin, buf, count, datatype, comm);
-  HHL2->reqfins[*reqp] = fin;
 
   MPI_Irecv(fin.recv.cptr, fin.recv.csize, fin.recv.ctype, 
 	    source, tag, comm, reqp);
+
+  HHL2->reqfins[*reqp] = fin;
+#if 0
+  fprintf(stderr, "[HHMPI_Irecv@p%d] added req=%ld\n",
+	  HH_MYID, (long)(*reqp));
+#endif
 
   return 0;
 }
