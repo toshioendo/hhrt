@@ -136,7 +136,6 @@ int fileheap::openSFileIfNotYet()
 fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
 {
   int rc;
-  cudaError_t crc;
 
   sprintf(name, "fileheap");
 
@@ -156,6 +155,8 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
   int i;
   for (i = 0; i < 2; i++) {
     copybufs[i] = valloc(copyunit);
+#ifdef USE_CUDA
+    cudaError_t crc;
     crc = cudaHostRegister(copybufs[i], copyunit, 0 /*cudaHostRegisterPortable*/);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:fileheap::init@p%d] cudaHostRegister(%ldMiB) failed (rc=%d)\n",
@@ -169,6 +170,7 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
 	      HH_MYID, crc);
       exit(1);
     }
+#endif
   }
 
   return;
@@ -178,11 +180,11 @@ int fileheap::finalize()
 {
   int i;
   for (i = 0; i < 2; i++) {
-    cudaHostUnregister(copybufs[i]);
-    free(copybufs[i]);
-#if 01
+#ifdef USE_CUDA
     cudaStreamDestroy(copystreams[i]);
+    cudaHostUnregister(copybufs[i]);
 #endif
+    free(copybufs[i]);
   }
   if (sfd != -1) {
     close(sfd);
@@ -234,6 +236,7 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
     return 0;
   }
 
+#ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
     crc = cudaMemcpyAsync(copybufs[0], buf, size, cudaMemcpyDeviceToHost, copystreams[0]);
@@ -245,17 +248,19 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
     cudaStreamSynchronize(copystreams[0]);
     ptr = copybufs[0];
   }
-  else if ((size_t)buf % align != 0) {
-#if 1
-    fprintf(stderr, "[HH:fileheap::write_small@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
-	    HH_MYID, buf, size);
+  else 
 #endif
-    memcpy(copybufs[0], buf, size);
-    ptr = copybufs[0];
-  }
-  else {
-    ptr = buf;
-  }
+    if ((size_t)buf % align != 0) {
+#if 1
+      fprintf(stderr, "[HH:fileheap::write_small@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
+	      HH_MYID, buf, size);
+#endif
+      memcpy(copybufs[0], buf, size);
+      ptr = copybufs[0];
+    }
+    else {
+      ptr = buf;
+    }
 
   /* seek the swap file */
   off_t orc = lseek(sfd, offs, SEEK_SET);
@@ -325,16 +330,19 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
 	  HH_MYID, align);
 #endif
 
+#ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     ptr = copybufs[0];
   }
-  else if ((size_t)buf % align != 0) {
-    ptr = copybufs[0];
-  }
-  else {
-    ptr = buf;
-  }
-
+  else 
+#endif
+    if ((size_t)buf % align != 0) {
+      ptr = copybufs[0];
+    }
+    else {
+      ptr = buf;
+    }
+  
   if ((offs % align) != 0) {
     fprintf(stderr, "[HH:fileheap::read_s@p%d] offs=0x%lx not supported. to be fixed!\n",
 	    HH_MYID, offs);
@@ -359,6 +367,7 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
     exit(1);
   }
 
+#ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
     crc = cudaMemcpyAsync(buf, copybufs[0], size, cudaMemcpyHostToDevice, copystreams[0]);
@@ -369,14 +378,16 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
     }
     cudaStreamSynchronize(copystreams[0]);
   }
-  else if ((size_t)buf % align != 0) {
-#if 1
-    fprintf(stderr, "[HH:fileheap::read_s@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
-	    HH_MYID, buf, size);
+  else 
 #endif
-    memcpy(buf, copybufs[0], size);
-  }
-
+    if ((size_t)buf % align != 0) {
+#if 1
+      fprintf(stderr, "[HH:fileheap::read_s@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
+	      HH_MYID, buf, size);
+#endif
+      memcpy(buf, copybufs[0], size);
+    }
+  
 #if 0
   fprintf(stderr, "[HH:fileheap::read_s@p%d] OK (align=%ld)\n",
 	  HH_MYID, align);

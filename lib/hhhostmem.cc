@@ -77,26 +77,15 @@ hostheap::hostheap() : heap(0L)
   swapfd = -1; // anonymous mmap
   mmapflags = MAP_PRIVATE|MAP_ANONYMOUS;
 
+#ifdef USE_CUDA
   cudaError_t crc;
-
-  copyunit = 32L*1024*1024;
-
-  int i;
-  for (i = 0; i < 2; i++) {
-    crc = cudaHostAlloc(&copybufs[i], copyunit, cudaHostAllocDefault);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:hostheap::init@p%d] cudaHostAlloc(%ldMiB) failed (rc=%d)\n",
-	      HH_MYID, copyunit>>20, crc);
-      exit(1);
-    }
-  }
-
   crc = cudaStreamCreate(&copystream);
   if (crc != cudaSuccess) {
     fprintf(stderr, "[HH:hostheap::init@p%d] cudaStreamCreate failed (rc=%d)\n",
 	    HH_MYID, crc);
     exit(1);
   }
+#endif
 
   return;
 }
@@ -324,13 +313,18 @@ int hostheap::releaseSwapResAsLower(int kind)
 int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 {
   void *hp = offs2ptr(offs);
+#ifdef USE_CUDA
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
+#else
+  assert(bufkind == HHM_HOST);
+#endif
 
 #if 0
   fprintf(stderr, "[HH:hostheap::write_s@p%d] called: hscid=%d, loffs=0x%lx <- [%p,%p) (size=0x%lx)\n",
 	  HH_MYID, hscid, loffs, buf, piadd(buf, size), size);
 #endif
 
+#ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
     crc = cudaMemcpyAsync(hp, buf, size, cudaMemcpyDeviceToHost, copystream);
@@ -341,10 +335,12 @@ int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
     }
     //copyD2H(hp, buf, size, copystream, "HH:hostheap::write_s");
     cudaStreamSynchronize(copystream);
-  }
-  else {
-    memcpy(hp, buf, size);
-  }
+  } 
+  else 
+#endif
+    {
+      memcpy(hp, buf, size);
+    }
 
   return 0;
 }
@@ -352,8 +348,13 @@ int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
 {
   void *hp = offs2ptr(offs);
+#ifdef USE_CUDA
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
+#else
+  assert(bufkind == HHM_HOST);
+#endif
 
+#ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
     crc = cudaMemcpyAsync(buf, hp, size, cudaMemcpyHostToDevice, copystream);
@@ -364,10 +365,12 @@ int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
     }
     cudaStreamSynchronize(copystream);
   }
-  else {
-    memcpy(buf, hp, size);
-  }
-
+  else 
+#endif
+    {
+      memcpy(buf, hp, size);
+    }
+  
   return 0;
 }
 
