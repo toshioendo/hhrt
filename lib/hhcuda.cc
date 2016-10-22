@@ -37,17 +37,27 @@ heap *HH_curdevheap()
   return h;
 }
 
+int HH_printMemHandle(FILE *out, cudaIpcMemHandle_t *handle)
+{
+  int i;
+  unsigned char *p = (unsigned char*)(void*)handle;
+  for (i = 0; i < sizeof(cudaIpcMemHandle_t); i++) {
+    fprintf(out, "%02x", p[i]);
+  }
+}
+
 static int initSharedDevmem(dev *d)
 {
   cudaError_t crc;
   int devid = d->devid;
+
   crc = cudaSetDevice(devid);
   if (crc != cudaSuccess) {
     fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] cudaSetDevice for heap failed!\n",
 	    HHS->hostname, devid);
     exit(1);
   }
-  
+
   size_t heapsize = d->default_heapsize;
   crc = cudaMalloc(&d->hp_baseptr0, heapsize * HHS->cuda.ndh_slots);
   if (crc != cudaSuccess) {
@@ -65,17 +75,20 @@ static int initSharedDevmem(dev *d)
 #if 1
   fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] exporting pointer %p\n",
 	  HHS->hostname, devid, d->hp_baseptr0);
+  fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] handle is ", HHS->hostname, devid);
+  HH_printMemHandle(stderr, &d->hp_handle);
+  fprintf(stderr, "\n");
 #endif
   return 0;
 }
 
 
-static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
+static int initDev(int devid, int lsize, hhconf *confp)
 {
   cudaError_t crc;
-  dev *d = &HHS->cuda.devs[i];
+  dev *d = &HHS->cuda.devs[devid];
 
-  d->devid = i;
+  d->devid = devid;
   HH_mutex_init(&d->ml);
   HH_mutex_init(&d->userml);
   if (confp->devmem > 0) {
@@ -83,11 +96,11 @@ static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
   }
   else {
     cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, i);
+    cudaGetDeviceProperties(&prop, devid);
     d->memsize = prop.totalGlobalMem;
 #if 0
     fprintf(stderr, "[HHRT] dev %d: memsize=%ld\n",
-	    i, d->memsize);
+	    devid, d->memsize);
 #endif
   }
   
@@ -103,7 +116,7 @@ static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
   
 #if 1
   fprintf(stderr, "[HH:initDev@%s:dev%d] memsize=%ld -> default_heapsize=%ld\n",
-	  HHS->hostname, i, d->memsize, d->default_heapsize);
+	  HHS->hostname, devid, d->memsize, d->default_heapsize);
 #endif
 
   initSharedDevmem(d);
@@ -123,7 +136,6 @@ static int initDev(int i, int lsize, /*int size,*/ hhconf *confp)
 // Called only by leader (local rank=0) process on the node 
 int HH_cudaInitNode(hhconf *confp)
 {
-  int mydevid;
   cudaError_t crc;
   int ndevs;
   int lsize = HHS->nlprocs;
@@ -146,13 +158,14 @@ int HH_cudaInitNode(hhconf *confp)
   HHS->cuda.ndh_slots = confp->dh_slots;
   if (HHS->cuda.ndh_slots > lsize) HHS->cuda.ndh_slots = lsize;
 
-  crc = cudaGetDevice(&mydevid);
+  int orgdevid;
+  crc = cudaGetDevice(&orgdevid);
   
   for (int i = 0; i < ndevs; i++) {
     initDev(i, lsize, /*size,*/ confp);
   }
   
-  crc = cudaSetDevice(mydevid); // restore
+  crc = cudaSetDevice(orgdevid); // restore
 
   return 0;
 }
@@ -186,14 +199,14 @@ int HH_cudaCheckDev()
       HHL->cuda.curdevid = 0;
     }
   }
-    if (HHL->cuda.curdevid >= HHS->cuda.ndevs) {
+  if (HHL->cuda.curdevid >= HHS->cuda.ndevs) {
     fprintf(stderr, 
 	    "[HH_cudaCheckDev@p%d] ERROR: cuda.curdevid %d is invalid\n",
 	    HH_MYID, HHL->cuda.curdevid);
     exit(1);
   }
-  heap *h = HHL2->devheaps[HHL->cuda.curdevid];
 
+  heap *h = HHL2->devheaps[HHL->cuda.curdevid];
   if (h != NULL) {
     // device heap is already initialized. Do nothing
 #if 0
@@ -384,13 +397,18 @@ int HH_devSetMode(int mode)
 
 cudaError_t HHcudaSetDevice(int devid)
 {
-  cudaError_t crc = cudaSetDevice(devid);
+  cudaError_t crc;
+  assert(devid >= 0 && devid < HHS->cuda.ndevs);
+  crc = cudaSetDevice(devid);
   if (crc != cudaSuccess) {
-    fprintf(stderr, "[HHcudaSetDevice@p%d] cudaSetDevice(%d) FAILED!!!\n");
+    fprintf(stderr, "[HHcudaSetDevice@p%d] cudaSetDevice(%d) FAILED!!!\n", HH_MYID);
     return crc;
   }
+#if 1
+  fprintf(stderr, "[HHcudaSetDevice@p%d] cudaSetDevice(%d) ok\n",
+	  HH_MYID, devid);
+#endif
 
-  assert(devid >= 0 && HHS->cuda.ndevs);
   HHL->cuda.curdevid = devid;
   HH_cudaCheckDev(); // init heap for new device if not
 

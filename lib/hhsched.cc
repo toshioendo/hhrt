@@ -100,6 +100,7 @@ int HH_swapIfOk(int kind)
       if (h->checkSwapRes(kind) == HHSS_OK) {
 	HH_unlockSched();
 	// can proceed swap
+
 #ifdef USE_SWAP_THREAD
 	HH_startSwapHeap(h, kind);
 #else

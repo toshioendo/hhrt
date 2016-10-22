@@ -69,6 +69,8 @@ int devheap::releaseHeap()
   return 0;
 }
 
+int HH_printMemHandle(FILE *out, cudaIpcMemHandle_t *handle);
+
 void *devheap::allocDevMem(size_t heapsize)
 {
   dev *d = device;
@@ -85,6 +87,14 @@ void *devheap::allocDevMem(size_t heapsize)
       if (crc != cudaSuccess) {
 	fprintf(stderr, "[HH:%s::allocHeap@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
 		name, HH_MYID, cudaGetErrorString(crc));
+	fprintf(stderr, "[HH:%s::allocHeap@p%d]  handle is ",
+		name, HH_MYID);
+	HH_printMemHandle(stderr, &d->hp_handle);
+	fprintf(stderr, "\n");
+	int devid = -1;
+	cudaGetDevice(&devid);
+	fprintf(stderr, "[HH:%s::allocHeap@p%d]  current using dev %d\n",
+		name, HH_MYID, devid);
 	exit(1);
       }
     }
@@ -208,6 +218,16 @@ int devheap::reserveSwapResSelf(int kind)
   }
 
   swapping_kind = kind; // remember the kind
+  return 0;
+}
+
+int devheap::doSwap()
+{
+  int olddevid;
+  cudaGetDevice(&olddevid);
+  cudaSetDevice(device->devid);
+  heap::doSwap(); // parent class
+  cudaSetDevice(olddevid); // restore devid
   return 0;
 }
 

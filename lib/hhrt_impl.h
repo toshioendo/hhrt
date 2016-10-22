@@ -244,6 +244,8 @@ class devheap: public heap {
   virtual int reserveSwapResSelf(int kind);
   virtual int reserveSwapResAsLower(int kind) {};
 
+  virtual int doSwap();
+
   virtual int releaseSwapResSelf(int kind);
   virtual int releaseSwapResAsLower(int kind) {};
 
