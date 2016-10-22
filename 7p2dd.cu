@@ -29,7 +29,7 @@ static double Wtime()
 #define USE_MADVISE
 #define INIT_ON_GPU
 
-#define GPUS_PER_NODE 1
+#define GPUS_PER_NODE -1 // -1 means all GPUs on the node
 
 #define BSX 32
 #define BSY 8
@@ -295,8 +295,16 @@ int init()
   }
 
 #ifdef GPUS_PER_NODE
-  int devid = myid % GPUS_PER_NODE;
-  fprintf(stderr, "Process %d uses gpu %d\n", myid, devid);
+  int devid;
+  int ndevs = 1;
+  if (GPUS_PER_NODE > 0) {
+    ndevs = GPUS_PER_NODE;
+  }
+  else {
+    cudaGetDeviceCount(&ndevs);
+  }
+  devid = myid % ndevs;
+  fprintf(stderr, "Process %d uses gpu %d (ndevs=%d)\n", myid, devid, ndevs);
   cudaSetDevice(devid);
 #endif
 
