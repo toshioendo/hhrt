@@ -264,6 +264,13 @@ int heap::free(void *p)
     return -1;
   }
 
+  if (mbp->soffs != (ssize_t)-1) {
+    // there may be replica in lower layer. this must be invalidated
+    mbp->soffs = (ssize_t)-1;
+    fprintf(stderr, "[HH:%s::madvise@p%d] WARNING: replica may be resident eternally. should be fixed\n",
+	    name, HH_MYID);
+  }
+
   mbp->kind = HHMADV_FREED;
   mbp->usersize = 0L;
 
@@ -457,20 +464,29 @@ int heap::swapOut()
     for (it = membufs.begin(); it != membufs.end(); it++) {
       /* scan all buffers in queue */
       membuf *mbp = *it;
-      if (mbp->kind == HHMADV_NORMAL) {
-	void *dp = offs2ptr(mbp->doffs);
-	void *sp = lower->alloc(mbp->size);
+      void *dp = offs2ptr(mbp->doffs);
+      if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
+	if (mbp->soffs == (ssize_t)-1) {
+	  void *sp = lower->alloc(mbp->size);
 #if 0
-	fprintf(stderr, "[HH:%s::swapOut@p%d] got pointer %p from %s\n",
-		name, HH_MYID, sp, lower->name);
+	  fprintf(stderr, "[HH:%s::swapOut@p%d] got pointer %p from %s\n",
+		  name, HH_MYID, sp, lower->name);
 #endif
-	mbp->soffs = lower->ptr2offs(sp);
-	lower->writeSeq(mbp->soffs, dp, memkind, mbp->size);
-
-	nmoved++;
-	smoved += mbp->size;
+	  mbp->soffs = lower->ptr2offs(sp);
+	  lower->writeSeq(mbp->soffs, dp, memkind, mbp->size);
+	  
+	  nmoved++;
+	  smoved += mbp->size;
+	}
+	else {
+	  // Replica in the lower layer is valid. no need to copy
+	  assert(mbp->kind == HHMADV_READONLY);
+	  nskipped++;
+	  sskipped += mbp->size;
+	}
       }
       else {
+	assert(mbp->kind == HHMADV_FREED || mbp->kind == HHMADV_CANDISCARD);
 	mbp->soffs = (ssize_t)-1;
 	nskipped++;
 	sskipped += mbp->size;
@@ -539,18 +555,22 @@ int heap::swapIn()
     for (it = membufs.begin(); it != membufs.end(); it++) {
       /* scan all buffers in queue */
       membuf *mbp = *it;
-      if (mbp->kind == HHMADV_NORMAL) {
-	void *dp = offs2ptr(mbp->doffs);
+      void *dp = offs2ptr(mbp->doffs);
+      if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
 	lower->readSeq(mbp->soffs, dp, memkind, mbp->size);
-	void *sp = lower->offs2ptr(mbp->soffs);
-	lower->free(sp);
 
-	mbp->soffs = (ssize_t)-1;
+	if (mbp->kind == HHMADV_NORMAL) {
+	  /* Discard replica in lower layer */
+	  void *sp = lower->offs2ptr(mbp->soffs);
+	  lower->free(sp);
+	  mbp->soffs = (ssize_t)-1;
+	}
 
 	nmoved++;
 	smoved += mbp->size;
       }
       else {
+	assert(mbp->kind == HHMADV_FREED || mbp->kind == HHMADV_CANDISCARD);
 	nskipped++;
 	sskipped += mbp->size;
       }
@@ -579,15 +599,22 @@ int heap::madvise(void *p, size_t size, int kind)
     return -1;
   }
   if (mbp->kind == HHMADV_FREED) {
-    fprintf(stderr, "[%s::madvise@p%d] pointer %p is already freed\n",
+    fprintf(stderr, "[HH:%s::madvise@p%d] pointer %p is already freed\n",
 	    name, HH_MYID, p);
     return -1;
   }
 
   if (kind == HHMADV_NORMAL) {
     mbp->kind = kind;
+
+    if (mbp->soffs != (ssize_t)-1) {
+      // there may be replica in lower layer. this must be invalidated
+      mbp->soffs = (ssize_t)-1;
+      fprintf(stderr, "[HH:%s::madvise@p%d] WARNING: replica may be resident eternally. should be fixed\n",
+	      name, HH_MYID);
+    }
   }
-  else if (kind == HHMADV_CANDISCARD) {
+  else if (kind == HHMADV_CANDISCARD || kind == HHMADV_READONLY) {
     ssize_t doffs = ptr2offs(p);
     if (doffs == mbp->doffs && size >= mbp->usersize) {
       /* mark CANDISCARD if the whole region is specified */
@@ -615,6 +642,9 @@ int heap::dump()
     }
     else if (mbp->kind == HHMADV_CANDISCARD) {
       strcpy(kind, "CANDISCARD");
+    }
+    else if (mbp->kind == HHMADV_READONLY) {
+      strcpy(kind, "READONLY");
     }
     else if (mbp->kind == HHMADV_FREED) {
       strcpy(kind, "FREED");

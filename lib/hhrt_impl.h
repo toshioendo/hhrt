@@ -142,7 +142,7 @@ struct fsdir {
 struct membuf {
   membuf(ssize_t doffs0, size_t size0, size_t usersize0, int kind0) {
     doffs = doffs0; size = size0; usersize = usersize0;
-    kind = kind0;
+    kind = kind0; soffs = (ssize_t)-1;
   }
 
   ssize_t doffs; /* offset is used instead of address */
@@ -150,7 +150,7 @@ struct membuf {
   size_t usersize; // valid if used by user. alignup(usersize) == size
   int kind; /* HHM_* */
 
-  ssize_t soffs; /* offset of swapepd out buffer */
+  ssize_t soffs; /* offset of swapped out buffer. if -1, not swapped out */
 };
 
 class heap;

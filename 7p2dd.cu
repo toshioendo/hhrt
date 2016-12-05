@@ -29,7 +29,7 @@ static double Wtime()
 #define USE_MADVISE
 #define INIT_ON_GPU
 
-#define GPUS_PER_NODE -1 // -1 means all GPUs on the node
+#define GPUS_PER_NODE 1 //-1 // -1 means all GPUs on the node
 
 #define BSX 32
 #define BSY 8

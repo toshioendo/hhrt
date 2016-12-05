@@ -72,7 +72,7 @@ static int initSharedDevmem(dev *d)
 	    HHS->hostname, devid);
     exit(1);
   }
-#if 1
+#if 0
   fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] exporting pointer %p\n",
 	  HHS->hostname, devid, d->hp_baseptr0);
   fprintf(stderr, "[HH:initSharedDevmem@%s:dev%d] handle is ", HHS->hostname, devid);

@@ -29,6 +29,7 @@ enum {
   HHMADV_FREED = 0,
   HHMADV_NORMAL,
   HHMADV_CANDISCARD,
+  HHMADV_READONLY,
 };
 
 enum {
