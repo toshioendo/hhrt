@@ -93,6 +93,15 @@ Then execute the sample program with 8 x 6 = 48processes.
 
 ## Current limitations
 
+* Each process has to be single-threaded.
+* Each process can use up to one GPU. (to be fixed soon)
+* Only (part of) MPI-1 APIs are supported. Especially one-side communication APIs in MPI-2/3 are not supported.
+* Some memory allocation functions, such as valloc, memalign are still missing.
+* Some CUDA features are NOT supported including unified virtual memory, texture cache, Hyper-Q, etc.
+* malloc invocations inside CUDA kernel functions are not considered.
+* Global variables (on device or on host) are not targets of swapping, thus they consume memory capacity and may limit the total problem scale.
+* C++ "new" is not supported yet.
+
 ## References
 
 Toshio Endo, Guanghao Jin. Software Technologies Coping with Memory Hierarchy of GPGPU Clusters for Stencil Computations . In Proceedings of IEEE Cluster Computing (CLUSTER2014), pp.132-139, Madrid, September 25, 2014. 
