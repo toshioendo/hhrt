@@ -19,7 +19,7 @@ For example, many stencil applications on GPU clusters have these characteristic
 
 * Do `cp make.inc.default make.inc` . Then edit make.inc for your environment. You can find some examples in make.inc.\*.
 * `make` makes lib/libhhrt.a, which is the HHRT library.
-  Also a sample program 7p2dd (7-point stencil with 2d division) is made.
+  Also a sample program 7pstencil (7-point stencil with 2d division) is made.
   If you try this sample, go to the next section.
 * Edit your application code by adding
   `#include <hhrt.h>`
@@ -28,16 +28,16 @@ For example, many stencil applications on GPU clusters have these characteristic
 
 ## Execution of the sample program
 
-The usage of 7p2dd sample is as follows:
+The usage of 7pstencil sample is as follows:
 
 `
-% ./7p2dd [-p PY PZ] [-bt BT] [-nt NT] [NX NY NZ]
+% ./7pstencil [-p PY PZ] [-bt BT] [-nt NT] [NX NY NZ]
 `
 
 like
 
 `
-% ./7p2dd 512 512 512
+% ./7pstencil 512 512 512
 `
 
 But this does not exceed the device memory capacity.
@@ -46,7 +46,7 @@ In order to do it, "process oversubscription" is used as follows.
 ### On single GPU/node envorinment
 
 `
-% mpirun -np 8 ./7p2dd -p 2 4 1024 1024 2048
+% mpirun -np 8 ./7pstencil -p 2 4 1024 1024 2048
 `
 
 In this execution, a single GPU is shared by 8 processes, instead of 1 process as above.
@@ -56,7 +56,7 @@ However, there is still a severe problem in speed; the execution speed is very s
 In order to this relieve it, this sample is equipped with "temporal blocking" that improves locality.
 
 `
-% mpirun -np 8 ./7p2dd -p 2 4 -bt 8 1024 1024 2048
+% mpirun -np 8 ./7pstencil -p 2 4 -bt 8 1024 1024 2048
 `
 
 Here "-bt 8" specifies temporal block size.
@@ -88,7 +88,7 @@ Write a machine file as follows (each node appears 8 times.).
 Then execute the sample program with 8 x 6 = 48processes.
 
 `
-% mpirun -np 48 -machinefile my-machine-file ./7p2dd -p 6 8 -bt 8 2048 2048 2048
+% mpirun -np 48 -machinefile my-machine-file ./7pstencil -p 6 8 -bt 8 2048 2048 2048
 `
 
 ## Current limitations

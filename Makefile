@@ -9,9 +9,9 @@ CFLAGS += -I./$(ARCDIR)
 LIBS = $(ARCDIR)/libhhrt.a 
 #libipsm/libipsm.so
 
-all: 7p2dd
+all: 7pstencil
 
-7p2dd: 7p2dd.o libhhrt Makefile
+7pstencil: 7pstencil.o libhhrt Makefile
 	$(LD) $@.o -o $@ $(LIBS) $(LDFLAGS)
 
 pingpong: pingpong.o $(LIBS) Makefile
