@@ -17,7 +17,7 @@ For example, many stencil applications on GPU clusters have these characteristic
 
 ## Basic usage
 
-* Do `cp make.inc.default make.inc` . Then edit make.inc for your environment. You can find some examples in make.inc.\*.
+* Do `cp make.inc.gpu+cpu make.inc` . Then edit make.inc for your environment. You can find some examples in make.inc.\*.
 * `make` makes lib/libhhrt.a, which is the HHRT library.
   Also a sample program 7pstencil (7-point stencil with 2d division) is made.
   If you try this sample, go to the next section.
