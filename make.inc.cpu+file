@@ -1,4 +1,4 @@
-CONFIG=
+CONFIG=-DUSE_SWAPHOST
 
 CC = mpicc
 CXX = mpicxx

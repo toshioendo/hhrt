@@ -17,7 +17,6 @@ extern "C" {
 #endif
 
 /* configure */
-#define USE_SWAPHOST
 
 //#define USE_MMAPSWAP // testing. use mmaped host buffer, instead of fileheap
 
@@ -37,25 +36,19 @@ enum {
   HHDEV_NOTUSED,
 };
 
-/************************************************/
-/* user programmer writes this function */
-int HH_initHeap(size_t heapsize);
-int HH_finalizeHeap();
-int HH_myid();
-int HH_nvps();
-
 /****************************************/
-/* memory management */
+/* HHRT specific APIs */
 
+/* memory optimization */
 int HH_madvise(void *p, size_t size, int kind);
 
+/* scheduling */
+int HH_yield();
+
+/* obsolete */
 int HH_devLock();
 int HH_devUnlock();
 int HH_devSetMode(int kind);
-
-/****************************************/
-/* scheduling */
-int HH_yield();
 
 /****************************************/
 /* MPI-1 compatible interface */
@@ -95,6 +88,7 @@ int HHMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 int HHMPI_Comm_split(MPI_Comm comm, int color, int key,
 		     MPI_Comm *newcomm);
 
+/* MPI-1 has more APIs!!! */
 
 #ifdef USE_CUDA
 /**************************************************/
@@ -132,6 +126,9 @@ cudaError_t HHcudaMemcpy2DAsync(void * dst,
 			      enum cudaMemcpyKind kind,
 			      cudaStream_t stream 
 			      );
+
+/* CUDA has much much more APIs!!! */
+
 #endif
 
 /**************/

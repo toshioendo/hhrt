@@ -1,4 +1,4 @@
-CONFIG = -DUSE_CUDA
+CONFIG = -DUSE_CUDA -DUSE_SWAPHOST
 
 CC = mpicc
 CXX = mpicxx
