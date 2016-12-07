@@ -91,9 +91,33 @@ Then execute the sample program with 8 x 6 = 48processes.
 % mpirun -np 48 -machinefile my-machine-file ./7pstencil -p 6 8 -bt 8 2048 2048 2048
 `
 
+## HHRT Specific APIs
+
+While the goal of HHRT is to support existing parallel codes with little modification, the performance may be improved by the following APIs.
+
+### HH_madvise
+
+`
+int HH_madvise(void *addr, size_t length, int advice);
+`
+
+This API gives hints about the memory region specified by [addr, addr+length).
+HHRT may use the hint information to improve performance in swapping-in/out.
+
+This is similar to "madvise" systemcall, however, HH_madvise defines several 
+advices that original madvise does not have.
+
+* HHMADV_NORMAL: Default value.
+* HHMADV_CANDISCARD: The contents of memory region are not read nor updated by user. HHRT may break its contents.
+* HHMADV_READONLY: The contents of memory region may be read by user, but not updated.
+
+Notes:
+* The memory region may be either on GPU device memory or on host memory.
+* Currently, the memory region specified by [addr, addr+length) must correspond to an entire memory object allocated by cudaMalloc/malloc (management is not page-wise like the original madvise).
+
 ## Current limitations
 
-* Each process has to be single-threaded.
+* Functions wrapped by HHRT (MPI APIs, CUDA APIs, malloc/free etc) are thread-unsafe. They should not be called in parallel.
 * Each process can use up to one GPU. (to be fixed soon)
 * Only (part of) MPI-1 APIs are supported. Especially one-side communication APIs in MPI-2/3 are not supported.
 * Some memory allocation functions, such as valloc, memalign are still missing.
