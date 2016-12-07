@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <mpi.h>
+#include <cuda_runtime.h>
 
 #include "hhrt.h"
 
@@ -219,10 +221,10 @@ int setup_comminfo()
 }
 
 #ifdef INIT_ON_GPU
-__global__ void init_array(REAL *buf,
-			   int nx, int ny, int nz,
-			   int sx, int sy, int sz, int bt,
-			   int bufx, int bufy, int bufz)
+__global__ void init_array_gpu(REAL *buf,
+			       int nx, int ny, int nz,
+			       int sy, int sz, int bt,
+			       int bufx, int bufy, int bufz)
 {
   int jx = blockDim.x*blockIdx.x + threadIdx.x;
   int jy = blockDim.y*blockIdx.y + threadIdx.y;
@@ -256,6 +258,37 @@ __global__ void init_array(REAL *buf,
   }
 
 }
+#else /* !INIT_ON_GPU */
+
+void init_array_cpu(REAL *buf,
+		    int nx, int ny, int nz,
+		    int sy, int sz, int bt,
+		    int bufx, int bufy, int bufz)
+{
+  int jz;
+#pragma omp parallel for
+  for (jz = 0; jz < bufz; jz++) {
+    int jy;
+    REAL rz = (REAL)(jz+sz-bt)/nz;
+    if (rz < (REAL)0.0) rz = (REAL)0.0;
+    if (rz > (REAL)1.0) rz = (REAL)1.0;
+    for (jy = 0; jy < bufy; jy++) {
+      int jx;
+      REAL ry = (REAL)(jy+sy-bt)/ny;
+      if (ry < (REAL)0.0) ry = (REAL)0.0;
+      if (ry > (REAL)1.0) ry = (REAL)1.0;
+      for (jx = 0; jx < nx+2; jx++) {
+	REAL rx = (REAL)(jx-1)/nx;
+	if (rx < (REAL)0.0) rx = (REAL)0.0;
+	if (rx > (REAL)1.0) rx = (REAL)1.0;
+	REAL v = rx*rx+ry*ry+rz*rz;
+	buf[IDX(jx, jy, jz)] = v;
+      }
+    }
+  }
+  return;
+}
+
 #endif
 
 int init()
@@ -309,7 +342,6 @@ int init()
 #endif
 
   /* data region to be computed by this process */
-  // modified 2014/11/26
   sy = (ny*myy+npy-1)/npy;
   ey = (ny*(myy+1)+npy-1)/npy;
   if (ey > ny) ey = ny;
@@ -337,46 +369,25 @@ int init()
 #ifdef INIT_ON_GPU
   hp = NULL;
 
-  init_array<<<dim3((bufx+BSX-1)/BSX, (bufy+BSY-1)/BSY, 1),
+  init_array_gpu<<<dim3((bufx+BSX-1)/BSX, (bufy+BSY-1)/BSY, 1),
     dim3(BSX, BSY, 1)>>>
     (dps[0], nx, ny, nz,
-     sz, sy, sz, bt, bufx, bufy, bufz);
+     sy, sz, bt, bufx, bufy, bufz);
 
-#else // !INIT_ON_GPU
+#else /* !INIT_ON_GPU */
 
-#if 1
   hp = (REAL*)malloc(bufsize);
   if (hp == NULL) {perror("malloc");exit(1);}
-#else
-  crc = cudaMallocHost((void**)&hp, bufsize);
-  if (crc != cudaSuccess) {perror("cudaMallocHost");exit(1);}
+
+  init_array_cpu(hp, nx, ny, nz,
+     sy, sz, bt, bufx, bufy, bufz);
+
+  cudaMemcpy(dps[0], hp, bufsize, cudaMemcpyHostToDevice);
+#ifdef USE_MADVISE
+  HH_madvise(hp, bufsize, HHMADV_CANDISCARD); /* hint for optimization */
 #endif
 
-  /* initialize data */
-  {
-    int jz;
-#pragma omp parallel for
-    for (jz = 0; jz < bufz; jz++) {
-      int jy;
-      REAL rz = (REAL)(jz+sz-bt)/nz;
-      if (rz < (REAL)0.0) rz = (REAL)0.0;
-      if (rz > (REAL)1.0) rz = (REAL)1.0;
-      for (jy = 0; jy < bufy; jy++) {
-	int jx;
-	REAL ry = (REAL)(jy+sy-bt)/ny;
-	if (ry < (REAL)0.0) ry = (REAL)0.0;
-	if (ry > (REAL)1.0) ry = (REAL)1.0;
-	for (jx = 0; jx < nx+2; jx++) {
-	  REAL rx = (REAL)(jx-1)/nx;
-	  if (rx < (REAL)0.0) rx = (REAL)0.0;
-	  if (rx > (REAL)1.0) rx = (REAL)1.0;
-	  REAL v = rx*rx+ry*ry+rz*rz;
-	  hp[IDX(jx, jy, jz)] = v;
-	}
-      }
-    }
-  }
-#endif
+#endif /* !INIT_ON_GPU */
 
   return 0;
 }
@@ -580,7 +591,6 @@ int mainloop()
     }
 
     /* bt-steps local computation */
-    //HH_devLock(); /* this may improve overall performance */
     st = Wtime();
     for (ii = 0; ii < ntinner; ii++) {
       
@@ -591,7 +601,7 @@ int mainloop()
       bufid = 1-bufid;
     }
     cudaDeviceSynchronize();
-    //HH_devUnlock(); /* this may improve overall performance */
+
     if (logflag) {
       et = Wtime();
       ms = (long)((et-st)*1000);
@@ -659,16 +669,11 @@ int main(int argc, char **argv)
     nz = atoi(argv[3]);
   }
 
+  /* initialize application */
   init();
 
   /* copy local stencil data to device */
   bufid = 0;
-#ifndef INIT_ON_GPU
-  cudaMemcpy(dps[bufid], hp, bufsize, cudaMemcpyHostToDevice);
-#ifdef USE_MADVISE
-  HH_madvise(hp, bufsize, HHMADV_CANDISCARD); /* hint for optimization */
-#endif
-#endif
 
   struct timeval st, et;
   if (myid == 0) {
@@ -676,18 +681,6 @@ int main(int argc, char **argv)
 	    nx, ny, nz, nt, (size_t)nx*ny*nz*2*sizeof(REAL)/(1024*1024));
       fprintf(stderr, "Rank %d starts first barrier...\n", myid);
   }
-
-#if 0
-  {
-    int res;
-    if (myid == 0) {
-      fprintf(stderr, "[7p2dd] MPI_Allreduce test\n");
-    }
-    MPI_Allreduce(&myid, &res, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    fprintf(stderr, "[7p2dd@p%d] MPI_Allreduce(myid) --> %d\n",
-	    myid, res);
-  }
-#endif
 
   MPI_Barrier(MPI_COMM_WORLD);
   gettimeofday(&st, NULL);
