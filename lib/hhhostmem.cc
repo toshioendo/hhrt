@@ -281,7 +281,7 @@ int hostheap::reserveSwapResSelf(int kind)
   }
   else if (kind == HHSW_OUT) {
   }
-  //swapping_kind = kind; // remember the kind
+
   return 0;
 }
 

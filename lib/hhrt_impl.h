@@ -169,7 +169,6 @@ class memlayer {
   heap *lower;
   heap *uppers[MAX_UPPERS];
 
-  int swapped;
   char name[16]; /* for debug */
 
 };
@@ -225,6 +224,7 @@ class heap: public memlayer {
   size_t align;
   int expandable;
   int memkind; // HHM_*
+  int swapped;
   int swapping_kind;
 };
 

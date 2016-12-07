@@ -34,7 +34,6 @@ memlayer::memlayer()
   for (int i = 0; i < MAX_UPPERS; i++) {
     uppers[i] = NULL;
   }
-  swapped = 1;
 }
 
 int memlayer::addLower(heap *h) 
@@ -104,6 +103,7 @@ heap::heap(size_t heapsize0) : memlayer()
   }
 
   swapping_kind = HHSW_NONE;
+  swapped = 1;
   strcpy(name, "(HEAP)");
 
   return;
@@ -301,26 +301,26 @@ int heap::checkSwapRes(int kind)
   int line = -999; // debug
   int line2 = -9999;
 
-  if (lower == NULL) {
-    res = HHSS_NONEED;
-    line == __LINE__;
-    goto out;
-  }
-  else if (swapping_kind != HHSW_NONE) {
+  if (swapping_kind != HHSW_NONE) {
     // already swapping is ongoing (this happens in threaded swap)
     res = HHSS_EBUSY;
     line = __LINE__;
     goto out;
   }
   else if (kind == HHSW_OUT) {
-    if (swapped) {
+    if (lower == NULL) {
+      res = HHSS_NONEED;
+      line == __LINE__;
+      goto out;
+    }
+    else if (swapped) {
       // swapping-out was already done
       res = HHSS_NONEED;
       line = __LINE__;
       goto out;
     }
     else {
-      // check upper hosts
+      // check upper heaps
       int ih;
       for (ih = 0; ih < MAX_UPPERS; ih++) {
 	heap *h = uppers[ih];
@@ -338,14 +338,27 @@ int heap::checkSwapRes(int kind)
     }
   }
   else if (kind == HHSW_IN) {
-    if (swapped == 0) {
+    if (lower == NULL) {
+      if (heapptr != NULL) {
+	res = HHSS_NONEED;
+	line == __LINE__;
+	goto out;
+      }
+      else {
+	// need initial swapIn
+	res = HHSS_OK;
+	line == __LINE__;
+	goto out;
+      }
+    }
+    else if (swapped == 0) {
       // swapping-in was already done
       res = HHSS_NONEED;
       line = __LINE__;
       goto out;
     }
     else {
-      // check lower host
+      // check lower heap
       heap *h = lower;
       if (h != NULL && h->swapped) {
 	// we have to wait lower heap's swapping-in
@@ -399,8 +412,9 @@ int heap::checkSwapRes(int kind)
 int heap::reserveSwapRes(int kind)
 {
   reserveSwapResSelf(kind);
-  assert(lower != NULL);
-  lower->reserveSwapResAsLower(kind);
+  if (lower != NULL) {
+    lower->reserveSwapResAsLower(kind);
+  }
 
   swapping_kind = kind; // remember the kind for following doSwap()
   return 0;
@@ -430,8 +444,9 @@ int heap::releaseSwapRes()
   int kind = swapping_kind;
 
   releaseSwapResSelf(kind);
-  assert(lower != NULL);
-  lower->releaseSwapResAsLower(kind);
+  if (lower != NULL) {
+    lower->releaseSwapResAsLower(kind);
+  }
 
   swapping_kind = HHSW_NONE; // swap finished
 
@@ -541,6 +556,7 @@ int heap::swapIn()
   }
 
   if ( lower == NULL || swapped == 0) {
+    swapped = 0; // added 16/12/07
     return 0;
   }
   
