@@ -113,12 +113,11 @@ int HH_madvise(void *addr, size_t length, int advice);
 This API gives hints about the memory region specified by [addr, addr+length).
 HHRT may use the hint information to improve performance.
 
-This is similar to "madvise" systemcall, however, HH_madvise defines
-advices that are different from original madvise.
+This is similar to "madvise" systemcall, however, HH_madvise defines different advices.
 
 * `HHMADV_NORMAL`: Default value.
-* `HHMADV_READONLY`: The contents of memory region may be read by user, but not updated.
-* `HHMADV_CANDISCARD`: The contents of memory region are not read nor updated by user. HHRT may break its contents.
+* `HHMADV_READONLY`: Contents of the memory region may be read by user, but not updated.
+* `HHMADV_CANDISCARD`: Contents of the memory region are not read nor updated by user. HHRT may break its contents.
 
 Notes:
 * The memory region may be either on GPU device memory or on host memory.
