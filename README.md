@@ -23,10 +23,10 @@ For example, many stencil applications on GPU clusters have these characteristic
   If you try this sample, go to the next section.
 * Edit your application code by adding
   `#include <hhrt.h>`
-* Application must be compiled with
+* Application must be compiled with the following flags:
   * the same string as "CONFIG" in make.inc (such as `-DUSE_CUDA`).
   * `-I[HHRT_ROOT]/lib`
-* Application must be linked with
+* Application must be linked with the following flags:
   * `-L[HHRT_ROOT]/lib -lhhrt`
 
 ## Execution of the sample program
@@ -37,14 +37,19 @@ The usage of 7pstencil sample is as follows:
 % ./7pstencil [-p PY PZ] [-bt BT] [-nt NT] [NX NY NZ]
 `
 
-like
+* NX NY NZ: size of 3D arrays to be simulated
+* PY PZ: data distribution grid. PY*PZ must be equal to #MPI-processes
+* NT: # of time steps to be simulated
+* BT: temporal block size
+
+You can run it by
 
 `
 % ./7pstencil 512 512 512
 `
 
 But this does not exceed the device memory capacity.
-In order to do it, "process oversubscription" is used as follows.
+In order to achieve "out-of-core" execution on HHRT, "process oversubscription" is used as follows.
 
 ### On single GPU/node envorinment
 
