@@ -1,0 +1,14 @@
+CONFIG = -DUSE_CUDA
+
+CC = mpicc
+CXX = mpicxx
+MPIDIR=/home/endo/local/mpich-3.2
+
+CUDADIR = /usr/local/cuda
+LD = mpicxx
+
+CFLAGS = -O -g $(CONFIG) -I$(CUDADIR)/include -I$(MPIDIR)/include
+# -O
+NVFLAGS = $(CFLAGS) -arch sm_35
+
+LDFLAGS = -lpthread -lm -L$(CUDADIR)/lib64 -lcudart 
