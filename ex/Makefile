@@ -1,27 +1,26 @@
 HHRTROOT = ..
-ARCDIR = $(HHRTROOT)/lib
-#ARCDIR = $(HHRTROOT)/noplib
+HHRTLIBDIR = $(HHRTROOT)/lib
 
 include $(HHRTROOT)/make.inc
 
-LDFLAGS += -lrt
-CFLAGS += -I$(ARCDIR)
+CFLAGS += -I$(HHRTLIBDIR)
 
-LIBS = $(ARCDIR)/libhhrt.a 
+LIBS = $(HHRTLIBDIR)/libhhrt.a 
+LDFLAGS += -lrt -L$(HHRTLIBDIR) -lhhrt
 
 all: gcomm
 
 gcomm: gcomm.o libhhrt Makefile
-	$(LD) $@.o -o $@ $(LIBS) $(LDFLAGS)
+	$(LD) $@.o -o $@ $(LDFLAGS)
 
 pingpong: pingpong.o $(LIBS) Makefile
-	$(LD) $@.o -o $@ $(LIBS) $(LDFLAGS)
+	$(LD) $@.o -o $@ $(LDFLAGS)
 
-readonlytest: readonlytest.o $(LIBS) Makefile
-	$(LD) $@.o -o $@ $(LIBS) $(LDFLAGS)
+#readonlytest: readonlytest.o $(LIBS) Makefile
+#	$(LD) $@.o -o $@ $(LDFLAGS)
 
 libhhrt:
-	pushd .; cd $(ARCDIR); make ; popd
+	pushd .; cd $(HHRTLIBDIR); make ; popd
 
 %.o : %.c $(HDRS)
 	$(CC) $(CFLAGS) -c $< -o $*.o
@@ -33,10 +32,9 @@ libhhrt:
 	nvcc $(NVFLAGS) -c $< -o $*.o
 
 clean:
-	cd $(ARCDIR); make clean; cd ..
+	cd $(HHRTLIBDIR); make clean; cd ..
 	rm -f *.o
 	rm -f *~
 	rm -f core
 	rm -f core.*
-	rm -f $(APP)
 	rm -f a.out
