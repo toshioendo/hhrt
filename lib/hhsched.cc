@@ -98,14 +98,13 @@ int HH_swapIfOk(int kind)
     if (h->checkSwapRes(kind) == HHSS_OK) {
       HH_lockSched();
       if (h->checkSwapRes(kind) == HHSS_OK) {
-	HH_unlockSched();
 	// can proceed swap
-
 #ifdef USE_SWAP_THREAD
 	HH_startSwapHeap(h, kind);
 #else
 	HH_swapHeap(h, kind);
 #endif
+	HH_unlockSched(); // debug 16/12/07
 	return 1;
       }
 

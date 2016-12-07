@@ -338,18 +338,10 @@ int heap::checkSwapRes(int kind)
     }
   }
   else if (kind == HHSW_IN) {
-    if (lower == NULL) {
-      if (heapptr != NULL) {
-	res = HHSS_NONEED;
-	line == __LINE__;
-	goto out;
-      }
-      else {
-	// need initial swapIn
-	res = HHSS_OK;
-	line == __LINE__;
-	goto out;
-      }
+    if (lower == NULL && heapptr != NULL) {
+      res = HHSS_NONEED;
+      line == __LINE__;
+      goto out;
     }
     else if (swapped == 0) {
       // swapping-in was already done
@@ -384,13 +376,14 @@ int heap::checkSwapRes(int kind)
   }
 
   // class specific check of lower layer
-  assert(lower != NULL);
-  res = lower->checkSwapResAsLower(kind, &line2);
-  if (res != HHSS_OK) {
-    line = 20000+line2;
-  }
-  else {
-    line = __LINE__;
+  if (lower != NULL) {
+    res = lower->checkSwapResAsLower(kind, &line2);
+    if (res != HHSS_OK) {
+      line = 20000+line2;
+    }
+    else {
+      line = __LINE__;
+    }
   }
 
  out:
@@ -400,7 +393,7 @@ int heap::checkSwapRes(int kind)
     name, HH_MYID, Wtime_prt(), hhsw_names[kind], hhss_names[res], line);
 #endif  
 
-#if 0
+#if 1
   if (res == HHSS_OK /*|| rand() % 1024 == 0*/) {
     fprintf(stderr, "[HH:heap(%s)::checkSwapRes@p%d] for %s result=%s (line=%d)\n",
 	    name, HH_MYID, hhsw_names[kind], hhss_names[res], line);
