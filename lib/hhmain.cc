@@ -303,8 +303,12 @@ int HH_readConf(hhconf *confp)
 
   /* HH_SWAP_PATH */
   /* default value */
+#if 1
+  confp->n_fileswap_dirs = 0; // default value changed
+#else
   confp->n_fileswap_dirs = 1;
   strcpy(confp->fileswap_dirs[0], "./hhswap");
+#endif
 
   p = getenv("HH_FILESWAP_PATH");
   if (p != NULL) {

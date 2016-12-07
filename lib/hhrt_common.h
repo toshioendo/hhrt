@@ -21,7 +21,7 @@ extern "C" {
 
 //#define USE_MMAPSWAP // testing. use mmaped host buffer, instead of fileheap
 
-#define HHRT_VERSION 400
+#define HHRT_VERSION 20161207
 
 #  define HH(X) HH##X
 
@@ -39,8 +39,6 @@ enum {
 
 /************************************************/
 /* user programmer writes this function */
-int HHmain(int argc, char **argv);
-
 int HH_initHeap(size_t heapsize);
 int HH_finalizeHeap();
 int HH_myid();
