@@ -23,8 +23,11 @@ For example, many stencil applications on GPU clusters have these characteristic
   If you try this sample, go to the next section.
 * Edit your application code by adding
   `#include <hhrt.h>`
-* Application should be compiled and linked with
-  `-I[HHRT_ROOT]/lib -L[HHRT_ROOT]/lib`
+* Application must be compiled with
+  * the same string as "CONFIG" in make.inc (such as `-DUSE_CUDA`).
+  * `-I[HHRT_ROOT]/lib`
+* Application must be linked with
+  * `-L[HHRT_ROOT]/lib -lhhrt`
 
 ## Execution of the sample program
 

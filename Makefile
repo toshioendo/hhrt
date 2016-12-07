@@ -7,12 +7,14 @@ LDFLAGS += -lrt
 CFLAGS += -I./$(ARCDIR)
 
 LIBS = $(ARCDIR)/libhhrt.a 
+LDFLAGS += -L$(ARCDIR) -lhhrt
 #libipsm/libipsm.so
 
 all: 7pstencil
 
 7pstencil: 7pstencil.o libhhrt Makefile
-	$(LD) $@.o -o $@ $(LIBS) $(LDFLAGS)
+#	$(LD) $@.o -o $@ $(LIBS) $(LDFLAGS)
+	$(LD) $@.o -o $@ $(LDFLAGS)
 
 pingpong: pingpong.o $(LIBS) Makefile
 	$(LD) $@.o -o $@ $(LDFLAGS)
