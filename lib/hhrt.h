@@ -57,8 +57,12 @@ extern "C" {
 #define malloc HHmalloc
 #define calloc HHcalloc
 #define free HHfree
+#define realloc HHrealloc
+
 #define memalign HHmemalign
 #define valloc HHvalloc
+#define posix_memalign HHposix_memalign
+#define aligned_alloc HHaligned_alloc
 
 #define cudaMallocHost HHcudaMallocHost
 #define cudaHostAlloc HHcudaHostAlloc

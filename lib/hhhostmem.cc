@@ -466,16 +466,37 @@ void HHfree(void *p)
   return;
 }
 
-void *HHmemalign(size_t boundary, size_t size)
+void *HHrealloc(void *ptr, size_t size)
+{
+  fprintf(stderr, "[HHrealloc] not implemented yet\n");
+  return NULL;
+}
+
+void *HHmemalign(size_t align, size_t size)
 {
   // a simple version
-  size_t xsize = size+boundary;
+  size_t xsize = size+align;
   void *xp = HHmalloc(xsize);
   if (xp == NULL) return NULL;
 
-  void *p = (void*)roundup(xp, boundary);
+  void *p = (void*)roundup(xp, align);
   // This is an internal pointer, but HHfree can support it
   return p;
+}
+
+int HHposix_memalign(void **memptr, size_t align, size_t size)
+{
+  void *p = HHmemalign(align, size);
+  if (p == NULL) {
+    return -1;
+  }
+  *memptr = p;
+  return 0;
+}
+
+void *HHaligned_alloc(size_t align, size_t size)
+{
+  return HHmemalign(align, size);
 }
 
 void *HHvalloc(size_t size)
@@ -483,5 +504,14 @@ void *HHvalloc(size_t size)
   size_t align = sysconf(_SC_PAGESIZE);
   return HHmemalign(align, size);
 }
+
+void *HHpvalloc(size_t size)
+{
+  size_t align = sysconf(_SC_PAGESIZE);
+  size_t xsize = roundup(size, align);
+  return HHmemalign(align, xsize);
+}
+
+
 
 #endif
