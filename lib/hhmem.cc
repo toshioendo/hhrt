@@ -248,6 +248,86 @@ membuf *heap::findMembuf(void *p)
   return *it;
 }
 
+#if 1
+int heap::free(void *p)
+{
+  if (p == NULL) return 0;
+  ssize_t doffs = ptr2offs(p);
+  if (doffs < 0 || doffs >= heapsize) {
+    fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is invalid\n",
+	    name, HH_MYID, p);
+    return -1;
+  }
+
+  list<membuf *>::iterator it;
+  it = findMembufIter(doffs);
+  if (it == membufs.end()) {
+    fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is invalid\n",
+	    name, HH_MYID, p);
+    return -1;
+  }
+
+  membuf *mbp = *it;
+  assert(mbp != NULL);
+  if (mbp->kind == HHMADV_FREED) {
+    fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is doubly freed\n",
+	    name, HH_MYID, p);
+    return -1;
+  }
+
+  if (mbp->soffs != (ssize_t)-1) {
+    // there may be replica in lower layer. this must be invalidated
+    mbp->soffs = (ssize_t)-1;
+    fprintf(stderr, "[HH:heap(%s)::free@p%d] WARNING: replica may be resident eternally. should be fixed\n",
+	    name, HH_MYID);
+  }
+
+  mbp->kind = HHMADV_FREED;
+  mbp->usersize = 0L;
+
+  /* TODO: deal with fragmentation */
+  if (it != membufs.begin()) {
+    list<membuf *>::iterator previt = it;
+    previt--;
+    membuf *prevmbp = *previt;
+    if (prevmbp->kind == HHMADV_FREED) {
+      // coalesching is possible
+#if 0
+      fprintf(stderr, "[HH:heap(%s)::free@p%d] try coalesce free area [%ld,%ld) and [%ld,%ld)\n",
+	      name, HH_MYID, prevmbp->doffs, prevmbp->doffs+prevmbp->size,
+	      mbp->doffs, mbp->doffs+mbp->size);
+#endif
+
+      mbp->size += prevmbp->size;
+      mbp->doffs = prevmbp->doffs;
+
+      // delete prevmbp
+      membufs.erase(previt);
+    }
+  }
+
+  list<membuf *>::iterator nextit = it;
+  nextit++;
+  if (nextit != membufs.end()) {
+    list<membuf *>::iterator nextit = it;
+    nextit++;
+    membuf *nextmbp = *nextit;
+    if (nextmbp->kind == HHMADV_FREED) {
+      // coalescing is possible
+#if 0
+      fprintf(stderr, "[HH:heap(%s)::free@p%d] try coalesce free area [%ld,%ld) and [%ld,%ld)\n",
+	      name, HH_MYID, mbp->doffs, mbp->doffs+mbp->size,
+	      nextmbp->doffs, nextmbp->doffs+nextmbp->size);
+#endif
+      mbp->size += nextmbp->size;
+      // delete nextmbp
+      membufs.erase(nextit);
+    }
+  }
+
+  return 0;
+}
+#else
 int heap::free(void *p)
 {
   if (p == NULL) return 0;
@@ -277,6 +357,7 @@ int heap::free(void *p)
   /* TODO: deal with fragmentation */
   return 0;
 }
+#endif
 
 int heap::expandHeap(size_t reqsize)
 {
@@ -393,7 +474,7 @@ int heap::checkSwapRes(int kind)
     name, HH_MYID, Wtime_prt(), hhsw_names[kind], hhss_names[res], line);
 #endif  
 
-#if 1
+#if 0
   if (res == HHSS_OK /*|| rand() % 1024 == 0*/) {
     fprintf(stderr, "[HH:heap(%s)::checkSwapRes@p%d] for %s result=%s (line=%d)\n",
 	    name, HH_MYID, hhsw_names[kind], hhss_names[res], line);
