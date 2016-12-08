@@ -131,7 +131,6 @@ ssize_t heap::ptr2offs(void* p)
   return ppsub(p, heapptr);
 }
 
-
 void* heap::alloc(size_t size0)
 {
   /* round up for alignment */
@@ -358,6 +357,17 @@ int heap::free(void *p)
   return 0;
 }
 #endif
+
+// mainly for HHrealloc
+size_t heap::getobjsize(void *p)
+{
+  membuf *mbp = findMembuf(p);
+  if (mbp == NULL) {
+    return (size_t)0;
+  }
+
+  return mbp->usersize;
+}
 
 int heap::expandHeap(size_t reqsize)
 {

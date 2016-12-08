@@ -466,10 +466,25 @@ void HHfree(void *p)
   return;
 }
 
-void *HHrealloc(void *ptr, size_t size)
+void *HHrealloc(void *p, size_t size)
 {
-  fprintf(stderr, "[HHrealloc] not implemented yet\n");
-  return NULL;
+  // a simple version
+  size_t orgsize = HHL2->hostheap->getobjsize(p);
+  size_t minsize = (orgsize < size)? orgsize: size;
+  void *newp = NULL;
+  if (size > 0) {
+    newp = HHmalloc(size);
+  }
+
+  if (minsize > 0) {
+    memcpy(newp, p, minsize);
+  }
+
+  if (p != NULL && orgsize > 0) {
+    HHfree(p);
+  }
+
+  return newp;
 }
 
 void *HHmemalign(size_t align, size_t size)

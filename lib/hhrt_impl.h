@@ -182,6 +182,7 @@ class heap: public memlayer {
 
   virtual void* alloc(size_t size);
   virtual int free(void *p);
+  virtual size_t getobjsize(void *p);
 
   virtual list<membuf *>::iterator findMembufIter(ssize_t doffs);
   virtual membuf *findMembuf(void *p);
