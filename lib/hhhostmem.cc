@@ -468,14 +468,20 @@ void HHfree(void *p)
 
 void *HHmemalign(size_t boundary, size_t size)
 {
-  fprintf(stderr, "[HHmemalign] ERROR: NOT SUPPORTED YET\n");
-  exit(1);
+  // a simple version
+  size_t xsize = size+boundary;
+  void *xp = HHmalloc(xsize);
+  if (xp == NULL) return NULL;
+
+  void *p = (void*)roundup(xp, boundary);
+  // This is an internal pointer, but HHfree can support it
+  return p;
 }
 
 void *HHvalloc(size_t size)
 {
-  fprintf(stderr, "[HHvalloc] ERROR: NOT SUPPORTED YET\n");
-  exit(1);
+  size_t align = sysconf(_SC_PAGESIZE);
+  return HHmemalign(align, size);
 }
 
 #endif
