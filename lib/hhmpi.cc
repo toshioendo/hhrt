@@ -88,10 +88,10 @@ int HH_exitGComm()
 
 #if defined USE_SWAPHOST
 
-/* Returns 1 if type is "contiguous" on memory */
+/* Returns 0 if type is "contiguous" on memory */
 /* (This may not mean a type made by MPI_Type_contiguous) */
-/* Returns 0 if type has holes, or unknown */
-static int isTypeCont(MPI_Datatype type)
+/* Returns 1 if type has holes, or unknown */
+static int doesTypeNeedPacked(MPI_Datatype type)
 {
   int nint, naddr, ntype, combiner;
   MPI_Type_get_envelope(type, &nint, &naddr, &ntype, &combiner);
@@ -101,11 +101,11 @@ static int isTypeCont(MPI_Datatype type)
   return 0;
 }
 
-/* Do something so that MPI comm works well even with hostheap swapping */
-/* This is called before MPI communication involving send */
-int HH_reqfin_setup_send_gene(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
-			      MPI_Comm comm)
+int HH_reqfin_setup_send(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
+			 MPI_Comm comm)
 {
+  finp->send.packflag = doesTypeNeedPacked(datatype);
+
   int tsize;
   size_t bsize;
 
@@ -118,7 +118,11 @@ int HH_reqfin_setup_send_gene(reqfin *finp, const void *buf, int count, MPI_Data
     exit(1);
   }
 
-  {
+  finp->mode |= HHRF_SEND;
+  finp->comm = comm;
+  finp->send.orgptr = NULL; /* org* are not used later */
+
+  if (finp->send.packflag) {
     int psize;
     int pos = 0;
     MPI_Pack_size(count, datatype, comm, &psize);
@@ -129,74 +133,30 @@ int HH_reqfin_setup_send_gene(reqfin *finp, const void *buf, int count, MPI_Data
 #endif
     
     /* copy(MPI_Pack) to dedicated buffer before sending */
-    finp->mode |= HHRF_SEND;
-    finp->comm = comm;
-    
     finp->send.cptr = valloc(psize);
     finp->send.csize = psize;
     finp->send.ctype = MPI_PACKED;
-    finp->send.orgptr = NULL; /* org* are not used */
     HH_addHostMemStat(HHST_MPIBUFCOPY, psize);
     MPI_Pack(buf, count, datatype, 
 	     finp->send.cptr, psize, &pos, comm);
-    finp->send.packflag = 1;
   }
-
-  return 0;
-}
-
-/* This assumes datatype is contiguous memory */
-/* We should not use MPI_Pack, since MPI_Reduce does not work with packed data */
-int HH_reqfin_setup_send_cont(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
-			      MPI_Comm comm)
-{
-  int tsize;
-  size_t bsize;
-
-  MPI_Type_size(datatype, &tsize);
-  bsize = (size_t)tsize*count;
-
-  if (bsize >= (size_t)1<<31) {
-    fprintf(stderr, "[HH_reqfin_setup_send@p%d] MESSAGE SIZE %ld TOO BIG!\n",
-	    HH_MYID, bsize);
-    exit(1);
-  }
-
-  {
-    int pos = 0;
-
+  else {
     /* copy(memcpy) to dedicated buffer before sending */
-    finp->mode |= HHRF_SEND;
-    finp->comm = comm;
-    
     finp->send.cptr = valloc(bsize);
     finp->send.csize = count;
     finp->send.ctype = datatype;
-    finp->send.orgptr = NULL; /* orgptr are not used */
     HH_addHostMemStat(HHST_MPIBUFCOPY, bsize);
     memcpy(finp->send.cptr, buf, bsize);
-    finp->send.packflag = 0;
   }
-
   return 0;
 }
 
-int HH_reqfin_setup_send(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
+
+int HH_reqfin_setup_recv(reqfin *finp, void *buf, int count, MPI_Datatype datatype,
 			 MPI_Comm comm)
 {
-  if (isTypeCont(datatype)) {
-    return HH_reqfin_setup_send_cont(finp, buf, count, datatype, comm);
-  }
-  else {
-    return HH_reqfin_setup_send_gene(finp, buf, count, datatype, comm);
-  }
-}
+  finp->recv.packflag = doesTypeNeedPacked(datatype);
 
-
-/* This is called before MPI communication involving recv */
-int HH_reqfin_setup_recv_gene(reqfin *finp, void *buf, int count, MPI_Datatype datatype,
-			      MPI_Comm comm)
-{
   int tsize;
   size_t bsize;
 
@@ -208,15 +168,16 @@ int HH_reqfin_setup_recv_gene(reqfin *finp, void *buf, int count, MPI_Datatype d
 	    HH_MYID, bsize);
     exit(1);
   }
-  {
+
+  finp->mode |= HHRF_RECV;
+  finp->comm = comm;
+  if (finp->recv.packflag) {
     int psize;
     int pos = 0;
     
     MPI_Pack_size(count, datatype, comm, &psize);
 
-    /* we should copy(Unpack) from dedicated buffer after recieving */
-    finp->mode |= HHRF_RECV;
-    finp->comm = comm;
+    /* we should copy(Unpack) from dedicated buffer after receiving */
     
     finp->recv.cptr = valloc(psize);
     finp->recv.csize = psize;
@@ -224,57 +185,19 @@ int HH_reqfin_setup_recv_gene(reqfin *finp, void *buf, int count, MPI_Datatype d
     finp->recv.orgptr = buf;
     finp->recv.orgsize = count;
     finp->recv.orgtype = datatype;
-    finp->recv.packflag = 1;
     HH_addHostMemStat(HHST_MPIBUFCOPY, psize);
   }
-
-  return 0;
-}
-
-
-/* This assumes datatype is contiguous memory */
-/* We should not use MPI_Pack, since MPI_Reduce does not work with packed data */
-int HH_reqfin_setup_recv_cont(reqfin *finp, void *buf, int count, MPI_Datatype datatype,
-			    MPI_Comm comm)
-{
-  int tsize;
-  size_t bsize;
-
-  MPI_Type_size(datatype, &tsize);
-  bsize = (size_t)tsize*count;
-
-  if (bsize >= (size_t)1<<31) {
-    fprintf(stderr, "[HH_reqfin_setup_recv@p%d] MESSAGE SIZE %ld TOO BIG!\n",
-	    HH_MYID, bsize);
-    exit(1);
-  }
-  {
-    /* we should copy(Unpack) from dedicated buffer after recieving */
-    finp->mode |= HHRF_RECV;
-    finp->comm = comm;
-    
+  else {
+    /* we should copy(memcpy) from dedicated buffer after receiving */
     finp->recv.cptr = valloc(bsize);
     finp->recv.csize = count;
     finp->recv.ctype = datatype;
     finp->recv.orgptr = buf;
     finp->recv.orgsize = count;
     finp->recv.orgtype = datatype;
-    finp->recv.packflag = 0;
     HH_addHostMemStat(HHST_MPIBUFCOPY, bsize);
   }
-
   return 0;
-}
-
-int HH_reqfin_setup_recv(reqfin *finp, void *buf, int count, MPI_Datatype datatype,
-			 MPI_Comm comm)
-{
-  if (isTypeCont(datatype)) {
-    return HH_reqfin_setup_recv_cont(finp, buf, count, datatype, comm);
-  }
-  else {
-    return HH_reqfin_setup_recv_gene(finp, buf, count, datatype, comm);
-  }
 }
 
 int HH_reqfin_finalize(reqfin *finp)
@@ -301,10 +224,8 @@ int HH_reqfin_finalize(reqfin *finp)
       MPI_Type_size(finp->recv.ctype, &tsize);
       bsize = (size_t)tsize*finp->recv.csize;
       memcpy(finp->recv.orgptr, finp->recv.cptr, bsize);
-#if 1
       free(finp->recv.cptr);
       HH_addHostMemStat(HHST_MPIBUFCOPY, -finp->recv.csize);
-#endif
     }
   }
 
