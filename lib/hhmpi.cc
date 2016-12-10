@@ -168,8 +168,8 @@ int HH_reqfin_setup_recv(reqfin *finp, void *buf, int count, MPI_Datatype dataty
   return 0;
 }
 
-/* similar to setup_send, but for MPI_Reduce/Allreduce */
-/* we don't use MPI_Pack */
+/* Similar to setup_send, but for MPI_Reduce/Allreduce */
+/* We cannot use MPI_Pack, since MPI_Reduce does not work with packed data */
 /* datatype must be basic type */
 int HH_reqfin_setup_sendRed(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
 			    MPI_Comm comm)
