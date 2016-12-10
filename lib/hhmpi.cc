@@ -220,7 +220,7 @@ int HH_req_finalize(MPI_Request req)
 int HH_reqfin_setup_send(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
 			 MPI_Comm comm)
 {
-  finp->send.cptr = buf;
+  finp->send.cptr = (void*)buf;
   finp->send.csize = count;
   finp->send.ctype = datatype;
   return 0;
@@ -229,7 +229,25 @@ int HH_reqfin_setup_send(reqfin *finp, const void *buf, int count, MPI_Datatype 
 int HH_reqfin_setup_recv(reqfin *finp, void *buf, int count, MPI_Datatype datatype,
 			 MPI_Comm comm)
 {
-  finp->recv.cptr = buf;
+  finp->recv.cptr = (void*)buf;
+  finp->recv.csize = count;
+  finp->recv.ctype = datatype;
+  return 0;
+}
+
+int HH_reqfin_setup_sendRed(reqfin *finp, const void *buf, int count, MPI_Datatype datatype,
+			    MPI_Comm comm)
+{
+  finp->send.cptr = (void*)buf;
+  finp->send.csize = count;
+  finp->send.ctype = datatype;
+  return 0;
+}
+
+int HH_reqfin_setup_recvRed(reqfin *finp, void *buf, int count, MPI_Datatype datatype,
+			    MPI_Comm comm)
+{
+  finp->recv.cptr = (void*)buf;
   finp->recv.csize = count;
   finp->recv.ctype = datatype;
   return 0;
