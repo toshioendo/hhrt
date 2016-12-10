@@ -354,6 +354,14 @@ class fileheap: public heap {
 /* MPI request finalizer */
 struct reqfin {
   // copy mpi buf
+  reqfin() {
+    mode = 0;
+    send.cptr = NULL; send.orgptr = NULL;
+    send.packflag = 0;
+    recv.cptr = NULL; recv.orgptr = NULL;
+    recv.packflag = 0;
+  };
+
   int mode; /* bitwise OR of HHRF_* */
   MPI_Comm comm;
   struct {
@@ -363,6 +371,7 @@ struct reqfin {
     void *orgptr;
     int orgsize;
     MPI_Datatype orgtype;
+    int packflag;
   } send, recv;
 };
 
