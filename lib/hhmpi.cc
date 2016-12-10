@@ -213,8 +213,6 @@ int HH_reqfin_finalize(reqfin *finp)
       MPI_Unpack(finp->recv.cptr, finp->recv.csize, &pos,
 		 finp->recv.orgptr, finp->recv.orgsize, finp->recv.orgtype, 
 		 finp->comm);
-      free(finp->recv.cptr);
-      HH_addHostMemStat(HHST_MPIBUFCOPY, -finp->recv.csize);
     }
     else {
       int tsize;
@@ -224,9 +222,9 @@ int HH_reqfin_finalize(reqfin *finp)
       MPI_Type_size(finp->recv.ctype, &tsize);
       bsize = (size_t)tsize*finp->recv.csize;
       memcpy(finp->recv.orgptr, finp->recv.cptr, bsize);
-      free(finp->recv.cptr);
-      HH_addHostMemStat(HHST_MPIBUFCOPY, -finp->recv.csize);
     }
+    free(finp->recv.cptr);
+    HH_addHostMemStat(HHST_MPIBUFCOPY, -finp->recv.csize);
   }
 
   return 0;
