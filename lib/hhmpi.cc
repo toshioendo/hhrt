@@ -630,7 +630,7 @@ int HHMPI_Comm_split(MPI_Comm comm, int color, int key,
   int rc;
   MPI_Comm newcomm2;
   HH_enterGComm("Comm_Split");
-  rc = HHMPI_Comm_split(comm, color, key, &newcomm2);
+  rc = MPI_Comm_split(comm, color, key, &newcomm2);
   HH_exitGComm();
   *newcomm = newcomm2;
   return rc;
