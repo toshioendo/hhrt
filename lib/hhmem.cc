@@ -247,7 +247,6 @@ membuf *heap::findMembuf(void *p)
   return *it;
 }
 
-#if 1
 int heap::free(void *p)
 {
   if (p == NULL) return 0;
@@ -326,37 +325,6 @@ int heap::free(void *p)
 
   return 0;
 }
-#else
-int heap::free(void *p)
-{
-  if (p == NULL) return 0;
-
-  membuf *mbp = findMembuf(p);
-  if (mbp == NULL) {
-    fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is invalid\n",
-	    name, HH_MYID, p);
-    return -1;
-  }
-  if (mbp->kind == HHMADV_FREED) {
-    fprintf(stderr, "[HH:hea@(%s)::free@p%d] pointer %p is doubly freed\n",
-	    name, HH_MYID, p);
-    return -1;
-  }
-
-  if (mbp->soffs != (ssize_t)-1) {
-    // there may be replica in lower layer. this must be invalidated
-    mbp->soffs = (ssize_t)-1;
-    fprintf(stderr, "[HH:%s::madvise@p%d] WARNING: replica may be resident eternally. should be fixed\n",
-	    name, HH_MYID);
-  }
-
-  mbp->kind = HHMADV_FREED;
-  mbp->usersize = 0L;
-
-  /* TODO: deal with fragmentation */
-  return 0;
-}
-#endif
 
 // mainly for HHrealloc
 size_t heap::getobjsize(void *p)

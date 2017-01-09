@@ -16,6 +16,9 @@ gcomm: gcomm.o libhhrt Makefile
 pingpong: pingpong.o $(LIBS) Makefile
 	$(LD) $@.o -o $@ $(LDFLAGS)
 
+readonlytest: readonlytest.o libhhrt Makefile
+	$(LD) $@.o -o $@ $(LDFLAGS)
+
 libhhrt:
 	pushd .; cd $(HHRTLIBDIR); make ; popd
 
