@@ -268,7 +268,7 @@ int heap::free(void *p)
   membuf *mbp = *it;
   assert(mbp != NULL);
   if (mbp->kind == HHMADV_FREED) {
-    fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is doubly freed\n",
+    fprintf(stderr, "[HH:heap(%s)::free@p%d] WARNING: pointer %p is doubly freed\n",
 	    name, HH_MYID, p);
     return -1;
   }

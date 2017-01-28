@@ -485,7 +485,7 @@ extern struct shdata *HHS;
 // Function declaration
 // hhmain.cc
 int HH_init();
-int HH_finalize();
+void HH_finalize();
 
 int HH_mutex_init(pthread_mutex_t *ml);
 void HHstacktrace();

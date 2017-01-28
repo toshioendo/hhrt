@@ -458,7 +458,7 @@ int HH_init()
 }
 
 // Finalize HHRT
-int HH_finalize()
+void HH_finalize()
 {
   int rank = HHL->rank;
   int lrank = HHL->lrank;
@@ -471,23 +471,35 @@ int HH_finalize()
   HH_finalizeHeaps();
 
 #ifndef EAGER_ICS_DESTROY
-  MPI_Barrier(MPI_COMM_WORLD);
+  //MPI_Barrier(MPI_COMM_WORLD);
   ipsm_destroy();
 #endif
 
-  return 0;
+  return;
+}
+
+void HH_atexit_func()
+{
+  fprintf(stderr, "[HH_atexit_func@p%d] finalize...\n", HH_MYID);
+  HH_finalize();
+  MPI_Finalize();
 }
 
 int HHMPI_Init(int *argcp, char ***argvp)
 {
   MPI_Init(argcp, argvp);
   HH_init();
+#if 1
+  atexit(HH_atexit_func);
+#endif
   return 0;
 }
 
 int HHMPI_Finalize()
 {
+#if 0
   HH_finalize();
   MPI_Finalize();
+#endif
   return 0;
 }
