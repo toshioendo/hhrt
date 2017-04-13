@@ -81,7 +81,7 @@ hostheap::hostheap() : heap(0L)
   cudaError_t crc;
   crc = cudaStreamCreate(&copystream);
   if (crc != cudaSuccess) {
-    fprintf(stderr, "[HH:hostheap::init@p%d] cudaStreamCreate failed (rc=%d)\n",
+    fprintf(stderr, "[HH:hostheap::init@p%d] ERROR: cudaStreamCreate failed (rc=%d)\n",
 	    HH_MYID, crc);
     exit(1);
   }

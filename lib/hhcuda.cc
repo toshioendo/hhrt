@@ -88,28 +88,44 @@ static int initDev(int devid, int lsize, hhconf *confp)
   cudaError_t crc;
   dev *d = &HHS->cuda.devs[devid];
 
+  cudaSetDevice(devid);
+
   d->devid = devid;
   HH_mutex_init(&d->ml);
   HH_mutex_init(&d->userml);
+
+  // get GPU device memory information
+  size_t fsize, tsize;
+  crc = cudaMemGetInfo(&fsize, &tsize);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HHRT] dev %d: GetMemInfo failed, rc=%d\n",
+	    devid, crc);
+  }
+#if 0
+  fprintf(stderr, "[HHRT] dev %d: GetMemInfo -> free=%ld, total=%ld\n",
+	  devid, fsize, tsize);
+#endif
+  
   if (confp->devmem > 0) {
     d->memsize = confp->devmem;
   }
   else {
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, devid);
-    d->memsize = prop.totalGlobalMem;
-#if 0
-    fprintf(stderr, "[HHRT] dev %d: memsize=%ld\n",
-	    devid, d->memsize);
-#endif
+    d->memsize = tsize;
   }
-  
-  /* determine device heap size */
-  size_t avail = d->memsize - d->memsize/64L;
+
+  // determine device heap size per proc
+  size_t avail = tsize - tsize/64L;
+  size_t tax_per_proc = tsize-fsize;
+
+#if 1
+  fprintf(stderr, "[HH:initDev:dev%d] Estimated context size per proc -> %ld\n",
+	  devid, tax_per_proc);
+#endif
+
 #ifdef USE_CUDA_MPS
-  avail -= DEVMEM_USED_BY_PROC * 1;
+  avail -= tax_per_proc * 1;
 #else
-  avail -= DEVMEM_USED_BY_PROC * lsize;
+  avail -= tax_per_proc * lsize;
 #endif
   d->default_heapsize = avail / HHS->cuda.ndh_slots;
   d->default_heapsize = (d->default_heapsize/HEAP_ALIGN)*HEAP_ALIGN;
@@ -187,6 +203,7 @@ int HH_cudaInitProc()
 }
 
 // Start using device structure if this process uses it for first time
+// This function creates device heap structure
 // This may be blocked
 int HH_cudaCheckDev()
 {

@@ -30,7 +30,8 @@ using namespace std;
 #define USE_SWAP_THREAD 1
 
 // each process occupies this size even if it does nothing
-#define DEVMEM_USED_BY_PROC (85L*1024*1024) // 74L
+//#define DEVMEM_USED_BY_PROC (85L*1024*1024) // 74L
+#define DEVMEM_USED_BY_PROC (150L*1024*1024) // 74L
 
 #define HOSTHEAP_PTR ((void*)0x700000000000)
 #define HOSTHEAP_STEP (1L*1024*1024*1024)

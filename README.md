@@ -146,7 +146,7 @@ Subject to change.
 
 * HH_NLPHOST (Default is 99999): Maximum number of processes that are put on host memory (or upper layer).
 
-* HH_FILESWAP_PATH (Default is nul string): Directory names MUST be specified to use the file layer. Swapped files are generated in the directory(s). You can specify multiple pathes, like "swapdir1:swapdir2", which are used in round-robin fashion among processes on a node.
+* HH_FILESWAP_PATH (Default is nul string): Directory names MUST be specified to use the file layer. Swap-files are generated in the directory(s). You can specify multiple pathes, like "swapdir1:swapdir2", which are used in a round-robin fashion among processes on a node.
 
 ## Current limitations
 
