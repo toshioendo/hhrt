@@ -128,19 +128,25 @@ Notes:
 Some environment variables control behavior of HHRT, which may be useful for optimizations.
 Subject to change.
 
+### General
+
+* HH_MAXRP (Default is 1): Maximum number of processes that becomes "running" per node.
+
+* HH_PROF_PATH: See a document in tools directory.
+
+### Valid if HHRT is compiled with USE_CUDA
+
 * HH_DEVMEM (Default is 0): Device memory size that HHRT recognizes. If it is 0 (default case), we use the entire physical device memory. You can use expressions, 2.5G, 4096M, etc.
 
 * HH_DH_SLOTS (Default is 2): Device memory size that each process can use is configured as HH_DEVMEM/HH_DH_SLOTS. If it is 1, the size limitation is mitigated, but the overall performance tends to lower. The default value is 2, for enabling overlapped swapping.
 
-* HH_MAXRP (Default is 1): Maximum number of processes that becomes "running" per node.
-
 * HH_PIN_HOSTBUF (Default is 0): If it is 1 (and the library is compiled with USE_CUDA), host heap and swapping buffer on host are allocated on pinned memory.
 
-* HH_NLPHOST (Default is 99999): Valid if you are using the "file layer". Maximum number of processes that are put on host memory (or upper layer).
+### Valid if using the "file layer"
 
-* HH_FILESWAP_PATH (Default is nul string): Directory names must be specified if you are using the "file layer". Swapped files are generated in the specified directory. You can specify multiple pathes, like "swapdir1:swapdir2", which are used in process round-robin fashion.
+* HH_NLPHOST (Default is 99999): Maximum number of processes that are put on host memory (or upper layer).
 
-* HH_PROF_PATH: See a document in tools directory.
+* HH_FILESWAP_PATH (Default is nul string): Directory names MUST be specified to use the file layer. Swapped files are generated in the directory(s). You can specify multiple pathes, like "swapdir1:swapdir2", which are used in round-robin fashion among processes on a node.
 
 ## Current limitations
 
@@ -177,4 +183,4 @@ Toshio Endo (endo-at-is.titech.ac.jp)
 
 Twitter: toshioendo
 
-Copyright (C) 2013-2016, Toshio Endo. All Rights Reserved.
+Copyright (C) 2013-2017, Toshio Endo. All Rights Reserved.
