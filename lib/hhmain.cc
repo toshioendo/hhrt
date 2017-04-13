@@ -294,18 +294,18 @@ int HH_readConf(hhconf *confp)
     confp->maxrp = atoi(p);
   }
 
-  /* HH_NLPHOST */
-  confp->nlphost = 99999;
-  p = getenv("HH_NLPHOST");
-  if (p != NULL) {
-    confp->nlphost = atoi(p);
-  }
-
   /* HH_PIN_HOSTBUF */
   confp->pin_hostbuf = 0;
   p = getenv("HH_PIN_HOSTBUF");
   if (p != NULL) {
     confp->pin_hostbuf = atoi(p);
+  }
+
+  /* HH_NLPHOST */
+  confp->nlphost = 99999;
+  p = getenv("HH_NLPHOST");
+  if (p != NULL) {
+    confp->nlphost = atoi(p);
   }
 
   /* HH_SWAP_PATH */
@@ -370,8 +370,8 @@ int HH_printConf(FILE *ofp, hhconf *confp)
   fprintf(ofp, "  HH_DEVMEM=%ld\n", confp->devmem);
   fprintf(ofp, "  HH_DH_SLOTS=%d\n", confp->dh_slots);
   fprintf(ofp, "  HH_MAXRP=%d\n", confp->maxrp);
-  fprintf(ofp, "  HH_NLPHOST=%d\n", confp->nlphost);
   fprintf(ofp, "  HH_PIN_HOSTBUF=%d\n", confp->pin_hostbuf);
+  fprintf(ofp, "  HH_NLPHOST=%d\n", confp->nlphost);
   fprintf(ofp, "  HH_FILESWAP_PATH= ");
   int i;
   for (i = 0; i < confp->n_fileswap_dirs; i++) {

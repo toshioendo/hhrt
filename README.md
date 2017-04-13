@@ -123,6 +123,25 @@ Notes:
 * The memory region may be either on GPU device memory or on host memory.
 * Currently, the memory region specified by [addr, addr+length) must correspond to an entire memory object allocated by cudaMalloc/malloc (management is not page-wise like the original madvise).
 
+## Environment variables
+
+Some environment variables control behavior of HHRT, which may be useful for optimizations.
+Subject to change.
+
+* HH_DEVMEM (Default is 0): Device memory size that HHRT recognizes. If it is 0 (default case), we use the entire physical device memory. You can use expressions, 2.5G, 4096M, etc.
+
+* HH_DH_SLOTS (Default is 2): Device memory size that each process can use is configured as HH_DEVMEM/HH_DH_SLOTS. If it is 1, the size limitation is mitigated, but the overall performance tends to lower. The default value is 2, for enabling overlapped swapping.
+
+* HH_MAXRP (Default is 1): Maximum number of processes that becomes "running" per node.
+
+* HH_PIN_HOSTBUF (Default is 0): If it is 1 (and the library is compiled with USE_CUDA), host heap and swapping buffer on host are allocated on pinned memory.
+
+* HH_NLPHOST (Default is 99999): Valid if you are using the "file layer". Maximum number of processes that are put on host memory (or upper layer).
+
+* HH_FILESWAP_PATH (Default is nul string): Directory names must be specified if you are using the "file layer". Swapped files are generated in the specified directory. You can specify multiple pathes, like "swapdir1:swapdir2", which are used in process round-robin fashion.
+
+* HH_PROF_PATH: See a document in tools directory.
+
 ## Current limitations
 
 * Functions wrapped by HHRT (MPI APIs, CUDA APIs, malloc/free etc) are thread-unsafe. They should not be called in parallel.
@@ -133,6 +152,7 @@ Notes:
 * malloc invocations inside CUDA kernel functions are not considered.
 * Global variables (on device or on host) are not targets of swapping, thus they consume memory capacity and may limit the total problem scale.
 * C++ "new" is not supported yet.
+* And more :-(
 
 ## References
 
