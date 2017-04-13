@@ -279,7 +279,7 @@ int HH_readConf(hhconf *confp)
   confp->dh_slots = 2;
   p = getenv("HH_DH_SLOTS");
   if (p != NULL) {
-    confp->dh_slots = (int)getLP(p);
+    confp->dh_slots = atoi(p);
   }
   if (confp->dh_slots > MAX_DH_SLOTS) {
     fprintf(stderr, "[HH_readConf] HH_DH_SLOTS(%d) cannot exceed %d\n",
@@ -291,14 +291,21 @@ int HH_readConf(hhconf *confp)
   confp->maxrp = 1;
   p = getenv("HH_MAXRP");
   if (p != NULL) {
-    confp->maxrp = (int)getLP(p);
+    confp->maxrp = atoi(p);
   }
 
   /* HH_NLPHOST */
   confp->nlphost = 99999;
   p = getenv("HH_NLPHOST");
   if (p != NULL) {
-    confp->nlphost = (int)getLP(p);
+    confp->nlphost = atoi(p);
+  }
+
+  /* HH_PIN_HOSTBUF */
+  confp->pin_hostbuf = 0;
+  p = getenv("HH_PIN_HOSTBUF");
+  if (p != NULL) {
+    confp->pin_hostbuf = atoi(p);
   }
 
   /* HH_SWAP_PATH */
@@ -364,6 +371,7 @@ int HH_printConf(FILE *ofp, hhconf *confp)
   fprintf(ofp, "  HH_DH_SLOTS=%d\n", confp->dh_slots);
   fprintf(ofp, "  HH_MAXRP=%d\n", confp->maxrp);
   fprintf(ofp, "  HH_NLPHOST=%d\n", confp->nlphost);
+  fprintf(ofp, "  HH_PIN_HOSTBUF=%d\n", confp->pin_hostbuf);
   fprintf(ofp, "  HH_FILESWAP_PATH= ");
   int i;
   for (i = 0; i < confp->n_fileswap_dirs; i++) {

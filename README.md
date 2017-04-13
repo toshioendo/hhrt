@@ -52,7 +52,7 @@ You can run it by
 But this does not exceed the device memory capacity.
 In order to achieve "out-of-core" execution on HHRT, "process oversubscription" is used as follows.
 
-### On single GPU/node envorinment
+### On single GPU/node environment
 
 `
 % mpirun -np 8 ./7pstencil -p 2 4 1024 1024 2048
@@ -129,7 +129,7 @@ Notes:
 * Each process can use up to one GPU. (to be fixed soon)
 * Only (part of) MPI-1 APIs are supported. Especially one-side communication APIs in MPI-2/3 are not supported.
 * Some memory allocation functions, such as valloc, memalign are still missing.
-* Some CUDA features are NOT supported including unified virtual memory, texture cache, Hyper-Q, etc.
+* Some CUDA features are NOT supported including unified memory, texture cache, Hyper-Q, etc.
 * malloc invocations inside CUDA kernel functions are not considered.
 * Global variables (on device or on host) are not targets of swapping, thus they consume memory capacity and may limit the total problem scale.
 * C++ "new" is not supported yet.

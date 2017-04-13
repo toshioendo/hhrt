@@ -380,6 +380,7 @@ struct hhconf {
   size_t devmem;
   int dh_slots; /* # of heap slots in a GPU */
   int maxrp; /* max runnable processes per device */
+  int pin_hostbuf; /* if 1, pin down buffers allocated in host swapper */
   int nlphost; /* # of local procs that can share host memory simultaneously */
   int n_fileswap_dirs;
   char fileswap_dirs[MAX_FILESWAP_DIRS][CONFSTRLEN];
