@@ -125,6 +125,21 @@ void *hostheap::allocCapacity(size_t offset, size_t size)
     exit(1);
   }
 
+#ifdef USE_CUDA
+  if (HHL2->conf.pin_hostbuf) {
+    cudaError_t crc;
+    crc = cudaHostRegister(mapp, size, 
+			   cudaHostRegisterPortable|cudaHostRegisterMapped);
+    if (crc != cudaSuccess) {
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaHostRegister failed (rc=%d)\n",
+	      name, HH_MYID, crc);
+      HHstacktrace();
+      exit(1);
+    }
+  }
+  
+#endif
+
   return resp;
 }
 
@@ -168,6 +183,21 @@ int hostheap::releaseHeap()
 
   if (heapsize > 0L) {
     /* Free memory! */
+#ifdef USE_CUDA
+    if (HHL2->conf.pin_hostbuf) {
+      cudaError_t crc;
+      crc = cudaHostUnregister(heapptr);
+      // BUG if heap has been expanded by multiple HostRegister
+      if (crc != cudaSuccess) {
+	fprintf(stderr, "[HH:%s::releaseHeap@p%d] ERROR: cudaHostUnregister failed (rc=%d)\n",
+		name, HH_MYID, crc);
+	HHstacktrace();
+	exit(1);
+      }
+    }
+  
+#endif
+
     rc = munmap(heapptr, heapsize);
     if (rc != 0) {
       fprintf(stderr, "[HH:hostheap::releaseHeap@p%d] munmap(ptr=%p, size=%lx) failed!\n",
@@ -223,6 +253,22 @@ int hostheap::restoreHeap()
   /* Now we can access HEAPPTR */
   return 0;
 }
+
+//////////////////////////////////
+#if 0 && defined USE_CUDA
+// pinned memory 
+// In default, allocPinned/freePinned are same as alloc/free
+// only meaningful in host memory with CUDA
+void* hostheap::allocPinned(size_t size0)
+{
+  return alloc(size0);
+}
+
+void* hostheap::freePinned(void *p)
+{
+  return free(p);
+}
+#endif
 
 //////////////////////////////////
 // sched_ml should be locked in caller
