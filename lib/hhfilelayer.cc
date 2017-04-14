@@ -11,6 +11,11 @@
 
 /* File layer management */
 
+/* constants */
+#define FILEHEAP_STEP (256L*1024*1024)
+#define FILEHEAP_PTR ((void*)512) // the pointer is not accessed
+
+
 int HH_fileInitNode(hhconf *confp)
 {
   int i;

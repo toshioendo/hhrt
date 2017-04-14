@@ -9,6 +9,10 @@
 
 /* Host memory management */
 
+/* constants */
+#define HOSTHEAP_PTR ((void*)0x700000000000)
+#define HOSTHEAP_STEP (1L*1024*1024*1024)
+
 heap *HH_hostheapCreate()
 {
   heap *h;
@@ -85,6 +89,11 @@ hostheap::hostheap() : heap(0L)
 	    HH_MYID, crc);
     exit(1);
   }
+#if 0
+  fprintf(stderr, "[HH:hostheap::init@p%d] cudaStreamCreate -> str %ld\n",
+	  HH_MYID, copystream);
+#endif
+
 #endif
 
   return;
@@ -102,7 +111,7 @@ int hostheap::finalize()
 
 void *hostheap::allocCapacity(size_t offset, size_t size)
 {
-  void *mapp = piadd(HOSTHEAP_PTR, offset);
+  void *mapp = piadd(heapptr, offset);
   void *resp;
 
   if (size == 0) {
@@ -128,7 +137,17 @@ void *hostheap::allocCapacity(size_t offset, size_t size)
 #ifdef USE_CUDA
   if (HHL2->conf.pin_hostbuf) {
     cudaError_t crc;
-    crc = cudaHostRegister(mapp, size, 
+    if (offset != (size_t)0) {
+      crc = cudaHostUnregister(heapptr);
+      if (crc != cudaSuccess) {
+	fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaHostUnregister failed (rc=%d)\n",
+		name, HH_MYID, crc);
+	HHstacktrace();
+	exit(1);
+      }
+    }
+    
+    crc = cudaHostRegister(heapptr, offset+size,/*mapp, size, */
 			   cudaHostRegisterPortable|cudaHostRegisterMapped);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaHostRegister failed (rc=%d)\n",
@@ -250,25 +269,9 @@ int hostheap::restoreHeap()
 	  name, HH_MYID, heapptr, offs2ptr(heapsize));
 #endif
 
-  /* Now we can access HEAPPTR */
+  /* Now we can access heapptr */
   return 0;
 }
-
-//////////////////////////////////
-#if 0 && defined USE_CUDA
-// pinned memory 
-// In default, allocPinned/freePinned are same as alloc/free
-// only meaningful in host memory with CUDA
-void* hostheap::allocPinned(size_t size0)
-{
-  return alloc(size0);
-}
-
-void* hostheap::freePinned(void *p)
-{
-  return free(p);
-}
-#endif
 
 //////////////////////////////////
 // sched_ml should be locked in caller
@@ -375,8 +378,8 @@ int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
     cudaError_t crc;
     crc = cudaMemcpyAsync(hp, buf, size, cudaMemcpyDeviceToHost, copystream);
     if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:%s::writeSeq@p%d] cudaMemcpy(%ldMiB) failed!!\n",
-	      name, HH_MYID, size>>20);
+      fprintf(stderr, "[HH:%s::writeSeq@p%d] ERROR: cudaMemcpy(%p,%p,%ldMiB)(D2H)(str=%ld) failed!! rc=%d\n",
+	      name, HH_MYID, hp,buf,size>>20, copystream, crc);
       exit(1);
     }
     //copyD2H(hp, buf, size, copystream, "HH:hostheap::write_s");
