@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
 	  for (dst = 1; dst < size; dst++) {
 	    double st = MPI_Wtime();
 	    mysend(dst, sbuf, msgsize);
-	    MPI_Recv(rbuf, 4, MPI_CHAR, MPI_ANY_TAG, 
-		     MPI_ANY_SOURCE, MPI_COMM_WORLD, &stat);
+	    MPI_Recv(rbuf, 4, MPI_CHAR, MPI_ANY_SOURCE, 
+		     MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
 	    double et = MPI_Wtime();
 	    long us = (long)((et-st)*1000000.0);
 	    fprintf(stderr, "pingpong with rank %d, size %ld: %ld us -> %ldMB/s\n",
@@ -77,8 +77,8 @@ int main(int argc, char *argv[])
 	}
 	else {
 	  fprintf(stderr, "%d starts to recv\n", rank);
-	  MPI_Recv(rbuf, msgsize, MPI_CHAR, MPI_ANY_TAG, 
-		   MPI_ANY_SOURCE, MPI_COMM_WORLD, &stat);
+	  MPI_Recv(rbuf, msgsize, MPI_CHAR, MPI_ANY_SOURCE, 
+		   MPI_ANY_TAG, MPI_COMM_WORLD, &stat);
 	  /* pong */
 	  mysend(0, sbuf, 4);
 	}

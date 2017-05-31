@@ -80,6 +80,14 @@ static int addCommTask(commtask *ctp)
 
 static int progressSend(commtask *ctp)
 {
+  int flag;
+  MPI_Status stat;
+  MPI_Test(&ctp->ireq, &flag, &stat);
+  if (flag == 0) {
+    /* do nothing */
+    return 0;
+  }
+
   /* divide original message and send */
   int cur;
   int chunksize = DEFAULT_CHUNKSIZE;
@@ -95,6 +103,7 @@ static int progressSend(commtask *ctp)
 
     memcpy(commbuf, piadd(ctp->ptr, cur), size);
     /* This should be Isend, and returns for each send */
+    printf("[HHR:progressSend] calling Internal MPI_Send\n");
     MPI_Send(commbuf, size, MPI_BYTE, ctp->partner, ctp->tag,
 	     ctp->comm);
   }
@@ -106,11 +115,27 @@ static int progressSend(commtask *ctp)
 
 static int progressRecv(commtask *ctp)
 {
-  /* divide original message and send */
+  int flag;
+  MPI_Status stat;
+  MPI_Test(&ctp->ireq, &flag, &stat);
+  if (flag == 0) {
+    /* do nothing */
+    return 0;
+  }
+
+  /* Now first header arrived. */
+  ctp->partner = stat.MPI_SOURCE;
+  ctp->tag = stat.MPI_TAG;
+  fprintf(stderr, "[HHRM:progressRecv] found src=%d, tag=%d\n",
+	  ctp->partner, ctp->tag);
+  /* Send ack */
+  MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
+	   ctp->partner, ctp->tag, ctp->comm);
+
+  /* recv divided messages */
   int cur;
   int chunksize = DEFAULT_CHUNKSIZE;
   int psize;
-
   void *commbuf = malloc(chunksize);
 
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
@@ -121,6 +146,7 @@ static int progressRecv(commtask *ctp)
     if (cur+size > psize) size = psize-cur;
 
     /* This should be Irecv, and returns for each send */
+    printf("[HHR:progressRecv] calling Internal MPI_Recv\n");
     MPI_Recv(commbuf, size, MPI_BYTE, ctp->partner, ctp->tag,
 	     ctp->comm, &stat);
 
@@ -134,17 +160,9 @@ static int progressRecv(commtask *ctp)
 
 static int progress1(commtask *ctp)
 {
-  int flag;
-  MPI_Status stat;
-
   if (ctp->fin) {
     /* already finished. do nothing */
     return 0;
-  }
-
-  MPI_Test(&ctp->ireq, &flag, &stat);
-  if (flag == 0) {
-    /* do nothing */
   }
 
   /* now ctp->hdr is valid */
@@ -191,6 +209,8 @@ int HHRMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   ctp->tag = tag;
   ctp->comm = comm;
 
+  fprintf(stderr, "[HHRMPI_Isend] called: dest=%d, tag=%d\n", dest, tag);
+
   if (!isTypeContiguous(datatype)) {
     fprintf(stderr, "[HHRTMPI_Isend] non contiguous datatype is specified. not supported yet\n");
     exit(1);
@@ -226,8 +246,10 @@ int HHRMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   ctp->tag = tag;
   ctp->comm = comm;
 
+  fprintf(stderr, "[HHRMPI_Irecv] called: src=%d, tag=%d\n", source, tag);
+
   if (!isTypeContiguous(datatype)) {
-    fprintf(stderr, "[HHRTMPI_Isend] non contiguous datatype is specified. not supported yet\n");
+    fprintf(stderr, "[HHRMPI_Irecv] non contiguous datatype is specified. not supported yet\n");
     exit(1);
   }
 
