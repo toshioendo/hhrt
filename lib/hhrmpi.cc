@@ -7,6 +7,10 @@
 #include <mpi.h>
 //#include "hhrt_impl.h"
 
+#include <list>
+#include <map>
+using namespace std;
+
 #ifndef piadd
 #define piadd(p, i) (void*)((char*)(p) + (size_t)(i))
 #endif
@@ -26,7 +30,8 @@ typedef struct {
   MPI_Datatype datatype;
 } commhdr;
 
-typedef struct {
+struct commtask {
+  commtask() {fin = 0;};
   int kind;
   void *ptr;
   int count;
@@ -38,11 +43,10 @@ typedef struct {
   /* inner request */
   MPI_Request ireq;
   commhdr hdr;
-} commtask;
+  int fin;
+};
 
-typedef struct {
-  commtask *ctp;
-} HHRMPI_Request;
+typedef commtask *HHRMPI_Request;
 
 class rmpig {
  public:
@@ -138,7 +142,7 @@ static int progress1(commtask *ctp)
     return 0;
   }
 
-  MPI_Test(ctp->ireq, &flag, &stat);
+  MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
   }
@@ -161,11 +165,18 @@ static int progress1(commtask *ctp)
 /* should be called to progress communication */
 int HHRM_progress()
 {
-  list<commtask *>::iter it;
+  list<commtask *>::iterator it;
   for (it = HHRL->commtasks.begin(); it != HHRL->commtasks.end(); it++) {
     commtask *ctp = *it;
     progress1(ctp);
+
+    if (ctp->fin) {
+      /* finished. remove from list */
+      HHRL->commtasks.erase(it);
+      break;
+    }
   }
+  return 0;
 }
 
 int HHRMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
@@ -173,7 +184,7 @@ int HHRMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
 {
   commtask *ctp = new commtask;
   ctp->kind = HHRM_SEND;
-  ctp->ptr = buf;
+  ctp->ptr = (void *)buf;
   ctp->count = count;
   ctp->datatype = datatype;
   ctp->partner = dest;
@@ -192,13 +203,13 @@ int HHRMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
 
   /* This should be Isend */
   /* We assume that hdr is enough small to eager communication works */
-  MPI_Send((void*)&hdr, sizeof(hdr), MPI_BYTE, dest, tag, comm);
+  MPI_Send((void*)&hdr, sizeof(commhdr), MPI_BYTE, dest, tag, comm);
   /* start to wait ack */
-  MPI_Irecv((void*)&comm.hdr, sizeof(hdr), MPI_BYTE, dest, tag, comm, &ctp->ireq);
+  MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, dest, tag, comm, &ctp->ireq);
   /* finish of ctp->ireq should be checked later */
 
-  reqp->ctp = ctp;
   addCommTask(ctp);
+  *reqp = ctp;
 
   return 0;
 }
@@ -221,14 +232,98 @@ int HHRMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   }
 
   /* Start recving the first header */
-  MPI_Irecv((void*)&comm.hdr, sizeof(hdr), MPI_BYTE, source, tag, comm, &ctp->ireq);
+  MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, source, tag, comm, &ctp->ireq);
 
-  reqp->ctp = ctp;
   addCommTask(ctp);
+  *reqp = ctp;
 
   return 0;
 }
 
+int HHRMPI_Testall(int n, HHRMPI_Request *reqs, int *flagp, MPI_Status *stats)
+{
+  int i;
+  *flagp = 0;
+  for (i = 0; i < n; i++) {
+    if (reqs[i] == NULL) continue;
+    if (reqs[i]->fin == 0) break;
+  }
+  
+  if (i < n) {
+    /* some request is not finished */
+    return 0;
+  }
+  *flagp = 1;
+  return MPI_SUCCESS;
+}
+
 int HHRMPI_Waitall(int n, HHRMPI_Request *reqs, MPI_Status *stats)
 {
+  do {
+    int flag;
+    int rc;
+    rc = HHRMPI_Testall(n, reqs, &flag, stats);
+    if (rc != MPI_SUCCESS) {
+      fprintf(stderr, "[HHRMPI_Waltall] failed! rc=%d\n", rc);
+      exit(1);
+    }
+    if (flag != 0) {
+      break;
+    }
+
+    //HH_progressSched();
+    HHRM_progress();
+    usleep(1);
+  } while (1);
+  return MPI_SUCCESS;
 }
+
+int HHRMPI_Wait(HHRMPI_Request *reqp, MPI_Status *statp)
+{
+  return HHRMPI_Waitall(1, reqp, statp);
+}
+
+int HHRMPI_Send( void *buf, int count, MPI_Datatype dt, int dst, 
+		int tag, MPI_Comm comm )
+{
+  int rc;
+  HHRMPI_Request mreq;
+  MPI_Status stat;
+  rc = HHRMPI_Isend(buf, count, dt, dst, tag, comm, &mreq);
+  if (rc != MPI_SUCCESS) {
+    fprintf(stderr, "[HHRMPI] ERROR: HHRMPI_Isend failed\n");
+    return rc;
+  }
+
+  rc = HHRMPI_Wait(&mreq, &stat);
+  if (rc != MPI_SUCCESS) {
+    fprintf(stderr, "[HHRMPI] ERROR: HHRMPI_Wait failed\n");
+    return rc;
+  }
+
+  return rc;
+}
+
+int HHRMPI_Recv( void *buf, int count, MPI_Datatype dt, int src, 
+		 int tag, MPI_Comm comm, MPI_Status *status )
+{
+  int rc;
+  HHRMPI_Request mreq;
+  MPI_Status stat;
+  rc = HHRMPI_Irecv(buf, count, dt, src, tag, comm, &mreq);
+  if (rc != MPI_SUCCESS) {
+    fprintf(stderr, "[HHRMPI] ERROR: HHRMPI_Irecv failed\n");
+    return rc;
+  }
+
+  rc = HHRMPI_Wait(&mreq, &stat);
+  if (rc != MPI_SUCCESS) {
+    fprintf(stderr, "[HHRMPI] ERROR: HHRMPI_Wait failed\n");
+    return rc;
+  }
+  *status = stat;
+
+  return rc;
+}
+
+

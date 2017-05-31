@@ -313,7 +313,7 @@ int HHMPI_Waitall_i(int n, MPI_Request *reqs, MPI_Status *stats)
     usleep(1);
   } while (1);
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
@@ -383,7 +383,7 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
 	  HH_MYID, (long)(*reqp));
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
@@ -402,7 +402,7 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 	  HH_MYID, (long)(*reqp));
 #endif
 
-  return 0;
+  return MPI_SUCCESS;
 }
 
 int HHMPI_Send( void *buf, int count, MPI_Datatype dt, int dst, 
@@ -412,13 +412,13 @@ int HHMPI_Send( void *buf, int count, MPI_Datatype dt, int dst,
   MPI_Request mreq;
   MPI_Status stat;
   rc = HHMPI_Isend(buf, count, dt, dst, tag, comm, &mreq);
-  if (rc != 0) {
+  if (rc != MPI_SUCCESS) {
     fprintf(stderr, "[HHMPI] ERROR: HHMPI_Isend failed\n");
     return rc;
   }
 
   rc = HHMPI_Wait(&mreq, &stat);
-  if (rc != 0) {
+  if (rc != MPI_SUCCESS) {
     fprintf(stderr, "[HHMPI] ERROR: HHMPI_Wait failed\n");
     return rc;
   }
@@ -433,13 +433,13 @@ int HHMPI_Recv( void *buf, int count, MPI_Datatype dt, int src,
   MPI_Request mreq;
   MPI_Status stat;
   rc = HHMPI_Irecv(buf, count, dt, src, tag, comm, &mreq);
-  if (rc != 0) {
+  if (rc != MPI_SUCCESS) {
     fprintf(stderr, "[HHMPI] ERROR: HHMPI_Irecv failed\n");
     return rc;
   }
 
   rc = HHMPI_Wait(&mreq, &stat);
-  if (rc != 0) {
+  if (rc != MPI_SUCCESS) {
     fprintf(stderr, "[HHMPI] ERROR: HHMPI_Wait failed\n");
     return rc;
   }
