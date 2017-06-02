@@ -38,10 +38,6 @@ devheap::devheap(size_t heapsize0, dev *device0) : heap(heapsize0)
   memkind = HHM_DEV;
 
   device = device0;
-#if 0
-  cudaError_t crc;
-  crc = cudaStreamCreate(&swapstream);
-#endif
   sprintf(name, "devheap(d%d)", device->devid);
   hp_baseptr = NULL;
 
