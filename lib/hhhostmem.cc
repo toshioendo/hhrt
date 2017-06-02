@@ -482,17 +482,6 @@ int hostmmapheap::restoreHeap()
 /************************************************/
 /* User API */
 
-int HH_madvise(void *p, size_t size, int kind)
-{
-  int ih;
-  for (ih = 0; ih < HHL2->nheaps; ih++) {
-    int rc = HHL2->heaps[ih]->madvise(p, size, kind);
-    if (rc == 0) return 0;
-  }
-
-  return -1;
-}
-
 #ifdef USE_SWAPHOST
 void *HHmalloc(size_t size)
 {

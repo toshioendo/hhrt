@@ -27,6 +27,19 @@ int HH_finalizeHeaps()
   return 0;
 }
 
+/* find a heap structure that contains pointer p */
+heap *HH_findHeap(void *p)
+{
+  int ih;
+  for (ih = 0; ih < HHL2->nheaps; ih++) {
+    heap *h = HHL2->heaps[ih];
+    if (h->doesInclude(p)) {
+      return h;
+    }
+  }
+  return NULL;
+}
+
 // memlayer class 
 memlayer::memlayer()
 {
@@ -129,6 +142,18 @@ void* heap::offs2ptr(ssize_t offs)
 ssize_t heap::ptr2offs(void* p)
 {
   return ppsub(p, heapptr);
+}
+
+int heap::doesInclude(void *p)
+{
+  if (heapptr == NULL) {
+    return 0;
+  }
+
+  if (p >= heapptr && p < piadd(heapptr, heapsize)) {
+    return 1;
+  }
+  return 0;
 }
 
 void* heap::alloc(size_t size0)
@@ -726,5 +751,20 @@ int heap::dump()
 	    kind);
   }
   return 0;
+}
+
+/************************************************/
+/* User API */
+
+int HH_madvise(void *p, size_t size, int kind)
+{
+  heap *h = HH_findHeap(p);
+  if (h == NULL) {
+    fprintf(stderr, "[HH_madvise@p%d] ptr %p is not managed by HHRT. ignored\n",
+	    HH_MYID, p);
+    return -1;
+  }
+
+  return h->madvise(p, size, kind);
 }
 

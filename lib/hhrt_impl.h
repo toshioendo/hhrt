@@ -180,6 +180,7 @@ class heap: public memlayer {
 
   virtual void* offs2ptr(ssize_t offs);
   virtual ssize_t ptr2offs(void* p);
+  virtual int doesInclude(void* p);
 
   virtual int expandHeap(size_t reqsize);
   virtual int releaseHeap();
