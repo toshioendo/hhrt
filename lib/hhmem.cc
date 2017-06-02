@@ -684,6 +684,63 @@ int heap::swapIn()
   return 0;
 }
 
+/********************/
+/* write/read data to heap */
+/* This recursive function is diffrent from writeSeq(), readSeq */
+/* if this heap is swapped out, swapped region in lower layer is updated. */
+/* rwtype: 'W' or 'R' */
+int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
+{
+  if (!doesInclude(tgt)) {
+    fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: this heap does not include ptr %p. Check HHRT implementation\n",
+	    name, HH_MYID, tgt);
+    return -1;
+  }
+
+  if (swapped == 0) {
+    /* not swapped */
+    if (rwtype == 'W') {
+      return writeSeq(ptr2offs(tgt), buf, bufkind, size);
+    }
+    else if (rwtype == 'R') {
+      return readSeq(ptr2offs(tgt), buf, bufkind, size);
+    }
+    else {
+      fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: unknown access type %c\n",
+	      name, HH_MYID, rwtype);
+      return -1;
+    }
+  }
+
+  assert(lower != NULL);
+  /* we need to investigate lower layer */
+  membuf *mbp = findMembuf(tgt);
+  if (mbp == NULL || mbp->kind == HHMADV_FREED) {
+    // unknown pointer
+    fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: this heap includes ptr %p, but invalid (maybe freed)\n",
+	    name, HH_MYID, tgt);
+    return -1;
+  }
+
+  if (mbp->soffs == (ssize_t)-1) {
+    fprintf(stderr, "[HH:%s::accessRec@p%d] WARNING: this heap is swapped out, but ptr %p does not have destination\n",
+	    name, HH_MYID, tgt);
+    return -1;
+  }
+
+  ssize_t inneroffs = ptr2offs(tgt) - mbp->doffs; /* offset inside the object */
+  assert(inneroffs >= 0 && inneroffs+size <= mbp->size);
+  ssize_t soffs = mbp->soffs + inneroffs;
+
+#if 1
+  fprintf(stderr, "[HH:%s::accessRec@p%d] delegate %c access to %s\n",
+	  name, HH_MYID, rwtype, lower->name);
+#endif
+  int rc = lower->accessRec(rwtype, lower->offs2ptr(soffs), buf, bufkind, size);
+  return rc;
+}
+
+/********************/
 int heap::madvise(void *p, size_t size, int kind)
 {
   membuf *mbp = findMembuf(p);

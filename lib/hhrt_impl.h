@@ -206,6 +206,7 @@ class heap: public memlayer {
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
+  virtual int accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size);
 
   virtual int madvise(void *p, size_t size, int kind);
 
