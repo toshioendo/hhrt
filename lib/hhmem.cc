@@ -8,7 +8,7 @@
 #include <errno.h>
 #include "hhrt_impl.h"
 
-/* Memory management (generic) */
+/* Memory management and swapping facility (generic base class) */
 
 int HH_finalizeHeaps()
 {
