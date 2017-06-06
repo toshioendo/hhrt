@@ -432,7 +432,9 @@ struct proc2 {
   heap *swapping_heap;
 #endif
 
+#if 0
   std::map<MPI_Request, reqfin> reqfins;
+#endif
 
   char api_str[64];
 #ifdef USE_MMAPSWAP

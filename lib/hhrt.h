@@ -36,6 +36,10 @@ extern "C" {
 #define MPI_Alltoall HHMPI_Alltoall
 #define MPI_Comm_split HHMPI_Comm_split
 
+#ifdef HHMPI_REND
+#define MPI_Request HHMPI_Request
+#endif
+
 /**************************************************/
 #ifdef USE_CUDA
 /* CUDA interface */

@@ -58,7 +58,7 @@ class rmpig {
 
 /* global variables */
 rmpig hhrls;
-rmpig *HHRL = &hhrls;
+rmpig *HHLMR = &hhrls;
 
 /* Returns 1 if type is "contiguous" on memory */
 /* (This may not mean a type made by MPI_Type_contiguous) */
@@ -76,7 +76,7 @@ static int isTypeContiguous(MPI_Datatype type)
 
 static int addCommTask(commtask *ctp)
 {
-  HHRL->commtasks.push_front(ctp);
+  HHLMR->commtasks.push_front(ctp);
   return 0;
 }
 
@@ -186,13 +186,13 @@ static int progress1(commtask *ctp)
 int HHRM_progress()
 {
   list<commtask *>::iterator it;
-  for (it = HHRL->commtasks.begin(); it != HHRL->commtasks.end(); it++) {
+  for (it = HHLMR->commtasks.begin(); it != HHLMR->commtasks.end(); it++) {
     commtask *ctp = *it;
     progress1(ctp);
 
     if (ctp->fin) {
       /* finished. remove from list */
-      HHRL->commtasks.erase(it);
+      HHLMR->commtasks.erase(it);
       break;
     }
   }

@@ -7,6 +7,16 @@
 
 #ifdef HHMPI_BASE
 
+class mpig {
+ public:
+  /* list of floating communications */
+  std::map<MPI_Request, reqfin> reqfins;
+};
+
+/* global variables */
+mpig hhlms;
+mpig *HHLM = &hhlms;
+
 /***/
 int HH_enterAPI(const char *str)
 {
@@ -238,17 +248,17 @@ int HH_req_finalize(MPI_Request req)
 	    HH_MYID);
   }
 
-  if (HHL2->reqfins.find(req) != HHL2->reqfins.end()) {
+  if (HHLM->reqfins.find(req) != HHLM->reqfins.end()) {
     /* find */
-    reqfin fin = HHL2->reqfins[req];
+    reqfin fin = HHLM->reqfins[req];
     HH_reqfin_finalize(&fin);
-    HHL2->reqfins.erase(req);
+    HHLM->reqfins.erase(req);
   }
   else {
     fprintf(stderr, "[HH_req_finalize@p%d] No request structure for req=%ld finalized, is it OK?\n",
 	    HH_MYID, (long)req);
-    std::map<MPI_Request, reqfin>::iterator iter = HHL2->reqfins.begin();
-    for (; iter != HHL2->reqfins.end(); iter++) {
+    std::map<MPI_Request, reqfin>::iterator iter = HHLM->reqfins.begin();
+    for (; iter != HHLM->reqfins.end(); iter++) {
       fprintf(stderr, "   req=%ld in map\n", (long)iter->first);
     }
   }
@@ -378,7 +388,7 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   MPI_Isend(fin.send.cptr, fin.send.csize, fin.send.ctype, 
 	    dest, tag, comm, reqp);
 
-  HHL2->reqfins[*reqp] = fin;
+  HHLM->reqfins[*reqp] = fin;
 #if 0
   fprintf(stderr, "[HHMPI_Isend@p%d] added req=%ld\n",
 	  HH_MYID, (long)(*reqp));
@@ -397,7 +407,7 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   MPI_Irecv(fin.recv.cptr, fin.recv.csize, fin.recv.ctype, 
 	    source, tag, comm, reqp);
 
-  HHL2->reqfins[*reqp] = fin;
+  HHLM->reqfins[*reqp] = fin;
 #if 0
   fprintf(stderr, "[HHMPI_Irecv@p%d] added req=%ld\n",
 	  HH_MYID, (long)(*reqp));
