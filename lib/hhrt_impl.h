@@ -10,6 +10,10 @@ extern "C" {
 #include <map>
 using namespace std;
 
+#ifndef HHMPI_REND
+#  define HHMPI_BASE
+#endif
+
 /*** definitions for HHRT implementation */
 
 #define MAX_LDEVS 16  /* max #GPUs per node */

@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include "hhrt_impl.h"
 
+#ifdef HHMPI_BASE
 
 /***/
 int HH_enterAPI(const char *str)
@@ -635,3 +636,5 @@ int HHMPI_Comm_split(MPI_Comm comm, int color, int key,
   *newcomm = newcomm2;
   return rc;
 }
+
+#endif // HHMPI_BASE

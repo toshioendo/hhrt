@@ -5,7 +5,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <mpi.h>
-//#include "hhrt_impl.h"
+#include "hhrt_impl.h"
+
+#ifdef HHMPI_REND
 
 #include <list>
 #include <map>
@@ -349,3 +351,5 @@ int HHRMPI_Recv( void *buf, int count, MPI_Datatype dt, int src,
 }
 
 
+
+#endif // HHMPI_REND
