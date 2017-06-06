@@ -40,6 +40,30 @@ heap *HH_findHeap(void *p)
   return NULL;
 }
 
+/* Read or write data in buf to tgt. */
+/* tgt may be in the heap structure, which is now swapped out */
+int HH_accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
+{
+  heap *h = HH_findHeap(tgt);
+  int rc = 0;
+  if (h != NULL) {
+    rc = h->accessRec(rwtype, tgt, buf, bufkind, size);
+  }
+  else {
+    // TODO: considering device memory
+    if (rwtype == 'R') {
+      memcpy(buf, tgt, size);
+    }
+    else if (rwtype == 'W') {
+      memcpy(tgt, buf, size);
+    }
+    else {
+      assert(0);
+    }
+  }
+  return rc;
+}
+
 // memlayer class 
 memlayer::memlayer()
 {

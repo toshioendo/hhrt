@@ -53,6 +53,12 @@ int HH_devSetMode(int kind);
 /****************************************/
 /* MPI-1 compatible interface */
 
+#ifdef HHMPI_REND
+typedef void *HHMPI_Request;
+#else
+typedef MPI_Request HHMPI_Request;
+#endif
+
 int HHMPI_Init(int *argcp, char ***argvp);
 int HHMPI_Finalize();
 
@@ -61,12 +67,12 @@ int HHMPI_Send( void *buf, int count, MPI_Datatype dt, int dst,
 int HHMPI_Recv( void *buf, int count, MPI_Datatype dt, int src, 
 	       int tag, MPI_Comm comm, MPI_Status *status );
 int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
-		int tag, MPI_Comm comm, MPI_Request *reqp);
+		int tag, MPI_Comm comm, HHMPI_Request *reqp);
 int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
-		int tag, MPI_Comm comm, MPI_Request *reqp);
+		int tag, MPI_Comm comm, HHMPI_Request *reqp);
 
-int HHMPI_Wait(MPI_Request *mreqp, MPI_Status *statp);
-int HHMPI_Waitall(int n, MPI_Request mreqs[], MPI_Status stats[]);
+int HHMPI_Wait(HHMPI_Request *mreqp, MPI_Status *statp);
+int HHMPI_Waitall(int n, HHMPI_Request mreqs[], MPI_Status stats[]);
 
 int HHMPI_Barrier(MPI_Comm comm);
 int HHMPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 

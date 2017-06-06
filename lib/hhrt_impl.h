@@ -492,6 +492,8 @@ void HHstacktrace();
 
 // hhmem.cc: memory management
 int HH_finalizeHeaps();
+heap *HH_findHeap(void *p);
+int HH_accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size);
 
 // hhhostmem.cc: host memory layer
 int HH_addHostMemStat(int kind, ssize_t incr);
@@ -515,8 +517,8 @@ int HH_progressSched();
 int HH_sleepForMemory();
 int HH_swapOutIfOver();
 
-int HH_enterAPI(const char *str);
-int HH_exitAPI();
+int HH_enterBlocking(const char *str);
+int HH_exitBlocking();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();
 

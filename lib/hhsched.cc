@@ -252,6 +252,84 @@ int HH_sleepForMemory()
 
 
 
+int HH_enterBlocking(const char *str)
+{
+  if (HHL->in_api == 0) {
+#ifdef HHLOG_API
+    strcpy(HHL2->api_str, str);
+    fprintf(stderr, "[HH_enterBlocking@p%d] API [%s] start\n",
+	    HH_MYID, HHL2->api_str);
+#endif
+    assert(HHL->pmode == HHP_RUNNING);
+    HHL->pmode = HHP_BLOCKED;
+    HH_profSetMode("BLOCKED");
+#ifdef HHLOG_API
+    fprintf(stderr, "[HH_enterBlocking@p%d] API [%s] end\n",
+	    HH_MYID, HHL2->api_str);
+#endif
+  }
+  HHL->in_api++;
+  return 0;
+}
+
+int HH_exitBlocking()
+{
+  assert(HHL->in_api >= 0);
+  HHL->in_api--;
+  if (HHL->in_api == 0) {
+    assert(HHL->pmode == HHP_BLOCKED);
+    HH_sleepForMemory();
+    /* now I'm awake */
+    assert(HHL->pmode == HHP_RUNNING);
+#ifdef HHLOG_API
+    fprintf(stderr, "[HH_exitBlocking@p%d] API [%s] end\n",
+	    HH_MYID, HHL2->api_str);
+#endif
+  }
+  return 0;
+}
+
+int HH_enterGComm(const char *str)
+{
+
+  if (HHL->in_api == 0) {
+#ifdef HHLOG_API
+    strcpy(HHL2->api_str, str);
+    fprintf(stderr, "[HH_enterGComm@p%d] [%.2lf] GComm [%s] start\n",
+	    HH_MYID, Wtime_prt(), HHL2->api_str);
+#endif
+    assert(HHL->pmode == HHP_RUNNING);
+
+    HHL->pmode = HHP_BLOCKED;
+    HH_profSetMode("BLOCKED");
+
+    /* When device is oversubscribed, I sleep eagerly */
+    HH_swapOutIfOver();
+
+  }
+  HHL->in_api++;
+
+
+  return 0;
+}
+
+int HH_exitGComm()
+{
+  assert(HHL->in_api >= 0);
+  HHL->in_api--;
+  if (HHL->in_api == 0) {
+    assert(HHL->pmode == HHP_BLOCKED);
+    HH_sleepForMemory();
+    /* now I'm awake */
+    assert(HHL->pmode == HHP_RUNNING);
+#ifdef HHLOG_API
+    fprintf(stderr, "[HH_exitGComm@p%d] [%.2lf] API [%s] end\n",
+	    HH_MYID, Wtime_prt(), HHL2->api_str);
+#endif
+  }
+  return 0;
+}
+
 
 /******************************/
 
