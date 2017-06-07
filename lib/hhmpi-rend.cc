@@ -93,12 +93,12 @@ static int progressSend(commtask *ctp)
 
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
-  fprintf(stderr, "[HHMPI(R):progressSend@p%d] progress! (src=%d,tag=%d) %d/%d\n",
-	  HH_MYID, stat.MPI_SOURCE, stat.MPI_TAG, ctp->cursor, psize);
+  fprintf(stderr, "[HHMPI(R):progressSend@p%d] progress! (dst=%d,tag=%d) %d/%d\n",
+	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor, psize);
 
   if (ctp->cursor >= psize) {
-    fprintf(stderr, "[HHMPI(R):progressSend@p%d] finish! (%dbytes,src=%d,tag=%d)\n",
-	    HH_MYID, psize, stat.MPI_SOURCE, stat.MPI_TAG);
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] finish! (dst=%d,tag=%d)\n",
+	    HH_MYID, ctp->partner, ctp->tag);
     free(ctp->commbuf);
     ctp->commbuf = NULL;
     ctp->ireq = MPI_REQUEST_NULL;
@@ -139,15 +139,15 @@ static int progressRecv(commtask *ctp)
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
 
-  ctp->partner = stat.MPI_SOURCE;
-  ctp->tag = stat.MPI_TAG;
   fprintf(stderr, "[HHMPI(R):progressRecv@p%d] progress! (src=%d, tag=%d) %d/%d\n",
 	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor, psize);
 
   if (ctp->cursor == 0) {
     /* Now first header arrived. */
     /* Send ack */
-    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d. sending ACK!\n",
+    ctp->partner = stat.MPI_SOURCE;
+    ctp->tag = stat.MPI_TAG;
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] sending ACK for (src=%d, tag=%d)!\n",
 	    HH_MYID, ctp->partner, ctp->tag);
     MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
 	     ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
@@ -161,8 +161,8 @@ static int progressRecv(commtask *ctp)
   }
 
   if (ctp->cursor >= psize) {
-    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] finish! (%dbytes,src=%d,tag=%d)\n",
-	    HH_MYID, psize, stat.MPI_SOURCE, stat.MPI_TAG);
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] finish! (src=%d,tag=%d)\n",
+	    HH_MYID, ctp->partner, ctp->tag);
     free(ctp->commbuf);
     ctp->commbuf = NULL;
     ctp->ireq = MPI_REQUEST_NULL;
