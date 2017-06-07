@@ -22,7 +22,7 @@ enum {
   HHMR_RECV,
 };
 
-#define DEFAULT_CHUNKSIZE (1024*1024)
+#define HHMR_CHUNKSIZE (8*1024*1024)
 
 typedef struct {
   int count;
@@ -30,7 +30,7 @@ typedef struct {
 } commhdr;
 
 struct commtask {
-  commtask() {fin = 0;};
+  commtask() {fin = 0; cursor = 0; prev = 0; ireq = MPI_REQUEST_NULL; commbuf = NULL;};
   int kind;
   void *ptr;
   int count;
@@ -41,6 +41,9 @@ struct commtask {
 
   /* inner request */
   MPI_Request ireq;
+  void *commbuf;
+  int cursor;
+  int prev;
   commhdr hdr;
   int fin;
 };
@@ -79,51 +82,51 @@ static int progressSend(commtask *ctp)
 {
   int flag;
   MPI_Status stat;
+
+  assert(ctp->ireq != MPI_REQUEST_NULL);
+  assert(ctp->fin == 0);
   MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
-    fprintf(stderr, "[HHMPI(R):progressSend@p%d] src=%d, tag=%d. not yet...\n",
-	    HH_MYID, ctp->partner, ctp->tag);
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] src=%d, tag=%d. cursor=%d not yet...\n",
+	    HH_MYID, ctp->partner, ctp->tag, ctp->cursor);
     usleep(1);
 
     return 0;
   }
 
-  {
-    int count;
-    MPI_Get_count(&stat, MPI_BYTE, &count);
-    fprintf(stderr, "[HHMPI(R):progressSend@p%d] recvd ack (%dbytes,SOURCE=%d,TAG=%d) from %d\n",
-	    HH_MYID, count, stat.MPI_SOURCE, stat.MPI_TAG, ctp->partner);
-  }
+  fprintf(stderr, "[HHMPI(R):progressSend@p%d] progress! (src=%d,tag=%d,cursor=%d) from %d\n",
+	  HH_MYID, stat.MPI_SOURCE, stat.MPI_TAG, ctp->cursor, ctp->partner);
 
   /* divide original message and send */
-  int cur;
-  int chunksize = DEFAULT_CHUNKSIZE;
+  int chunksize = HHMR_CHUNKSIZE;
   int psize;
-
-  void *commbuf = malloc(chunksize);
-
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
-  /* we still assume data are contiguous */
-  for (cur = 0; cur < psize; cur += chunksize) {
-    int size = chunksize;
-    if (cur+size > psize) size = psize-cur;
 
-#if 1
-    /* read from heap structure */
-    HH_accessRec('R', piadd(ctp->ptr, cur), commbuf, HHM_HOST, size);
-#else
-    memcpy(commbuf, piadd(ctp->ptr, cur), size);
-#endif
-    /* This should be Isend, and returns for each send */
-    printf("[HHMPI(R):progressSend@p%d] calling Internal MPI_Send(%ldbytes,dst=%d,tag=%d)\n",
-	   HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
-    MPI_Send(commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
-	     ctp->comm);
+  if (ctp->cursor >= psize) {
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] finish! (%dbytes,src=%d,tag=%d)\n",
+	    HH_MYID, psize, stat.MPI_SOURCE, stat.MPI_TAG);
+    free(ctp->commbuf);
+    ctp->commbuf = NULL;
+    ctp->ireq = MPI_REQUEST_NULL;
+    ctp->fin = 1;
+    /* finished */
+    return 0;
   }
 
-  free(commbuf);
-  ctp->fin = 1;
+  int size = chunksize;
+  if (ctp->cursor+size > psize) size = psize-ctp->cursor;
+
+  /* read from heap structure */
+  HH_accessRec('R', piadd(ctp->ptr, ctp->cursor), ctp->commbuf, HHM_HOST, size);
+
+  printf("[HHMPI(R):progressSend@p%d] calling Internal MPI_Isend(%ldbytes,dst=%d,tag=%d)\n",
+	 HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
+  MPI_Isend(ctp->commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
+	    ctp->comm, &ctp->ireq);
+
+  ctp->cursor += size;
+
   return 0;
 }
 
@@ -131,11 +134,13 @@ static int progressRecv(commtask *ctp)
 {
   int flag;
   MPI_Status stat;
+  assert(ctp->ireq != MPI_REQUEST_NULL);
+  assert(ctp->fin == 0);
   MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
-    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] src=%d, tag=%d. not yet...\n",
-	    HH_MYID, ctp->partner, ctp->tag);
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] src=%d, tag=%d. cursor=%d, not yet...\n",
+	    HH_MYID, ctp->partner, ctp->tag, ctp->cursor);
     usleep(1);
 
     return 0;
@@ -144,42 +149,51 @@ static int progressRecv(commtask *ctp)
   /* Now first header arrived. */
   ctp->partner = stat.MPI_SOURCE;
   ctp->tag = stat.MPI_TAG;
-  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d. sending ack...\n",
-	  HH_MYID, ctp->partner, ctp->tag);
-  fflush(0);
-  /* Send ack */
-  MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
-	   ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
+  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d, cursor=%d.\n",
+	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor);
 
-  /* recv divided messages */
-  int cur;
-  int chunksize = DEFAULT_CHUNKSIZE;
-  int psize;
-  void *commbuf = malloc(chunksize);
-
-  MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
-  /* we still assume data are contiguous */
-  for (cur = 0; cur < psize; cur += chunksize) {
-    int size = chunksize;
-    MPI_Status stat;
-    if (cur+size > psize) size = psize-cur;
-
-    /* This should be Irecv, and returns for each send */
-    printf("[HHMPI(R):progressRecv@p%d] calling Internal MPI_Recv(%ldbytes,src=%d,tag=%d)\n",
-	   HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
-    MPI_Recv(commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
-	     ctp->comm, &stat);
-
-#if 1
-    /* write to heap structure */
-    HH_accessRec('W', piadd(ctp->ptr, cur), commbuf, HHM_HOST, size);
-#else
-    memcpy(piadd(ctp->ptr, cur), commbuf, size);
-#endif
+  if (ctp->cursor == 0) {
+    /* Send ack */
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d. sending ACK!\n",
+	    HH_MYID, ctp->partner, ctp->tag);
+    MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
+	     ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
   }
 
-  free(commbuf);
-  ctp->fin = 1;
+  /* recv divided messages */
+  int chunksize = HHMR_CHUNKSIZE;
+  int psize;
+  MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
+
+  if (ctp->cursor > 0) {
+    int size = ctp->cursor - ctp->prev;
+    assert(size >= 0 && size <= HHMR_CHUNKSIZE);
+    /* write to heap structure */
+    HH_accessRec('W', piadd(ctp->ptr, ctp->prev), ctp->commbuf, HHM_HOST, size);
+  }
+
+  if (ctp->cursor >= psize) {
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] finish! (%dbytes,src=%d,tag=%d)\n",
+	    HH_MYID, psize, stat.MPI_SOURCE, stat.MPI_TAG);
+    free(ctp->commbuf);
+    ctp->commbuf = NULL;
+    ctp->ireq = MPI_REQUEST_NULL;
+    ctp->fin = 1;
+    /* finished */
+    return 0;
+  }
+
+  int size = chunksize;
+  if (ctp->cursor+size > psize) size = psize-ctp->cursor;
+
+  printf("[HHMPI(R):progressRecv@p%d] calling Internal MPI_Irecv(%ldbytes,src=%d,tag=%d)\n",
+	 HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
+  MPI_Irecv(ctp->commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
+	    ctp->comm, &ctp->ireq);
+
+  ctp->prev = ctp->cursor;
+  ctp->cursor += size;
+
   return 0;
 }
 
@@ -234,6 +248,8 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   ctp->tag = tag;
   ctp->comm = comm;
 
+  ctp->commbuf = malloc(HHMR_CHUNKSIZE);
+
   fprintf(stderr, "[HHMPI_Isend(R)@p%d] called: dest=%d, tag=%d\n", 
 	  HH_MYID, dest, tag);
 
@@ -276,6 +292,8 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   ctp->partner = source;
   ctp->tag = tag;
   ctp->comm = comm;
+
+  ctp->commbuf = malloc(HHMR_CHUNKSIZE);
 
   fprintf(stderr, "[HHMPI_Irecv(R)@p%d] called: src=%d, tag=%d\n", 
 	  HH_MYID, source, tag);
