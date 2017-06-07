@@ -88,20 +88,13 @@ static int progressSend(commtask *ctp)
   MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
-    fprintf(stderr, "[HHMPI(R):progressSend@p%d] src=%d, tag=%d. cursor=%d not yet...\n",
-	    HH_MYID, ctp->partner, ctp->tag, ctp->cursor);
-    usleep(1);
-
     return 0;
   }
 
-  fprintf(stderr, "[HHMPI(R):progressSend@p%d] progress! (src=%d,tag=%d,cursor=%d) from %d\n",
-	  HH_MYID, stat.MPI_SOURCE, stat.MPI_TAG, ctp->cursor, ctp->partner);
-
-  /* divide original message and send */
-  int chunksize = HHMR_CHUNKSIZE;
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
+  fprintf(stderr, "[HHMPI(R):progressSend@p%d] progress! (src=%d,tag=%d) %d/%d\n",
+	  HH_MYID, stat.MPI_SOURCE, stat.MPI_TAG, ctp->cursor, psize);
 
   if (ctp->cursor >= psize) {
     fprintf(stderr, "[HHMPI(R):progressSend@p%d] finish! (%dbytes,src=%d,tag=%d)\n",
@@ -114,7 +107,8 @@ static int progressSend(commtask *ctp)
     return 0;
   }
 
-  int size = chunksize;
+  /* divide original message and send */
+  int size = HHMR_CHUNKSIZE;
   if (ctp->cursor+size > psize) size = psize-ctp->cursor;
 
   /* read from heap structure */
@@ -139,31 +133,25 @@ static int progressRecv(commtask *ctp)
   MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
-    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] src=%d, tag=%d. cursor=%d, not yet...\n",
-	    HH_MYID, ctp->partner, ctp->tag, ctp->cursor);
-    usleep(1);
-
     return 0;
   }
 
-  /* Now first header arrived. */
+  int psize;
+  MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
+
   ctp->partner = stat.MPI_SOURCE;
   ctp->tag = stat.MPI_TAG;
-  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d, cursor=%d.\n",
-	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor);
+  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] progress! (src=%d, tag=%d) %d/%d\n",
+	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor, psize);
 
   if (ctp->cursor == 0) {
+    /* Now first header arrived. */
     /* Send ack */
     fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d. sending ACK!\n",
 	    HH_MYID, ctp->partner, ctp->tag);
     MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
 	     ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
   }
-
-  /* recv divided messages */
-  int chunksize = HHMR_CHUNKSIZE;
-  int psize;
-  MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
 
   if (ctp->cursor > 0) {
     int size = ctp->cursor - ctp->prev;
@@ -183,7 +171,8 @@ static int progressRecv(commtask *ctp)
     return 0;
   }
 
-  int size = chunksize;
+  /* recv divided messages */
+  int size = HHMR_CHUNKSIZE;
   if (ctp->cursor+size > psize) size = psize-ctp->cursor;
 
   printf("[HHMPI(R):progressRecv@p%d] calling Internal MPI_Irecv(%ldbytes,src=%d,tag=%d)\n",
