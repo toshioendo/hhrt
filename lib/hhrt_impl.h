@@ -517,7 +517,7 @@ int HH_progressSched();
 int HH_sleepForMemory();
 int HH_swapOutIfOver();
 
-int HH_enterBlocking(const char *str);
+int HH_enterBlocking();
 int HH_exitBlocking();
 int HH_enterGComm(const char *str);
 int HH_exitGComm();

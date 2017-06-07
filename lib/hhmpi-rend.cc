@@ -13,16 +13,13 @@
 #include <map>
 using namespace std;
 
-#ifndef piadd
-#define piadd(p, i) (void*)((char*)(p) + (size_t)(i))
-#endif
-#ifndef ppsub
-#define ppsub(p1, p2) (size_t)((char*)(p1) - (char*)(p2))
-#endif
+#define HHMR_TAG_OFFS 15000
+#define HHMR_TAG_ACK(t) ((t)+HHMR_TAG_OFFS)
+#define HHMR_TAG_BODY(t) ((t)+HHMR_TAG_OFFS)
 
 enum {
-  HHRM_SEND = 200,
-  HHRM_RECV,
+  HHMR_SEND = 200,
+  HHMR_RECV,
 };
 
 #define DEFAULT_CHUNKSIZE (1024*1024)
@@ -85,7 +82,18 @@ static int progressSend(commtask *ctp)
   MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] src=%d, tag=%d. not yet...\n",
+	    HH_MYID, ctp->partner, ctp->tag);
+    usleep(1);
+
     return 0;
+  }
+
+  {
+    int count;
+    MPI_Get_count(&stat, MPI_BYTE, &count);
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] recvd ack (%dbytes,SOURCE=%d,TAG=%d) from %d\n",
+	    HH_MYID, count, stat.MPI_SOURCE, stat.MPI_TAG, ctp->partner);
   }
 
   /* divide original message and send */
@@ -108,8 +116,9 @@ static int progressSend(commtask *ctp)
     memcpy(commbuf, piadd(ctp->ptr, cur), size);
 #endif
     /* This should be Isend, and returns for each send */
-    printf("[HHR:progressSend] calling Internal MPI_Send\n");
-    MPI_Send(commbuf, size, MPI_BYTE, ctp->partner, ctp->tag,
+    printf("[HHMPI(R):progressSend@p%d] calling Internal MPI_Send(%ldbytes,dst=%d,tag=%d)\n",
+	   HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
+    MPI_Send(commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
 	     ctp->comm);
   }
 
@@ -125,17 +134,22 @@ static int progressRecv(commtask *ctp)
   MPI_Test(&ctp->ireq, &flag, &stat);
   if (flag == 0) {
     /* do nothing */
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] src=%d, tag=%d. not yet...\n",
+	    HH_MYID, ctp->partner, ctp->tag);
+    usleep(1);
+
     return 0;
   }
 
   /* Now first header arrived. */
   ctp->partner = stat.MPI_SOURCE;
   ctp->tag = stat.MPI_TAG;
-  fprintf(stderr, "[HHMPI(R):progressRecv] found src=%d, tag=%d\n",
-	  ctp->partner, ctp->tag);
+  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] found src=%d, tag=%d. sending ack...\n",
+	  HH_MYID, ctp->partner, ctp->tag);
+  fflush(0);
   /* Send ack */
   MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
-	   ctp->partner, ctp->tag, ctp->comm);
+	   ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
 
   /* recv divided messages */
   int cur;
@@ -151,8 +165,9 @@ static int progressRecv(commtask *ctp)
     if (cur+size > psize) size = psize-cur;
 
     /* This should be Irecv, and returns for each send */
-    printf("[HHMPI(R):progressRecv] calling Internal MPI_Recv\n");
-    MPI_Recv(commbuf, size, MPI_BYTE, ctp->partner, ctp->tag,
+    printf("[HHMPI(R):progressRecv@p%d] calling Internal MPI_Recv(%ldbytes,src=%d,tag=%d)\n",
+	   HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
+    MPI_Recv(commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
 	     ctp->comm, &stat);
 
 #if 1
@@ -176,10 +191,10 @@ static int progress1(commtask *ctp)
   }
 
   /* now ctp->hdr is valid */
-  if (ctp->kind == HHRM_SEND) {
+  if (ctp->kind == HHMR_SEND) {
     progressSend(ctp);
   }
-  else if (ctp->kind == HHRM_RECV) {
+  else if (ctp->kind == HHMR_RECV) {
     progressRecv(ctp);
   }
   else {
@@ -211,7 +226,7 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
 		int tag, MPI_Comm comm, HHMPI_Request *reqp)
 {
   commtask *ctp = new commtask;
-  ctp->kind = HHRM_SEND;
+  ctp->kind = HHMR_SEND;
   ctp->ptr = (void *)buf;
   ctp->count = count;
   ctp->datatype = datatype;
@@ -219,10 +234,12 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   ctp->tag = tag;
   ctp->comm = comm;
 
-  fprintf(stderr, "[HHMPI_Isend(R)] called: dest=%d, tag=%d\n", dest, tag);
+  fprintf(stderr, "[HHMPI_Isend(R)@p%d] called: dest=%d, tag=%d\n", 
+	  HH_MYID, dest, tag);
 
   if (!isTypeContiguous(datatype)) {
-    fprintf(stderr, "[HHRTMPI_Isend] non contiguous datatype is specified. not supported yet\n");
+    fprintf(stderr, "[HHRTMPI_Isend(R)@p%d] non contiguous datatype is specified. not supported yet\n",
+	    HH_MYID);
     exit(1);
   }
 
@@ -235,8 +252,12 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   /* We assume that hdr is enough small to eager communication works */
   MPI_Send((void*)&hdr, sizeof(commhdr), MPI_BYTE, dest, tag, comm);
   /* start to wait ack */
-  MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, dest, tag, comm, &ctp->ireq);
+  MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, dest, 
+	    HHMR_TAG_ACK(tag), comm, &ctp->ireq);
   /* finish of ctp->ireq should be checked later */
+
+  fprintf(stderr, "[HHMPI_Isend(R)@p%d] Irecv for ack--> request=0x%lx\n",
+	  HH_MYID, ctp->ireq);
 
   addCommTask(ctp);
   *((commtask **)reqp) = ctp;
@@ -248,7 +269,7 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 		int tag, MPI_Comm comm, HHMPI_Request *reqp)
 {
   commtask *ctp = new commtask;
-  ctp->kind = HHRM_RECV;
+  ctp->kind = HHMR_RECV;
   ctp->ptr = buf;
   ctp->count = count;
   ctp->datatype = datatype;
@@ -256,15 +277,20 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   ctp->tag = tag;
   ctp->comm = comm;
 
-  fprintf(stderr, "[HHMPI_Irecv(R)] called: src=%d, tag=%d\n", source, tag);
+  fprintf(stderr, "[HHMPI_Irecv(R)@p%d] called: src=%d, tag=%d\n", 
+	  HH_MYID, source, tag);
 
   if (!isTypeContiguous(datatype)) {
-    fprintf(stderr, "[HHMPI_Irecv] non contiguous datatype is specified. not supported yet\n");
+    fprintf(stderr, "[HHMPI_Irecv(R)@p%d] non contiguous datatype is specified. not supported yet\n",
+	    HH_MYID);
     exit(1);
   }
 
   /* Start recving the first header */
   MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, source, tag, comm, &ctp->ireq);
+
+  fprintf(stderr, "[HHMPI_Irecv(R)@p%d] Irecv for first hdr--> request=0x%lx\n",
+	  HH_MYID, ctp->ireq);
 
   addCommTask(ctp);
   *((commtask **)reqp) = ctp;
@@ -292,6 +318,8 @@ int HHMPI_Testall(int n, HHMPI_Request *reqs, int *flagp, MPI_Status *stats)
 
 int HHMPI_Waitall(int n, HHMPI_Request *reqs, MPI_Status *stats)
 {
+  HH_enterBlocking();
+
   do {
     int flag;
     int rc;
@@ -309,6 +337,8 @@ int HHMPI_Waitall(int n, HHMPI_Request *reqs, MPI_Status *stats)
 
     usleep(1);
   } while (1);
+
+  HH_exitBlocking();
   return MPI_SUCCESS;
 }
 

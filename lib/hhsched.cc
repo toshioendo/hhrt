@@ -252,21 +252,16 @@ int HH_sleepForMemory()
 
 
 
-int HH_enterBlocking(const char *str)
+int HH_enterBlocking()
 {
   if (HHL->in_api == 0) {
 #ifdef HHLOG_API
-    strcpy(HHL2->api_str, str);
-    fprintf(stderr, "[HH_enterBlocking@p%d] API [%s] start\n",
-	    HH_MYID, HHL2->api_str);
+    fprintf(stderr, "[HH_enterBlocking@p%d] [%.2lf] start\n",
+	    HH_MYID, Wtime_prt());
 #endif
     assert(HHL->pmode == HHP_RUNNING);
     HHL->pmode = HHP_BLOCKED;
     HH_profSetMode("BLOCKED");
-#ifdef HHLOG_API
-    fprintf(stderr, "[HH_enterBlocking@p%d] API [%s] end\n",
-	    HH_MYID, HHL2->api_str);
-#endif
   }
   HHL->in_api++;
   return 0;
@@ -282,8 +277,8 @@ int HH_exitBlocking()
     /* now I'm awake */
     assert(HHL->pmode == HHP_RUNNING);
 #ifdef HHLOG_API
-    fprintf(stderr, "[HH_exitBlocking@p%d] API [%s] end\n",
-	    HH_MYID, HHL2->api_str);
+    fprintf(stderr, "[HH_exitBlocking@p%d] [%.2lf] end\n",
+	    HH_MYID, Wtime_prt());
 #endif
   }
   return 0;

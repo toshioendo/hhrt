@@ -254,11 +254,12 @@ int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
   double st, et;
   MPI_Request *bakreqs;
   MPI_Status *bakstats;
-  HH_enterBlocking("HHMPI_Waitall");
 
   bakreqs = (MPI_Request*)malloc(sizeof(MPI_Request)*n);
   memcpy(bakreqs, reqs, sizeof(MPI_Request)*n);
   bakstats = (MPI_Status*)malloc(sizeof(MPI_Status)*n);
+
+  HH_enterBlocking();
 
   st = Wtime();
   HHMPI_Waitall_i(n, bakreqs, bakstats);
