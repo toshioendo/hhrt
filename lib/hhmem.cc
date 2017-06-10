@@ -716,7 +716,7 @@ int heap::swapIn()
 int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
 {
   if (swapping_kind != HHSW_NONE) {
-    fprintf(stderr, "[HH:%s::accessRec@p%d] this heap is now under %s. DANGEROUS!. try it later\n",
+    fprintf(stderr, "[HH:%s::accessRec@p%d] this heap is now under %s --> EBUSY\n",
 	    name, HH_MYID, hhsw_names[swapping_kind]);
     return HHSS_EBUSY;
   }
