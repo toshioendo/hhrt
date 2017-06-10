@@ -80,6 +80,7 @@ enum {
   HHSS_OK = 0, // swapping can be started
   HHSS_EBUSY, // swapping must be suspended since resource is unavailable
   HHSS_NONEED, // no need for swapping
+  HHSS_ERROR, // other errors
 };
 
 static const char *hhss_names[] = {

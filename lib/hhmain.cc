@@ -393,8 +393,8 @@ void HHstacktrace()
 /* for debug */
 void HHsighandler(int sn, siginfo_t *si, void *sc)
 {
-  fprintf(stderr, "[HHsighandler@p%d] SIGNAL %d received! pid=%d\n",
-	  HH_MYID, sn, getpid());
+  fprintf(stderr, "[HHsighandler@p%d] [%.3lf] SIGNAL %d received! pid=%d\n",
+	  HH_MYID, Wtime_prt(), sn, getpid());
   fprintf(stderr, "[HHsighandler@p%d] si_addr=%p\n",
 	  HH_MYID, si->si_addr);
 

@@ -715,25 +715,35 @@ int heap::swapIn()
 /* rwtype: 'W' or 'R' */
 int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
 {
+  if (swapping_kind != HHSW_NONE) {
+    fprintf(stderr, "[HH:%s::accessRec@p%d] this heap is now under %s. DANGEROUS!. try it later\n",
+	    name, HH_MYID, hhsw_names[swapping_kind]);
+    return HHSS_EBUSY;
+  }
+
   if (!doesInclude(tgt)) {
     fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: this heap does not include ptr %p. Check HHRT implementation\n",
 	    name, HH_MYID, tgt);
-    return -1;
+    return HHSS_ERROR;
   }
 
   if (swapped == 0) {
     /* not swapped */
+    int rc;
     if (rwtype == 'W') {
-      return writeSeq(ptr2offs(tgt), buf, bufkind, size);
+      rc = writeSeq(ptr2offs(tgt), buf, bufkind, size);
     }
     else if (rwtype == 'R') {
-      return readSeq(ptr2offs(tgt), buf, bufkind, size);
+      rc = readSeq(ptr2offs(tgt), buf, bufkind, size);
     }
     else {
       fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: unknown access type %c\n",
 	      name, HH_MYID, rwtype);
-      return -1;
+      rc = -1;
     }
+
+    if (rc != 0) return HHSS_ERROR;
+    else return HHSS_OK;
   }
 
   assert(lower != NULL);
@@ -743,13 +753,13 @@ int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
     // unknown pointer
     fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: this heap includes ptr %p, but invalid (maybe freed)\n",
 	    name, HH_MYID, tgt);
-    return -1;
+    return HHSS_ERROR;
   }
 
   if (mbp->soffs == (ssize_t)-1) {
     fprintf(stderr, "[HH:%s::accessRec@p%d] WARNING: this heap is swapped out, but ptr %p does not have destination\n",
 	    name, HH_MYID, tgt);
-    return -1;
+    return HHSS_ERROR;
   }
 
   ssize_t inneroffs = ptr2offs(tgt) - mbp->doffs; /* offset inside the object */

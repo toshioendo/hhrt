@@ -22,7 +22,7 @@ enum {
   HHMR_RECV,
 };
 
-#define HHMR_CHUNKSIZE (8*1024*1024)
+#define HHMR_CHUNKSIZE (16*1024*1024)
 
 typedef struct {
   int count;
@@ -30,7 +30,7 @@ typedef struct {
 } commhdr;
 
 struct commtask {
-  commtask() {fin = 0; cursor = 0; prev = 0; ireq = MPI_REQUEST_NULL; commbuf = NULL;};
+  commtask() {fin = 0; cursor = 0; curmem = 0; ireq = MPI_REQUEST_NULL; commbuf = NULL;};
   int kind;
   void *ptr;
   int count;
@@ -43,7 +43,7 @@ struct commtask {
   MPI_Request ireq;
   void *commbuf;
   int cursor;
-  int prev;
+  int curmem; // cursor for accessRec
   commhdr hdr;
   int fin;
 };
@@ -78,18 +78,23 @@ static int addCommTask(commtask *ctp)
   return 0;
 }
 
-static int progressSend(commtask *ctp)
+int progressSend(commtask *ctp)
 {
   int flag;
   MPI_Status stat;
 
-  assert(ctp->ireq != MPI_REQUEST_NULL);
   assert(ctp->fin == 0);
-  MPI_Test(&ctp->ireq, &flag, &stat);
-  if (flag == 0) {
-    /* do nothing */
-    return 0;
+
+  if (ctp->ireq != MPI_REQUEST_NULL) {
+    MPI_Test(&ctp->ireq, &flag, &stat);
+    if (flag == 0) {
+      /* do nothing */
+      return 0;
+    }
+    ctp->ireq = MPI_REQUEST_NULL;
   }
+
+  assert(ctp->ireq == MPI_REQUEST_NULL);
 
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
@@ -112,7 +117,14 @@ static int progressSend(commtask *ctp)
   if (ctp->cursor+size > psize) size = psize-ctp->cursor;
 
   /* read from heap structure */
-  HH_accessRec('R', piadd(ctp->ptr, ctp->cursor), ctp->commbuf, HHM_HOST, size);
+  int rc;
+  rc = HH_accessRec('R', piadd(ctp->ptr, ctp->cursor), ctp->commbuf, HHM_HOST, size);
+  if (rc != HHSS_OK) {
+    /* do nothing and retry accessRec later */
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] accessRec ('R', cur=%d) failes, retry...\n",
+	    HH_MYID, ctp->cursor);
+    return 0;
+  }
 
   printf("[HHMPI(R):progressSend@p%d] calling Internal MPI_Isend(%ldbytes,dst=%d,tag=%d)\n",
 	 HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
@@ -124,23 +136,49 @@ static int progressSend(commtask *ctp)
   return 0;
 }
 
-static int progressRecv(commtask *ctp)
+int progressRecv(commtask *ctp)
 {
   int flag;
   MPI_Status stat;
-  assert(ctp->ireq != MPI_REQUEST_NULL);
   assert(ctp->fin == 0);
-  MPI_Test(&ctp->ireq, &flag, &stat);
-  if (flag == 0) {
-    /* do nothing */
-    return 0;
+  assert(ctp->curmem <= ctp->cursor);
+
+  if (ctp->ireq != MPI_REQUEST_NULL) {
+    MPI_Test(&ctp->ireq, &flag, &stat);
+    if (flag == 0) {
+      /* do nothing */
+      return 0;
+    }
+    ctp->ireq = MPI_REQUEST_NULL;
   }
+
+  assert(ctp->ireq == MPI_REQUEST_NULL);
+
+  if (ctp->cursor > ctp->curmem) {
+    int size = ctp->cursor - ctp->curmem;
+    assert(size >= 0 && size <= HHMR_CHUNKSIZE);
+    /* write to heap structure */
+    int rc;
+    rc = HH_accessRec('W', piadd(ctp->ptr, ctp->curmem), ctp->commbuf, HHM_HOST, size);
+
+    if (rc != HHSS_OK) {
+      /* do nothing and retry accessRec later */
+      fprintf(stderr, "[HHMPI(R):progressRecv@p%d] accessRec ('W', cur=%d) failes, retry...\n",
+	      HH_MYID, ctp->cursor);
+      return 0;
+    }
+
+    /* write finished */
+    ctp->curmem = ctp->cursor;
+  }
+
+  assert(ctp->curmem == ctp->cursor);
 
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
 
-  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] progress! (src=%d, tag=%d) %d/%d\n",
-	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor, psize);
+  fprintf(stderr, "[HHMPI(R):progressRecv@p%d] progress! (src=%d, tag=%d) %d/%d/%d\n",
+	  HH_MYID, ctp->partner, ctp->tag, ctp->curmem, ctp->cursor, psize);
 
   if (ctp->cursor == 0) {
     /* Now first header arrived. */
@@ -151,13 +189,6 @@ static int progressRecv(commtask *ctp)
 	    HH_MYID, ctp->partner, ctp->tag);
     MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
 	     ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
-  }
-
-  if (ctp->cursor > 0) {
-    int size = ctp->cursor - ctp->prev;
-    assert(size >= 0 && size <= HHMR_CHUNKSIZE);
-    /* write to heap structure */
-    HH_accessRec('W', piadd(ctp->ptr, ctp->prev), ctp->commbuf, HHM_HOST, size);
   }
 
   if (ctp->cursor >= psize) {
@@ -171,7 +202,7 @@ static int progressRecv(commtask *ctp)
     return 0;
   }
 
-  /* recv divided messages */
+  /* start to recv divided messages */
   int size = HHMR_CHUNKSIZE;
   if (ctp->cursor+size > psize) size = psize-ctp->cursor;
 
@@ -180,13 +211,14 @@ static int progressRecv(commtask *ctp)
   MPI_Irecv(ctp->commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
 	    ctp->comm, &ctp->ireq);
 
-  ctp->prev = ctp->cursor;
+  assert(ctp->ireq != MPI_REQUEST_NULL);
+
   ctp->cursor += size;
 
   return 0;
 }
 
-static int progress1(commtask *ctp)
+int progress1(commtask *ctp)
 {
   if (ctp->fin) {
     /* already finished. do nothing */
