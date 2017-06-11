@@ -151,6 +151,7 @@ struct membuf {
 
 class heap;
 
+#if 0
 // parent of heap
 class memlayer {
  public:
@@ -168,13 +169,18 @@ class memlayer {
   char name[16]; /* for debug */
 
 };
-
+#endif
 
 /*************/
-class heap: public memlayer {
+class heap {
  public:
   heap(size_t size0);
   virtual int finalize();
+
+  virtual int addLower(heap *h);
+  virtual int addUpper(heap *h);
+  virtual int delLower(heap *h);
+  virtual int delUpper(heap *h);
 
   virtual void* alloc(size_t size);
   virtual int free(void *p);
@@ -216,6 +222,12 @@ class heap: public memlayer {
   virtual int madvise(void *p, size_t size, int kind);
 
   virtual int dump();
+
+  // description of memory layer tree
+  heap *lower;
+  heap *uppers[MAX_UPPERS];
+
+  char name[16]; /* for debug */
 
   list <membuf *> membufs;
   void *heapptr;

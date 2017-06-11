@@ -64,73 +64,16 @@ int HH_accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
   return rc;
 }
 
-// memlayer class 
-memlayer::memlayer()
+// heap class
+
+heap::heap(size_t heapsize0)
 {
+  /* init heap tree structure */
   lower = NULL; 
   for (int i = 0; i < MAX_UPPERS; i++) {
     uppers[i] = NULL;
   }
-}
 
-int memlayer::addLower(heap *h) 
-{
-  if (lower != NULL) {
-    fprintf(stderr, "[HH:%s::addLower@p%d] ERROR: lower set twice!\n",
-	    name, HH_MYID);
-    exit(1);
-  }
-  lower = h;
-  return 0;
-}
-
-int memlayer::delLower(heap *h) 
-{
-  if (lower != h) {
-    fprintf(stderr, "[HH:%s::delLower@p%d] ERROR: invalid layer (%s) specified!\n",
-	    name, HH_MYID, h->name);
-    exit(1);
-  }
-  lower = NULL;
-  return 0;
-}
-
-int memlayer::addUpper(heap *h)
-{
-  int i;
-  for (int i = 0; i < MAX_UPPERS; i++) {
-    if (uppers[i] == NULL) {
-      uppers[i] = h;
-      return 0;
-    }
-  }
-
-  fprintf(stderr, "[HH:%s::addUpper@p%d] ERROR: too many upper layer (>=%d)\n",
-	  HH_MYID, name, MAX_UPPERS);
-  exit(1);
-  return -1;
-}
-
-int memlayer::delUpper(heap *h)
-{
-  int i;
-  for (int i = 0; i < MAX_UPPERS; i++) {
-    if (uppers[i] == h) {
-      uppers[i] = NULL;
-      return 0;
-    }
-  }
-
-  fprintf(stderr, "[HH:%s::delUpper@p%d] ERROR: invalid layer (%s) specified!\n",
-	  HH_MYID, name, h->name);
-  exit(1);
-  return -1;
-}
-
-// heap class
-
-heap::heap(size_t heapsize0) : memlayer()
-{
   heapsize = roundup(heapsize0, HEAP_ALIGN); /* heap size */
 
   if (heapsize > (size_t)0) {
@@ -156,6 +99,60 @@ int heap::finalize()
   heapsize = 0;
 
   return 0;
+}
+
+int heap::addLower(heap *h) 
+{
+  if (lower != NULL) {
+    fprintf(stderr, "[HH:%s::addLower@p%d] ERROR: lower set twice!\n",
+	    name, HH_MYID);
+    exit(1);
+  }
+  lower = h;
+  return 0;
+}
+
+int heap::delLower(heap *h) 
+{
+  if (lower != h) {
+    fprintf(stderr, "[HH:%s::delLower@p%d] ERROR: invalid layer (%s) specified!\n",
+	    name, HH_MYID, h->name);
+    exit(1);
+  }
+  lower = NULL;
+  return 0;
+}
+
+int heap::addUpper(heap *h)
+{
+  int i;
+  for (int i = 0; i < MAX_UPPERS; i++) {
+    if (uppers[i] == NULL) {
+      uppers[i] = h;
+      return 0;
+    }
+  }
+
+  fprintf(stderr, "[HH:%s::addUpper@p%d] ERROR: too many upper layer (>=%d)\n",
+	  HH_MYID, name, MAX_UPPERS);
+  exit(1);
+  return -1;
+}
+
+int heap::delUpper(heap *h)
+{
+  int i;
+  for (int i = 0; i < MAX_UPPERS; i++) {
+    if (uppers[i] == h) {
+      uppers[i] = NULL;
+      return 0;
+    }
+  }
+
+  fprintf(stderr, "[HH:%s::delUpper@p%d] ERROR: invalid layer (%s) specified!\n",
+	  HH_MYID, name, h->name);
+  exit(1);
+  return -1;
 }
 
 void* heap::offs2ptr(ssize_t offs)
