@@ -149,27 +149,6 @@ struct membuf {
   ssize_t soffs; /* offset of swapped out buffer. if -1, not swapped out */
 };
 
-class heap;
-
-#if 0
-// parent of heap
-class memlayer {
- public:
-  memlayer();
-
-  virtual int addLower(heap *h);
-  virtual int addUpper(heap *h);
-  virtual int delLower(heap *h);
-  virtual int delUpper(heap *h);
-
-  // description of memory layer tree
-  heap *lower;
-  heap *uppers[MAX_UPPERS];
-
-  char name[16]; /* for debug */
-
-};
-#endif
 
 /*************/
 class heap {
