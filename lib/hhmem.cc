@@ -74,15 +74,7 @@ heap::heap(size_t heapsize0)
     uppers[i] = NULL;
   }
 
-  heapsize = roundup(heapsize0, HEAP_ALIGN); /* heap size */
-
-#if 0
-  if (heapsize > (size_t)0) {
-    /* a single large freed area */
-    membuf *mbp = new membuf(0L, heapsize, 0L, HHMADV_FREED);
-    membufs.push_back(mbp);
-  }
-#endif
+  heapsize = roundup(heapsize0, HEAP_ALIGN); /* initial heap size */
 
   swap_stat = HHSW_SWAPPED; // swapIn() should be called soon for first heap allocation
   strcpy(name, "(HEAP)");
@@ -217,24 +209,12 @@ void* heap::alloc(size_t size0)
       continue;
     }
     /* found */
-#if 1
     membuf *umbp = new membuf(mbp->ptr, size, size0, HHMADV_NORMAL);
-#else
-    membuf *umbp = new membuf(mbp->doffs, size, size0, HHMADV_NORMAL);
-#endif
     membufs.insert(it, umbp);
-#if 1
     p = mbp->ptr;
-#else
-    p = offs2ptr(mbp->doffs);
-#endif
 
     /* change the rest free buffer */
-#if 1
     mbp->ptr = piadd(mbp->ptr, size);
-#else
-    mbp->doffs += size;
-#endif
     mbp->size -= size;
     mbp->usersize = 0L;
     
@@ -277,17 +257,13 @@ void* heap::alloc(size_t size0)
 
 /* aux functions for cudaFree etc. */
 
-list<membuf *>::iterator heap::findMembufIter(void *ptr /*ssize_t doffs*/)
+list<membuf *>::iterator heap::findMembufIter(void *ptr)
 {
   list<membuf *>::iterator it;
   for (it = membufs.begin(); it != membufs.end(); it++) {
     /* scan all buffers in queue */
     membuf *mbp = *it;
-#if 1
     if (ptr >= mbp->ptr && ptr < piadd(mbp->ptr, mbp->size)) {
-#else
-    if (doffs >= mbp->doffs && doffs < mbp->doffs + mbp->size) {
-#endif
       return it;
     }
   }
@@ -296,22 +272,12 @@ list<membuf *>::iterator heap::findMembufIter(void *ptr /*ssize_t doffs*/)
 
 membuf *heap::findMembuf(void *p)
 {
-#if 1
   if (p < heapptr || p >= piadd(heapptr, heapsize)) {
     return NULL;
   }
 
   list<membuf *>::iterator it;
   it = findMembufIter(p);
-#else
-  ssize_t doffs = ptr2offs(p);
-  if (doffs < 0 || doffs >= heapsize) {
-    return NULL;
-  }
-
-  list<membuf *>::iterator it;
-  it = findMembufIter(doffs);
-#endif
   if (it == membufs.end()) {
     return NULL;
   }
@@ -322,23 +288,14 @@ membuf *heap::findMembuf(void *p)
 int heap::free(void *p)
 {
   if (p == NULL) return 0;
-#if 1
   if (p < heapptr || p >= piadd(heapptr, heapsize)) {
-#else
-  ssize_t doffs = ptr2offs(p);
-  if (doffs < 0 || doffs >= heapsize) {
-#endif
     fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is invalid (out of heap)\n",
 	    name, HH_MYID, p);
     return -1;
   }
 
   list<membuf *>::iterator it;
-#if 1
   it = findMembufIter(p);
-#else
-  it = findMembufIter(doffs);
-#endif
   if (it == membufs.end()) {
     fprintf(stderr, "[HH:heap(%s)::free@p%d] pointer %p is invalid (no such membuf)\n",
 	    name, HH_MYID, p);
@@ -353,15 +310,9 @@ int heap::free(void *p)
     return -1;
   }
 
-#if 1
   if (mbp->sptr != NULL) {
     // there may be replica in lower layer. this must be invalidated
     mbp->sptr = NULL;
-#else
-  if (mbp->soffs != (ssize_t)-1) {
-    // there may be replica in lower layer. this must be invalidated
-    mbp->soffs = (ssize_t)-1;
-#endif
     fprintf(stderr, "[HH:heap(%s)::free@p%d] WARNING: replica may be resident eternally. should be fixed\n",
 	    name, HH_MYID);
   }
@@ -376,18 +327,9 @@ int heap::free(void *p)
     membuf *prevmbp = *previt;
     if (prevmbp->kind == HHMADV_FREED) {
       // coalesching is possible
-#if 0
-      fprintf(stderr, "[HH:heap(%s)::free@p%d] try coalesce free area [%ld,%ld) and [%ld,%ld)\n",
-	      name, HH_MYID, prevmbp->doffs, prevmbp->doffs+prevmbp->size,
-	      mbp->doffs, mbp->doffs+mbp->size);
-#endif
 
       mbp->size += prevmbp->size;
-#if 1
       mbp->ptr = prevmbp->ptr;
-#else
-      mbp->doffs = prevmbp->doffs;
-#endif
 
       // delete prevmbp
       membufs.erase(previt);
@@ -402,11 +344,6 @@ int heap::free(void *p)
     membuf *nextmbp = *nextit;
     if (nextmbp->kind == HHMADV_FREED) {
       // coalescing is possible
-#if 0
-      fprintf(stderr, "[HH:heap(%s)::free@p%d] try coalesce free area [%ld,%ld) and [%ld,%ld)\n",
-	      name, HH_MYID, mbp->doffs, mbp->doffs+mbp->size,
-	      nextmbp->doffs, nextmbp->doffs+nextmbp->size);
-#endif
       mbp->size += nextmbp->size;
       // delete nextmbp
       membufs.erase(nextit);
@@ -617,7 +554,7 @@ int heap::swapOut()
 
 #if 1
   fprintf(stderr, "[HH:%s::swapOut@p%d] [%.2lf] start. heap region is [%p,%p)\n",
-	  name, HH_MYID, Wtime_conv_prt(t0), heapptr, offs2ptr(heapsize));
+	  name, HH_MYID, Wtime_conv_prt(t0), heapptr, piadd(heapptr, heapsize));
 #endif
 
   /* for all membufs */
@@ -626,29 +563,16 @@ int heap::swapOut()
     for (it = membufs.begin(); it != membufs.end(); it++) {
       /* scan all buffers in queue */
       membuf *mbp = *it;
-#if 1
       void *dp = mbp->ptr;
-#else
-      void *dp = offs2ptr(mbp->doffs);
-#endif
       if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
-#if 1
 	if (mbp->sptr == NULL) {
-#else
-	if (mbp->soffs == (ssize_t)-1) {
-#endif
 	  void *sp = lower->alloc(mbp->size);
 #if 0
 	  fprintf(stderr, "[HH:%s::swapOut@p%d] got pointer %p from %s\n",
 		  name, HH_MYID, sp, lower->name);
 #endif
-#if 1
 	  mbp->sptr = sp;
 	  lower->writeSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
-#else
-	  mbp->soffs = lower->ptr2offs(sp);
-	  lower->writeSeq(mbp->soffs, dp, memkind, mbp->size);
-#endif
 	  
 	  nmoved++;
 	  smoved += mbp->size;
@@ -662,11 +586,7 @@ int heap::swapOut()
       }
       else {
 	assert(mbp->kind == HHMADV_FREED || mbp->kind == HHMADV_CANDISCARD);
-#if 1
 	mbp->sptr = NULL;
-#else
-	mbp->soffs = (ssize_t)-1;
-#endif
 	nskipped++;
 	sskipped += mbp->size;
       }
@@ -735,28 +655,14 @@ int heap::swapIn()
     for (it = membufs.begin(); it != membufs.end(); it++) {
       /* scan all buffers in queue */
       membuf *mbp = *it;
-#if 1
       void *dp = mbp->ptr;
-#else
-      void *dp = offs2ptr(mbp->doffs);
-#endif
       if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
-#if 1
 	lower->readSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
-#else
-	lower->readSeq(mbp->soffs, dp, memkind, mbp->size);
-#endif
 
 	if (mbp->kind == HHMADV_NORMAL) {
 	  /* Discard replica in lower layer */
-#if 1
 	  lower->free(mbp->sptr);
 	  mbp->sptr = NULL;
-#else
-	  void *sp = lower->offs2ptr(mbp->soffs);
-	  lower->free(sp);
-	  mbp->soffs = (ssize_t)-1;
-#endif
 	}
 
 	nmoved++;
@@ -832,11 +738,7 @@ int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
     return HHSS_ERROR;
   }
 
-#if 1
   if (mbp->sptr == NULL) {
-#else
-  if (mbp->soffs == (ssize_t)-1) {
-#endif
     fprintf(stderr, "[HH:%s::accessRec@p%d] WARNING: this heap is swapped out, but ptr %p does not have destination\n",
 	    name, HH_MYID, tgt);
     return HHSS_ERROR;
@@ -846,16 +748,9 @@ int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
   fprintf(stderr, "[HH:%s::accessRec@p%d] delegate %c access to %s\n",
 	  name, HH_MYID, rwtype, lower->name);
 #endif
-#if 1
   ssize_t inneroffs = ppsub(tgt, mbp->ptr); /* offset inside the object */
   assert(inneroffs >= 0 && inneroffs+size <= mbp->size);
   int rc = lower->accessRec(rwtype, piadd(mbp->sptr, inneroffs), buf, bufkind, size);
-#else
-  ssize_t inneroffs = ptr2offs(tgt) - mbp->doffs; /* offset inside the object */
-  assert(inneroffs >= 0 && inneroffs+size <= mbp->size);
-  ssize_t soffs = mbp->soffs + inneroffs;
-  int rc = lower->accessRec(rwtype, lower->offs2ptr(soffs), buf, bufkind, size);
-#endif
 
   return rc;
 }
@@ -877,26 +772,15 @@ int heap::madvise(void *p, size_t size, int kind)
   if (kind == HHMADV_NORMAL) {
     mbp->kind = kind;
 
-#if 1
     if (mbp->sptr != NULL) {
       // there may be replica in lower layer. this must be invalidated
       mbp->sptr = NULL;
-#else
-    if (mbp->soffs != (ssize_t)-1) {
-      // there may be replica in lower layer. this must be invalidated
-      mbp->soffs = (ssize_t)-1;
-#endif
       fprintf(stderr, "[HH:%s::madvise@p%d] WARNING: replica may be resident eternally. should be fixed\n",
 	      name, HH_MYID);
     }
   }
   else if (kind == HHMADV_CANDISCARD || kind == HHMADV_READONLY) {
-#if 1
     if (p == mbp->ptr && size >= mbp->usersize) {
-#else
-    ssize_t doffs = ptr2offs(p);
-    if (doffs == mbp->doffs && size >= mbp->usersize) {
-#endif
       /* mark CANDISCARD if the whole region is specified */
       mbp->kind = kind;
     }
@@ -933,15 +817,9 @@ int heap::dump()
       strcpy(kind, "UNKNOWN");
     }
 
-#if 1
     fprintf(stderr, "  [%p,%p) --> %s\n",
 	    mbp->ptr, piadd(mbp->ptr, mbp->size),
 	    kind);
-#else
-    fprintf(stderr, "  [%p,%p) --> %s\n",
-	    offs2ptr(mbp->doffs), offs2ptr(mbp->doffs+mbp->size),
-	    kind);
-#endif
   }
   return 0;
 }
