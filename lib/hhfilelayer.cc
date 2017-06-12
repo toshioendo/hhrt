@@ -145,11 +145,7 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
   sprintf(name, "fileheap");
 
   expandable = 1;
-#if 1
   swap_stat = HHSW_NONE;
-#else
-  swapped = 0;
-#endif
 
   heapptr = FILEHEAP_PTR;
   align = 512L;
@@ -207,8 +203,6 @@ int fileheap::finalize()
 int fileheap::expandHeap(size_t reqsize)
 {
   size_t addsize;
-  void *p;
-  void *mapp;
   if (reqsize > FILEHEAP_STEP) {
     addsize = roundup(reqsize, FILEHEAP_STEP);
   }
@@ -218,11 +212,7 @@ int fileheap::expandHeap(size_t reqsize)
 
   /* expand succeeded */
   /* make a single large free area */
-#if 1
   membuf *mbp = new membuf(piadd(heapptr, heapsize), addsize, 0L, HHMADV_FREED);
-#else
-  membuf *mbp = new membuf(heapsize, addsize, 0L, HHMADV_FREED);
-#endif
   membufs.push_back(mbp);
 
 #if 1  
@@ -284,7 +274,6 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   }
 
   /* alignment */
-  //size = ((size+align-1)/align)*align;
   size = roundup(size, align);
 
   size_t lrc = write(sfd, ptr, size);

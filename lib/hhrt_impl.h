@@ -182,11 +182,11 @@ class heap {
   // scheduling swap
   virtual int checkSwapResSelf(int kind, int *pline) {};
   virtual int checkSwapResAsLower(int kind, int *pline) {};
-  virtual int checkSwapRes(int kind);
+  int checkSwapRes(int kind);
 
   virtual int reserveSwapResSelf(int kind) {};
   virtual int reserveSwapResAsLower(int kind) {};
-  virtual int reserveSwapRes(int kind);
+  int reserveSwapRes(int kind);
 
   int swapOut();
   int swapIn();
@@ -194,7 +194,7 @@ class heap {
 
   virtual int releaseSwapResSelf(int kind) {};
   virtual int releaseSwapResAsLower(int kind) {};
-  virtual int releaseSwapRes();
+  int releaseSwapRes();
 
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
