@@ -378,6 +378,7 @@ cudaError_t HHcudaMallocHost(void ** pp, size_t size)
 #endif
 
 /*****************************************************/
+#if 0
 // will be obsolete
 int HH_devLock()
 {
@@ -393,7 +394,9 @@ int HH_devUnlock()
   pthread_mutex_unlock(&d->userml);
   return 0;
 }
+#endif
 
+#if 0
 // will be obsolete
 int HH_devSetMode(int mode)
 {
@@ -413,6 +416,7 @@ int HH_devSetMode(int mode)
 
   return 0;
 }
+#endif
 
 cudaError_t HHcudaSetDevice(int devid)
 {
