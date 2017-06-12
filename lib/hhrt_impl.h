@@ -175,7 +175,8 @@ class heap {
 
   virtual int expandHeap(size_t reqsize);
   virtual int releaseHeap();
-  virtual int allocHeap();
+  virtual int allocHeapInner();
+  int allocHeap();
   virtual int restoreHeap();
 
   // scheduling swap
@@ -187,8 +188,8 @@ class heap {
   virtual int reserveSwapResAsLower(int kind) {};
   virtual int reserveSwapRes(int kind);
 
-  virtual int swapOut();
-  virtual int swapIn();
+  int swapOut();
+  int swapIn();
   virtual int doSwap();
 
   virtual int releaseSwapResSelf(int kind) {};
@@ -225,7 +226,7 @@ class devheap: public heap {
   virtual int finalize();
 
   virtual int releaseHeap();
-  virtual int allocHeap();
+  virtual int allocHeapInner();
   virtual int restoreHeap();
 
   virtual int checkSwapResSelf(int kind, int *pline);
@@ -255,7 +256,7 @@ class hostheap: public heap {
 
   virtual int expandHeap(size_t reqsize);
 
-  virtual int allocHeap();
+  virtual int allocHeapInner();
   virtual int releaseHeap();
   virtual int restoreHeap();
 
@@ -298,7 +299,7 @@ class fileheap: public heap {
 
   virtual int expandHeap(size_t reqsize);
 
-  virtual int allocHeap() {return 0;};
+  virtual int allocHeapInner() {return 0;};
   virtual int releaseHeap() {return 0;};
   virtual int restoreHeap() {return 0;};
 

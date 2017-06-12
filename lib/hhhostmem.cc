@@ -233,14 +233,13 @@ int hostheap::releaseHeap()
   return 0;
 }
 
-int hostheap::allocHeap()
+int hostheap::allocHeapInner()
 {
-  void *p;
   assert(heapptr == NULL);
 
   heapptr = HOSTHEAP_PTR;
 #if 01
-  fprintf(stderr, "[%s::allocHeap@p%d] heapptr is set to %p\n",
+  fprintf(stderr, "[%s::allocHeapInner@p%d] heapptr is set to %p\n",
 	  name, HH_MYID, heapptr);
 #endif
   if (heapsize == 0) { /* mmap(size=0) fails */
@@ -249,9 +248,11 @@ int hostheap::allocHeap()
 
   allocCapacity((size_t)0, heapsize);
 
+#if 0
   /* make a single large free area */
   membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
   membufs.push_back(mbp);
+#endif
 
   HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
 

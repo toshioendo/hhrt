@@ -610,10 +610,21 @@ int heap::swapOut()
   return 0;
 }
 
+int heap::allocHeapInner()
+{
+  fprintf(stderr, "HH:heap::allocHeapInner should not called\n");
+  exit(1);
+}
+
 int heap::allocHeap()
 {
-  fprintf(stderr, "HH:heap::allocHeap should not called\n");
-  exit(1);
+  allocHeapInner();
+
+  /* make a single large free area */
+  membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
+
+  return 0;
 }
 
 int heap::restoreHeap()

@@ -100,7 +100,7 @@ void *devheap::allocDevMem(size_t heapsize)
   return dp;
 }
 
-int devheap::allocHeap()
+int devheap::allocHeapInner()
 {
   void *dp;
 
@@ -116,7 +116,7 @@ int devheap::allocHeap()
 	  name, HH_MYID, heapsize, dp);
 #endif
 
-#if 1
+#if 0
   /* make a single large free area */
   membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
   membufs.push_back(mbp);
