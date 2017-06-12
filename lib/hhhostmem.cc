@@ -178,7 +178,11 @@ int hostheap::expandHeap(size_t reqsize)
   
   /* expand succeeded */
   /* make a single large free area */
+#if 1
+  membuf *mbp = new membuf(piadd(heapptr, heapsize), addsize, 0L, HHMADV_FREED);
+#else
   membuf *mbp = new membuf(heapsize, addsize, 0L, HHMADV_FREED);
+#endif
   membufs.push_back(mbp);
 
 #if 1  
@@ -244,6 +248,12 @@ int hostheap::allocHeap()
   }
 
   allocCapacity((size_t)0, heapsize);
+
+#if 1
+  /* make a single large free area */
+  membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
+#endif
 
   HH_addHostMemStat(HHST_HOSTHEAP, heapsize);
 

@@ -81,15 +81,15 @@ void *devheap::allocDevMem(size_t heapsize)
     else {
       crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
       if (crc != cudaSuccess) {
-	fprintf(stderr, "[HH:%s::allocHeap@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
+	fprintf(stderr, "[HH:%s::allocDevMem@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
 		name, HH_MYID, cudaGetErrorString(crc));
-	fprintf(stderr, "[HH:%s::allocHeap@p%d]  handle is ",
+	fprintf(stderr, "[HH:%s::allocDevMem@p%d]  handle is ",
 		name, HH_MYID);
 	HH_printMemHandle(stderr, &d->hp_handle);
 	fprintf(stderr, "\n");
 	int devid = -1;
 	cudaGetDevice(&devid);
-	fprintf(stderr, "[HH:%s::allocHeap@p%d]  current using dev %d\n",
+	fprintf(stderr, "[HH:%s::allocDevMem@p%d]  current using dev %d\n",
 		name, HH_MYID, devid);
 	exit(1);
       }
@@ -114,6 +114,12 @@ int devheap::allocHeap()
 #ifdef HHLOG_SWAP
   fprintf(stderr, "[HH:%s::allocHeap@p%d] Get heap (size=0x%lx) pointer first -> %p\n",
 	  name, HH_MYID, heapsize, dp);
+#endif
+
+#if 1
+  /* make a single large free area */
+  membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
 #endif
 
   /* Now we can access HEAPPTR */

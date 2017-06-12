@@ -138,17 +138,29 @@ struct fsdir {
 };
 
 struct membuf {
+#if 1
+  membuf(void *ptr0, size_t size0, size_t usersize0, int kind0) {
+    ptr = ptr0; size = size0; usersize = usersize0;
+    kind = kind0; sptr = NULL;
+  }
+#else
   membuf(ssize_t doffs0, size_t size0, size_t usersize0, int kind0) {
     doffs = doffs0; size = size0; usersize = usersize0;
     kind = kind0; soffs = (ssize_t)-1;
   }
+#endif
 
+#if 1
+  void *ptr;
+  void *sptr; /* pointer of swapped out buffer. if NULL, not swapped out */
+#else
   ssize_t doffs; /* offset is used instead of address */
+  ssize_t soffs; /* offset of swapped out buffer. if -1, not swapped out */
+#endif
   size_t size;
   size_t usersize; // valid if used by user. alignup(usersize) == size
   int kind; /* HHM_* */
 
-  ssize_t soffs; /* offset of swapped out buffer. if -1, not swapped out */
 };
 
 
@@ -167,7 +179,7 @@ class heap {
   virtual int free(void *p);
   virtual size_t getobjsize(void *p);
 
-  virtual list<membuf *>::iterator findMembufIter(ssize_t doffs);
+  virtual list<membuf *>::iterator findMembufIter(void *ptr /*ssize_t doffs*/);
   virtual membuf *findMembuf(void *p);
 
   virtual void* offs2ptr(ssize_t offs);
