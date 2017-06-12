@@ -65,12 +65,14 @@ enum {
   HHSW_NONE = 0,
   HHSW_OUT,
   HHSW_IN,
+  HHSW_SWAPPED,
 };
 
 static const char *hhsw_names[] = {
   "NONE",
   "SWOUT",
   "SWIN",
+  "SWPD",
   "XXX",
   NULL,
 };
@@ -214,8 +216,11 @@ class heap {
   size_t align;
   int expandable;
   int memkind; // HHM_*
+  int swap_stat; // HHSW_*
+#if 0
   int swapped;
   int swapping_kind;
+#endif
 };
 
 #ifdef USE_CUDA

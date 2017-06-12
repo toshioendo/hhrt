@@ -252,7 +252,6 @@ int devheap::releaseSwapResSelf(int kind)
     exit(1);
   }
 
-  //swapping_kind = HHSW_NONE;
   return 0;
 }
 

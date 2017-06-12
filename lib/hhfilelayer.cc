@@ -145,7 +145,11 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
   sprintf(name, "fileheap");
 
   expandable = 1;
+#if 1
+  swap_stat = HHSW_NONE;
+#else
   swapped = 0;
+#endif
 
   heapptr = FILEHEAP_PTR;
   align = 512L;
