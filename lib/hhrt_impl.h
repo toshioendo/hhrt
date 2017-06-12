@@ -276,8 +276,6 @@ class hostheap: public heap {
   int swapfd;
   int mmapflags;
 
-  //size_t copyunit;
-  //void *copybufs[2];
 #ifdef USE_CUDA
   cudaStream_t copystream;
 #endif

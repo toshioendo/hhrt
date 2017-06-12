@@ -213,7 +213,6 @@ int devheap::reserveSwapResSelf(int kind)
     exit(1);
   }
 
-  swapping_kind = kind; // remember the kind
   return 0;
 }
 

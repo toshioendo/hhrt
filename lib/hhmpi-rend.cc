@@ -123,6 +123,7 @@ int progressSend(commtask *ctp)
     /* do nothing and retry accessRec later */
     fprintf(stderr, "[HHMPI(R):progressSend@p%d] accessRec ('R', cur=%d) failes, retry...\n",
 	    HH_MYID, ctp->cursor);
+    usleep(10000);
     return 0;
   }
 
@@ -165,6 +166,7 @@ int progressRecv(commtask *ctp)
       /* do nothing and retry accessRec later */
       fprintf(stderr, "[HHMPI(R):progressRecv@p%d] accessRec ('W', cur=%d) failes, retry...\n",
 	      HH_MYID, ctp->cursor);
+      usleep(10000);
       return 0;
     }
 
