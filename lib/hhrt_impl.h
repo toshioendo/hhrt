@@ -217,10 +217,6 @@ class heap {
   int expandable;
   int memkind; // HHM_*
   int swap_stat; // HHSW_*
-#if 0
-  int swapped;
-  int swapping_kind;
-#endif
 };
 
 #ifdef USE_CUDA

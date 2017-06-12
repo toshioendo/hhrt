@@ -82,12 +82,7 @@ heap::heap(size_t heapsize0)
     membufs.push_back(mbp);
   }
 
-#if 1
-  swap_stat = HHSW_SWAPPED;
-#else
-  swapping_kind = HHSW_NONE;
-  swapped = 1;
-#endif
+  swap_stat = HHSW_SWAPPED; // swapIn() should be called soon for first heap allocation
   strcpy(name, "(HEAP)");
 
   return;
@@ -410,11 +405,7 @@ int heap::checkSwapRes(int kind)
   int line = -999; // debug
   int line2 = -9999;
 
-#if 1
   if (swap_stat == HHSW_IN || swap_stat == HHSW_OUT) {
-#else
-  if (swapping_kind != HHSW_NONE) {
-#endif
     // already swapping is ongoing (this happens in threaded swap)
     res = HHSS_EBUSY;
     line = __LINE__;
@@ -426,11 +417,7 @@ int heap::checkSwapRes(int kind)
       line == __LINE__;
       goto out;
     }
-#if 1
     else if (swap_stat == HHSW_SWAPPED) {
-#else
-    else if (swapped) {
-#endif
       // swapping-out was already done
       res = HHSS_NONEED;
       line = __LINE__;
@@ -441,11 +428,7 @@ int heap::checkSwapRes(int kind)
       int ih;
       for (ih = 0; ih < MAX_UPPERS; ih++) {
 	heap *h = uppers[ih];
-#if 1
 	if (h != NULL && h->swap_stat != HHSW_SWAPPED) {
-#else
-	if (h != NULL && h->swapped == 0) {
-#endif
 	  break;
 	}
       }
@@ -464,11 +447,7 @@ int heap::checkSwapRes(int kind)
       line == __LINE__;
       goto out;
     }
-#if 1
     else if (swap_stat == HHSW_NONE) {
-#else
-    else if (swapped == 0) {
-#endif
       // swapping-in was already done
       res = HHSS_NONEED;
       line = __LINE__;
@@ -477,11 +456,7 @@ int heap::checkSwapRes(int kind)
     else {
       // check lower heap
       heap *h = lower;
-#if 1
       if (h != NULL && h->swap_stat == HHSW_SWAPPED) {
-#else
-      if (h != NULL && h->swapped) {
-#endif
 	// we have to wait lower heap's swapping-in
 	res = HHSS_EBUSY;
 	line = __LINE__;
@@ -539,21 +514,13 @@ int heap::reserveSwapRes(int kind)
     lower->reserveSwapResAsLower(kind);
   }
 
-#if 1
   swap_stat = kind; // remember the kind for following doSwap()
-#else
-  swapping_kind = kind; // remember the kind for following doSwap()
-#endif
   return 0;
 }
 
 int heap::doSwap()
 {
-#if 1
   int kind = swap_stat;
-#else
-  int kind = swapping_kind;
-#endif
   assert(kind == HHSW_IN || kind == HHSW_OUT);
 
   HH_profBeginAction(hhsw_names[kind]);
@@ -574,11 +541,7 @@ int heap::doSwap()
 
 int heap::releaseSwapRes()
 {
-#if 1
   int kind = swap_stat;
-#else
-  int kind = swapping_kind;
-#endif
   assert(kind == HHSW_IN || kind == HHSW_OUT);
 
   releaseSwapResSelf(kind);
@@ -586,16 +549,12 @@ int heap::releaseSwapRes()
     lower->releaseSwapResAsLower(kind);
   }
 
-#if 1
   if (kind == HHSW_IN) {
     swap_stat = HHSW_NONE;
   }
   else if (kind == HHSW_OUT) {
     swap_stat = HHSW_SWAPPED;
   }
-#else
-  swapping_kind = HHSW_NONE; // swap finished
-#endif
 
   return 0;
 }
@@ -664,9 +623,6 @@ int heap::swapOut()
   }
 #endif
 
-#if 0
-  swapped = 1;
-#endif
   releaseHeap();
 
   return 0;
@@ -696,11 +652,9 @@ int heap::swapIn()
   }
   assert(swap_stat == HHSW_IN);
 
-  if (heapptr == NULL) { // firstswapin
+  if (heapptr == NULL) { // first heap allocation
+    // here, lower may be NULL
     allocHeap();
-#if 0
-    swapped = 0;
-#endif
 #ifdef HHLOG_SWAP
     fprintf(stderr, "[HH:%s::swapIn@p%d] allocHeap() called for first swapin. swapIn finished immediately\n",
 	    name, HH_MYID);
@@ -708,27 +662,8 @@ int heap::swapIn()
     return 0;
   }
 
-  if ( lower == NULL ) {
-#if 0
-    swapped = HHSW_NONE;
-#endif
-    assert(0);
-    return 0;
-  }
-  
-#if 1
-  if ( swap_stat == HHSW_NONE) {
-#else
-  if ( swapped == 0) {
-#endif
-    assert(0);
-    return 0;
-  }
-  
+  assert(lower != NULL);
   assert(heapptr != NULL);
-#if 0
-  swapped = 0;
-#endif
   restoreHeap();
 
   t0 = Wtime();
@@ -781,11 +716,7 @@ int heap::swapIn()
 /* rwtype: 'W' or 'R' */
 int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
 {
-#if 1
   if (swap_stat == HHSW_IN || swap_stat == HHSW_OUT) {
-#else
-  if (swapping_kind != HHSW_NONE) {
-#endif
     fprintf(stderr, "[HH:%s::accessRec@p%d] this heap is now under %s --> EBUSY\n",
 	    name, HH_MYID, hhsw_names[swap_stat /*swaping_kind*/]);
     return HHSS_EBUSY;
@@ -797,11 +728,7 @@ int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
     return HHSS_ERROR;
   }
 
-#if 1
   if (swap_stat == HHSW_NONE) {
-#else
-  if (swapped == 0) {
-#endif
     /* not swapped */
     int rc;
     if (rwtype == 'W') {
