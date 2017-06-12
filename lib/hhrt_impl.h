@@ -384,7 +384,6 @@ struct proc {
   int pid;
   int curfsdirid; /* fileswap dir id now this process is using (constant) */
   int pmode; /* process mode: HHP_* */
-  int devmode; /* device usage mode: specified by HH_devSetMode */
   int in_api; /* 0: usual, >=1: in API */
 
 #ifdef USE_CUDA

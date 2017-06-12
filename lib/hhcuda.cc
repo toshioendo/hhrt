@@ -328,12 +328,7 @@ cudaError_t HHcudaMalloc(void **pp, size_t size)
 {
   HH_cudaCheckDev();
 
-  void *p = NULL;
-
-  if (HHL->devmode == HHDEV_NORMAL) {
-  }
-
-  p = HH_curdevheap()->alloc(size);
+  void *p = HH_curdevheap()->alloc(size);
   *pp = p;
   return cudaSuccess;
 }
@@ -374,47 +369,6 @@ cudaError_t HHcudaMallocHost(void ** pp, size_t size)
   HH_cudaCheckDev();
 
   return HHcudaHostAlloc(pp, size, cudaHostAllocDefault);
-}
-#endif
-
-/*****************************************************/
-#if 0
-// will be obsolete
-int HH_devLock()
-{
-  dev *d = HH_curdev();
-  pthread_mutex_lock(&d->userml);
-  return 0;
-}
-
-// will be obsolete
-int HH_devUnlock()
-{
-  dev *d = HH_curdev();
-  pthread_mutex_unlock(&d->userml);
-  return 0;
-}
-#endif
-
-#if 0
-// will be obsolete
-int HH_devSetMode(int mode)
-{
-  HH_cudaCheckDev();
-
-  assert(HHL->pmode == HHP_RUNNING);
-  int prevmode = HHL->devmode;
-  HHL->devmode = mode;
-  if (prevmode == HHDEV_NOTUSED && mode == HHDEV_NORMAL) {
-    /* This may incur swap in */
-#ifdef HHLOG_SCHED
-    fprintf(stderr, "[HH_devSetMode@p%d] calling sleepForMemory...\n",
-	    HH_MYID);
-#endif
-    HH_sleepForMemory();
-  }
-
-  return 0;
 }
 #endif
 

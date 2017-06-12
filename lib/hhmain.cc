@@ -212,7 +212,6 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   /* default mode */
   HHL->pmode = HHP_RUNNABLE;
-  HHL->devmode = HHDEV_NORMAL;
   HHL->in_api = 0;
 
   /* statistics */
