@@ -247,7 +247,7 @@ class devheap: public heap {
   virtual int writeSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
   virtual int readSeq(ssize_t offs, void *buf, int bufkind, size_t size) {};
 
-  void *allocDevMem(size_t heapsize);
+  void *allocCapacity(size_t dummy, size_t heapsize);
   void *hp_baseptr;
   dev *device;
 };
@@ -300,7 +300,7 @@ class fileheap: public heap {
 
   virtual int finalize();
 
-  virtual int expandHeapInner(size_t addsize);
+  virtual int expandHeapInner(size_t addsize) {return 0;};
   virtual int allocHeapInner() {return 0;};
   virtual int releaseHeap() {return 0;};
   virtual int restoreHeap() {return 0;};

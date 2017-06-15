@@ -201,33 +201,6 @@ int fileheap::finalize()
   return 0;
 }
 
-int fileheap::expandHeapInner(size_t reqsize)
-{
-#if 0
-  size_t addsize;
-  if (reqsize > FILEHEAP_STEP) {
-    addsize = roundup(reqsize, FILEHEAP_STEP);
-  }
-  else {
-    addsize = FILEHEAP_STEP;
-  }
-
-  /* expand succeeded */
-  /* make a single large free area */
-  membuf *mbp = new membuf(piadd(heapptr, heapsize), addsize, 0L, HHMADV_FREED);
-  membufs.push_back(mbp);
-
-#if 1  
-  fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
-	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
-#endif
-
-  heapsize += addsize;
-#endif
-  
-  return 0;
-}
-
 
 int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
 {

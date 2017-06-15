@@ -57,17 +57,10 @@ int devheap::finalize()
   return 0;
 }
 
-int devheap::releaseHeap()
-{
-  assert(heapptr != NULL);
-  // do nothing
-
-  return 0;
-}
-
+/*************************************/
 int HH_printMemHandle(FILE *out, cudaIpcMemHandle_t *handle);
 
-void *devheap::allocDevMem(size_t heapsize)
+void *devheap::allocCapacity(size_t dummy, size_t heapsize)
 {
   dev *d = device;
   cudaError_t crc;
@@ -81,15 +74,15 @@ void *devheap::allocDevMem(size_t heapsize)
     else {
       crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
       if (crc != cudaSuccess) {
-	fprintf(stderr, "[HH:%s::allocDevMem@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
+	fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
 		name, HH_MYID, cudaGetErrorString(crc));
-	fprintf(stderr, "[HH:%s::allocDevMem@p%d]  handle is ",
+	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  handle is ",
 		name, HH_MYID);
 	HH_printMemHandle(stderr, &d->hp_handle);
 	fprintf(stderr, "\n");
 	int devid = -1;
 	cudaGetDevice(&devid);
-	fprintf(stderr, "[HH:%s::allocDevMem@p%d]  current using dev %d\n",
+	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  current using dev %d\n",
 		name, HH_MYID, devid);
 	exit(1);
       }
@@ -106,7 +99,7 @@ int devheap::allocHeapInner()
 
   assert(heapptr == NULL);
 
-  dp = allocDevMem(heapsize);
+  dp = allocCapacity(0L, heapsize);
   assert(dp != NULL);
 
   /* first swapin */
@@ -116,13 +109,15 @@ int devheap::allocHeapInner()
 	  name, HH_MYID, heapsize, dp);
 #endif
 
-#if 0
-  /* make a single large free area */
-  membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
-  membufs.push_back(mbp);
-#endif
-
   /* Now we can access HEAPPTR */
+  return 0;
+}
+
+int devheap::releaseHeap()
+{
+  assert(heapptr != NULL);
+  // do nothing
+
   return 0;
 }
 
@@ -133,7 +128,7 @@ int devheap::restoreHeap()
 
   assert(heapptr != NULL);
 
-  dp = allocDevMem(heapsize);
+  dp = allocCapacity(0L, heapsize);
   assert(dp != NULL);
 
   if (heapptr != dp) {
