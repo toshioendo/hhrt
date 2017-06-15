@@ -566,7 +566,8 @@ int heap::swapOut()
 		  name, HH_MYID, sp, lower->name);
 #endif
 	  mbp->sptr = sp;
-	  lower->writeSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
+	  //lower->writeSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
+	  lower->writeSeq(mbp->sptr, dp, memkind, mbp->size);
 	  
 	  nmoved++;
 	  smoved += mbp->size;
@@ -698,7 +699,8 @@ int heap::swapIn()
       membuf *mbp = *it;
       void *dp = mbp->ptr;
       if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
-	lower->readSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
+	//lower->readSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
+	lower->readSeq(mbp->sptr, dp, memkind, mbp->size);
 
 	if (mbp->kind == HHMADV_NORMAL) {
 	  /* Discard replica in lower layer */
@@ -754,10 +756,12 @@ int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
     /* not swapped */
     int rc;
     if (rwtype == 'W') {
-      rc = writeSeq(ptr2offs(tgt), buf, bufkind, size);
+      //rc = writeSeq(ptr2offs(tgt), buf, bufkind, size);
+      rc = writeSeq(tgt, buf, bufkind, size);
     }
     else if (rwtype == 'R') {
-      rc = readSeq(ptr2offs(tgt), buf, bufkind, size);
+      //rc = readSeq(ptr2offs(tgt), buf, bufkind, size);
+      rc = readSeq(tgt, buf, bufkind, size);
     }
     else {
       fprintf(stderr, "[HH:%s::accessRec@p%d] ERROR: unknown access type %c\n",

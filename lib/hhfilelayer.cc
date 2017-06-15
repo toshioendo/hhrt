@@ -13,7 +13,7 @@
 
 /* constants */
 #define FILEHEAP_STEP (256L*1024*1024)
-#define FILEHEAP_PTR ((void*)512) // the pointer is not accessed
+#define FILEHEAP_PTR ((void*)(256L*1024*1024)) // the pointer is not accessed
 
 
 int HH_fileInitNode(hhconf *confp)
@@ -266,8 +266,9 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
-int fileheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
+int fileheap::writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size)
 {
+  ssize_t offs = ptr2offs(tgt);
   openSFileIfNotYet();
 
 #if 0
@@ -375,8 +376,9 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
-int fileheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
+int fileheap::readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size)
 {
+  ssize_t offs = ptr2offs(tgt);
   openSFileIfNotYet();
 
   size_t cur;

@@ -340,18 +340,13 @@ int hostheap::releaseSwapResAsLower(int kind)
 }
 
 // copy from contiguous region to contiguous region
-int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
+int hostheap::writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size)
 {
-  void *hp = offs2ptr(offs);
+  void *hp = tgt; //offs2ptr(offs);
 #ifdef USE_CUDA
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
 #else
   assert(bufkind == HHM_HOST);
-#endif
-
-#if 0
-  fprintf(stderr, "[HH:hostheap::write_s@p%d] called: hscid=%d, loffs=0x%lx <- [%p,%p) (size=0x%lx)\n",
-	  HH_MYID, hscid, loffs, buf, piadd(buf, size), size);
 #endif
 
 #ifdef USE_CUDA
@@ -375,9 +370,9 @@ int hostheap::writeSeq(ssize_t offs, void *buf, int bufkind, size_t size)
   return 0;
 }
 
-int hostheap::readSeq(ssize_t offs, void *buf, int bufkind, size_t size)
+int hostheap::readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size)
 {
-  void *hp = offs2ptr(offs);
+  void *hp = tgt; //offs2ptr(offs);
 #ifdef USE_CUDA
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
 #else
