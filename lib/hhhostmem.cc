@@ -71,6 +71,7 @@ int HH_printHostMemStat()
 hostheap::hostheap() : heap(0L)
 {
   expandable = 1;
+  expand_step = HOSTHEAP_STEP;
 
   heapptr = NULL;
   align = 512L;
@@ -162,30 +163,36 @@ void *hostheap::allocCapacity(size_t offset, size_t size)
   return resp;
 }
 
-int hostheap::expandHeap(size_t reqsize)
+int hostheap::expandHeapInner(size_t addsize /*reqsize*/)
 {
+#if 0
   size_t addsize;
-  if (reqsize > HOSTHEAP_STEP) {
-    addsize = roundup(reqsize, HOSTHEAP_STEP);
+  if (reqsize > expand_step) {
+    addsize = roundup(reqsize, expand_step);
   }
   else {
-    addsize = HOSTHEAP_STEP;
+    addsize = expand_step;
   }
+#endif
 
   allocCapacity(heapsize, addsize);
   
-  /* expand succeeded */
-  /* make a single large free area */
-  membuf *mbp = new membuf(piadd(heapptr, heapsize), addsize, 0L, HHMADV_FREED);
-  membufs.push_back(mbp);
+  HH_addHostMemStat(HHST_HOSTHEAP, addsize);
 
+#if 0
 #if 1  
   fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
 	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
 #endif
+
   heapsize += addsize;
-  HH_addHostMemStat(HHST_HOSTHEAP, addsize);
-  
+
+  /* expand succeeded */
+  /* make a single large free area */
+  membuf *mbp = new membuf(piadd(heapptr, heapsize), addsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
+#endif
+
   return 0;
 }
 

@@ -173,7 +173,8 @@ class heap {
   virtual ssize_t ptr2offs(void* p);
   virtual int doesInclude(void* p);
 
-  virtual int expandHeap(size_t reqsize);
+  virtual int expandHeapInner(size_t addsize);
+  int expandHeap(size_t reqsize);
   virtual int releaseHeap();
   virtual int allocHeapInner();
   int allocHeap();
@@ -215,6 +216,8 @@ class heap {
   size_t heapsize;
   size_t align;
   int expandable;
+  size_t expand_step;
+
   int memkind; // HHM_*
   int swap_stat; // HHSW_*
 };
@@ -225,6 +228,7 @@ class devheap: public heap {
   devheap(size_t size0, dev *device0);
   virtual int finalize();
 
+  virtual int expandHeapInner(size_t addsize) {return -1;};
   virtual int releaseHeap();
   virtual int allocHeapInner();
   virtual int restoreHeap();
@@ -254,8 +258,7 @@ class hostheap: public heap {
   hostheap();
   virtual int finalize();
 
-  virtual int expandHeap(size_t reqsize);
-
+  virtual int expandHeapInner(size_t addsize);
   virtual int allocHeapInner();
   virtual int releaseHeap();
   virtual int restoreHeap();
@@ -297,8 +300,7 @@ class fileheap: public heap {
 
   virtual int finalize();
 
-  virtual int expandHeap(size_t reqsize);
-
+  virtual int expandHeapInner(size_t addsize);
   virtual int allocHeapInner() {return 0;};
   virtual int releaseHeap() {return 0;};
   virtual int restoreHeap() {return 0;};

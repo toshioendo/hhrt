@@ -364,12 +364,6 @@ size_t heap::getobjsize(void *p)
   return mbp->usersize;
 }
 
-int heap::expandHeap(size_t reqsize)
-{
-  fprintf(stderr, "heap::expandHeap should not called\n");
-  exit(1);
-}
-
 int heap::releaseHeap()
 {
   fprintf(stderr, "heap::releaseHeap should not called\n");
@@ -623,6 +617,42 @@ int heap::allocHeap()
   /* make a single large free area */
   membuf *mbp = new membuf(heapptr, heapsize, 0L, HHMADV_FREED);
   membufs.push_back(mbp);
+
+  return 0;
+}
+
+int heap::expandHeapInner(size_t reqsize)
+{
+  fprintf(stderr, "HH:heap::expandHeapInner should not called\n");
+  exit(1);
+}
+
+
+int heap::expandHeap(size_t reqsize)
+{
+  assert(expandable);
+
+  size_t addsize;
+  if (reqsize > expand_step) {
+    addsize = roundup(reqsize, expand_step);
+  }
+  else {
+    addsize = expand_step;
+  }
+
+  expandHeapInner(addsize);
+
+  /* expand succeeded */
+  /* make a single large free area */
+  membuf *mbp = new membuf(piadd(heapptr, heapsize), addsize, 0L, HHMADV_FREED);
+  membufs.push_back(mbp);
+
+#if 1  
+  fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
+	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
+#endif
+
+  heapsize += addsize;
 
   return 0;
 }

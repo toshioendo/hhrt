@@ -145,6 +145,7 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
   sprintf(name, "fileheap");
 
   expandable = 1;
+  expand_step = FILEHEAP_STEP;
   swap_stat = HHSW_NONE;
 
   heapptr = FILEHEAP_PTR;
@@ -200,8 +201,9 @@ int fileheap::finalize()
   return 0;
 }
 
-int fileheap::expandHeap(size_t reqsize)
+int fileheap::expandHeapInner(size_t reqsize)
 {
+#if 0
   size_t addsize;
   if (reqsize > FILEHEAP_STEP) {
     addsize = roundup(reqsize, FILEHEAP_STEP);
@@ -219,7 +221,9 @@ int fileheap::expandHeap(size_t reqsize)
   fprintf(stderr, "[HH:%s::expandHeap@p%d] heap expand succeeded %ldMiB -> %ldMiB\n",
 	  name, HH_MYID, heapsize>>20, (heapsize + addsize)>>20);
 #endif
+
   heapsize += addsize;
+#endif
   
   return 0;
 }
