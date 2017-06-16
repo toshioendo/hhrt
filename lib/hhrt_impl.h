@@ -423,9 +423,7 @@ struct proc2 {
   heap *swapping_heap;
 #endif
 
-#if 0
-  std::map<MPI_Request, reqfin> reqfins;
-#endif
+  int ncurcomms; // only for HHMPI_REND. # of msg under actual transfer
 
   char api_str[64];
 #ifdef USE_MMAPSWAP
