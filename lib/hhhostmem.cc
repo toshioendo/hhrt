@@ -308,8 +308,10 @@ int hostheap::reserveSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
     HHL->host_use = 1;
+    HH_profBeginAction("F2H");
   }
   else if (kind == HHSW_OUT) {
+    HH_profBeginAction("H2F");
   }
 
   return 0;
@@ -323,6 +325,7 @@ int hostheap::reserveSwapResAsLower(int kind)
 int hostheap::releaseSwapResSelf(int kind)
 {
   if (kind == HHSW_IN) {
+    HH_profEndAction("F2H");
   }
   else if (kind == HHSW_OUT) {
     HHL->host_use = 0;
@@ -330,6 +333,7 @@ int hostheap::releaseSwapResSelf(int kind)
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
 #endif
+    HH_profEndAction("H2F");
   }
   return 0;
 }

@@ -205,9 +205,11 @@ int devheap::reserveSwapResSelf(int kind)
 	    name, HH_MYID, Wtime_prt(), HHL->cuda.hpid);
 #endif
     device->np_in++;
+    HH_profBeginAction("H2D");
   }
   else if (kind == HHSW_OUT) {
     device->np_out++;
+    HH_profBeginAction("D2H");
   }
   else {
     assert(0);
@@ -232,6 +234,7 @@ int devheap::releaseSwapResSelf(int kind)
   // Release resource information after swapping
   if (kind == HHSW_IN) {
     device->np_in--;
+    HH_profEndAction("H2D");
   }
   else if (kind == HHSW_OUT) {
     device->np_out--;
@@ -247,6 +250,7 @@ int devheap::releaseSwapResSelf(int kind)
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release devslot[%d]\n",
 	    name, HH_MYID, Wtime_prt(), HHL->cuda.hpid);
 #endif
+    HH_profEndAction("D2H");
   }
   else {
     assert(0);

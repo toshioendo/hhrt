@@ -499,7 +499,7 @@ int heap::doSwap()
   int kind = swap_stat;
   assert(kind == HHSW_IN || kind == HHSW_OUT);
 
-  HH_profBeginAction(hhsw_names[kind]);
+  //HH_profBeginAction(hhsw_names[kind]);
   if (kind == HHSW_OUT) {
     swapOut();
   }
@@ -511,7 +511,7 @@ int heap::doSwap()
 	    name, HH_MYID, kind);
     exit(1);
   }
-  HH_profEndAction(hhsw_names[kind]);
+  //HH_profEndAction(hhsw_names[kind]);
   return 0;
 }
 
