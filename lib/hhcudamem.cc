@@ -244,7 +244,7 @@ int devheap::releaseSwapResSelf(int kind)
     assert(device->dhslot_users[HHL->cuda.hpid] == HH_MYID);
     device->dhslot_users[HHL->cuda.hpid] = -1;
 #ifdef HHLOG_SWAP
-    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release heap slot %d\n",
+    fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release devslot[%d]\n",
 	    name, HH_MYID, Wtime_prt(), HHL->cuda.hpid);
 #endif
   }

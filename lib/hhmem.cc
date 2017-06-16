@@ -741,8 +741,10 @@ int heap::swapIn()
 int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
 {
   if (swap_stat == HHSW_IN || swap_stat == HHSW_OUT) {
+#if 0
     fprintf(stderr, "[HH:%s::accessRec@p%d] this heap is now under %s --> EBUSY\n",
 	    name, HH_MYID, hhsw_names[swap_stat /*swaping_kind*/]);
+#endif
     return HHSS_EBUSY;
   }
 
@@ -789,7 +791,7 @@ int heap::accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size)
     return HHSS_ERROR;
   }
 
-#if 1
+#if 0
   fprintf(stderr, "[HH:%s::accessRec@p%d] delegate %c access to %s\n",
 	  name, HH_MYID, rwtype, lower->name);
 #endif

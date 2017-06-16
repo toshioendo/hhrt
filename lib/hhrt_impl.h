@@ -197,8 +197,8 @@ class heap {
   virtual int releaseSwapResAsLower(int kind) {};
   int releaseSwapRes();
 
-  virtual int writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size) {};
-  virtual int readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size) {};
+  virtual int writeSeq(void *tgt, void *buf, int bufkind, size_t size) {};
+  virtual int readSeq(void *tgt, void *buf, int bufkind, size_t size) {};
   virtual int accessRec(char rwtype, void *tgt, void *buf, int bufkind, size_t size);
 
   virtual int madvise(void *p, size_t size, int kind);
@@ -244,8 +244,8 @@ class devheap: public heap {
   virtual int releaseSwapResSelf(int kind);
   virtual int releaseSwapResAsLower(int kind) {};
 
-  virtual int writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size) {};
-  virtual int readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size) {};
+  virtual int writeSeq(void *tgt, void *buf, int bufkind, size_t size) {};
+  virtual int readSeq(void *tgt, void *buf, int bufkind, size_t size) {};
 
   void *allocCapacity(size_t dummy, size_t heapsize);
   void *hp_baseptr;
@@ -272,8 +272,8 @@ class hostheap: public heap {
   virtual int releaseSwapResSelf(int kind);
   virtual int releaseSwapResAsLower(int kind);
 
-  virtual int writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size);
-  virtual int readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size);
+  virtual int writeSeq(void *tgt, void *buf, int bufkind, size_t size);
+  virtual int readSeq(void *tgt, void *buf, int bufkind, size_t size);
 
   virtual void *allocCapacity(size_t offset, size_t size);
 
@@ -314,8 +314,8 @@ class fileheap: public heap {
   virtual int releaseSwapResSelf(int kind) {};
   virtual int releaseSwapResAsLower(int kind);
 
-  virtual int writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size);
-  virtual int readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size);
+  virtual int writeSeq(void *tgt, void *buf, int bufkind, size_t size);
+  virtual int readSeq(void *tgt, void *buf, int bufkind, size_t size);
 
   int openSFileIfNotYet();
   int write_small(ssize_t offs, void *buf, int bufkind, size_t size);

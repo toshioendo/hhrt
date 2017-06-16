@@ -30,7 +30,10 @@ typedef struct {
 } commhdr;
 
 struct commtask {
-  commtask() {fin = 0; cursor = 0; curmem = 0; ireq = MPI_REQUEST_NULL; commbuf = NULL;};
+  commtask() {
+    fin = 0; cursor = 0; curmem = 0; ireq = MPI_REQUEST_NULL; commbuf = NULL;
+    tm_start = Wtime(); tm_rend = 0.0; tm_start_retry = 0.0;
+  };
   int kind;
   void *ptr;
   int count;
@@ -46,6 +49,11 @@ struct commtask {
   int curmem; // cursor for accessRec
   commhdr hdr;
   int fin;
+
+  /* statistics */
+  double tm_start; // time of creation of this structure
+  double tm_rend; // time of rendezvous (first ACK is sent or recvd)
+  double tm_start_retry; // time when blocking is started for busy heap
 };
 
 class rmpig {
@@ -88,7 +96,7 @@ int progressSend(commtask *ctp)
   if (ctp->ireq != MPI_REQUEST_NULL) {
     MPI_Test(&ctp->ireq, &flag, &stat);
     if (flag == 0) {
-      /* do nothing */
+      /* ireq is not finished. do nothing */
       return 0;
     }
     ctp->ireq = MPI_REQUEST_NULL;
@@ -98,14 +106,24 @@ int progressSend(commtask *ctp)
 
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
+#if 0
   fprintf(stderr, "[HHMPI(R):progressSend@p%d] progress! (dst=%d,tag=%d) %d/%d\n",
 	  HH_MYID, ctp->partner, ctp->tag, ctp->cursor, psize);
+#endif
+
+  if (ctp->cursor == 0) {
+    /* first ack is recvd. */
+    ctp->tm_rend = Wtime();
+  }
 
   if (ctp->cursor >= psize) {
-    fprintf(stderr, "[HHMPI(R):progressSend@p%d] finish! (dst=%d,tag=%d)\n",
-	    HH_MYID, ctp->partner, ctp->tag);
+    double et = Wtime();
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] [%.2lf-%.2lf] sending %ld bytes finish in %.2lfsecs (dst=%d,tag=%d)\n",
+	    HH_MYID, Wtime_conv_prt(ctp->tm_rend), Wtime_conv_prt(et), 
+	    psize, et-ctp->tm_rend, ctp->partner, ctp->tag);
     free(ctp->commbuf);
     ctp->commbuf = NULL;
+    HH_addHostMemStat(HHST_MPIBUFCOPY, -HHMR_CHUNKSIZE);
     ctp->ireq = MPI_REQUEST_NULL;
     ctp->fin = 1;
     /* finished */
@@ -121,14 +139,27 @@ int progressSend(commtask *ctp)
   rc = HH_accessRec('R', piadd(ctp->ptr, ctp->cursor), ctp->commbuf, HHM_HOST, size);
   if (rc != HHSS_OK) {
     /* do nothing and retry accessRec later */
-    fprintf(stderr, "[HHMPI(R):progressSend@p%d] accessRec ('R', cur=%d) failes, retry...\n",
-	    HH_MYID, ctp->cursor);
+    if (ctp->tm_start_retry == 0.0) {
+      fprintf(stderr, "[HHMPI(R):progressSend@p%d] [%.2lf] accessRec ('R', cur=%d) failes, retry...\n",
+	      HH_MYID, Wtime_prt(), ctp->cursor);
+      ctp->tm_start_retry = Wtime();
+    }
     usleep(10000);
     return 0;
   }
 
+  if (ctp->tm_start_retry != 0.0) {
+    double et = Wtime();
+    double rt = et - ctp->tm_start_retry;
+    fprintf(stderr, "[HHMPI(R):progressSend@p%d] [%.2lf-%.2lf] I have been blocked for busy heap for %.3lfsec\n",
+	    HH_MYID, Wtime_conv_prt(ctp->tm_start_retry), Wtime_conv_prt(et), rt);
+    ctp->tm_start_retry = 0.0;
+  }
+
+#if 0
   printf("[HHMPI(R):progressSend@p%d] calling Internal MPI_Isend(%ldbytes,dst=%d,tag=%d)\n",
 	 HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
+#endif
   MPI_Isend(ctp->commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
 	    ctp->comm, &ctp->ireq);
 
@@ -164,14 +195,25 @@ int progressRecv(commtask *ctp)
 
     if (rc != HHSS_OK) {
       /* do nothing and retry accessRec later */
-      fprintf(stderr, "[HHMPI(R):progressRecv@p%d] accessRec ('W', cur=%d) failes, retry...\n",
-	      HH_MYID, ctp->cursor);
+      if (ctp->tm_start_retry == 0.0) {
+	fprintf(stderr, "[HHMPI(R):progressSend@p%d] [%.2lf] accessRec ('W', cur=%d) failes, retry...\n",
+		HH_MYID, Wtime_prt(), ctp->cursor);
+	ctp->tm_start_retry = Wtime();
+      }
       usleep(10000);
       return 0;
     }
 
-    /* write finished */
+    /* write to heap finished */
     ctp->curmem = ctp->cursor;
+
+    if (ctp->tm_start_retry != 0.0) {
+      double et = Wtime();
+      double rt = et - ctp->tm_start_retry;
+      fprintf(stderr, "[HHMPI(R):progressRecv@p%d] [%.2lf-%.2lf] I have been blocked for busy heap for %.3lfsec\n",
+	      HH_MYID, Wtime_conv_prt(ctp->tm_start_retry), Wtime_conv_prt(et), rt);
+      ctp->tm_start_retry = 0.0;
+    }
   }
 
   assert(ctp->curmem == ctp->cursor);
@@ -179,25 +221,31 @@ int progressRecv(commtask *ctp)
   int psize;
   MPI_Pack_size(ctp->count, ctp->datatype, ctp->comm, &psize);
 
+#if 0
   fprintf(stderr, "[HHMPI(R):progressRecv@p%d] progress! (src=%d, tag=%d) %d/%d/%d\n",
 	  HH_MYID, ctp->partner, ctp->tag, ctp->curmem, ctp->cursor, psize);
+#endif
 
   if (ctp->cursor == 0) {
     /* Now first header arrived. */
     /* Send ack */
     ctp->partner = stat.MPI_SOURCE;
     ctp->tag = stat.MPI_TAG;
-    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] sending ACK for (src=%d, tag=%d)!\n",
-	    HH_MYID, ctp->partner, ctp->tag);
+    ctp->tm_rend = Wtime();
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] [%.2lf] sending ACK for (src=%d, tag=%d)!\n",
+	    HH_MYID, Wtime_prt(), ctp->partner, ctp->tag);
     MPI_Send((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, 
 	     ctp->partner, HHMR_TAG_ACK(ctp->tag), ctp->comm);
   }
 
   if (ctp->cursor >= psize) {
-    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] finish! (src=%d,tag=%d)\n",
-	    HH_MYID, ctp->partner, ctp->tag);
+    double et = Wtime();
+    fprintf(stderr, "[HHMPI(R):progressRecv@p%d] [%.2lf-%.2lf] recving %ld bytes finish in %.2lfsecs (dst=%d,tag=%d)\n",
+	    HH_MYID, Wtime_conv_prt(ctp->tm_rend), Wtime_conv_prt(et), 
+	    psize, et-ctp->tm_rend, ctp->partner, ctp->tag);
     free(ctp->commbuf);
     ctp->commbuf = NULL;
+    HH_addHostMemStat(HHST_MPIBUFCOPY, -HHMR_CHUNKSIZE);
     ctp->ireq = MPI_REQUEST_NULL;
     ctp->fin = 1;
     /* finished */
@@ -208,8 +256,10 @@ int progressRecv(commtask *ctp)
   int size = HHMR_CHUNKSIZE;
   if (ctp->cursor+size > psize) size = psize-ctp->cursor;
 
+#if 0
   printf("[HHMPI(R):progressRecv@p%d] calling Internal MPI_Irecv(%ldbytes,src=%d,tag=%d)\n",
 	 HH_MYID, size, ctp->partner, HHMR_TAG_BODY(ctp->tag));
+#endif
   MPI_Irecv(ctp->commbuf, size, MPI_BYTE, ctp->partner, HHMR_TAG_BODY(ctp->tag),
 	    ctp->comm, &ctp->ireq);
 
@@ -271,10 +321,11 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
   ctp->tag = tag;
   ctp->comm = comm;
 
-  ctp->commbuf = malloc(HHMR_CHUNKSIZE);
+  ctp->commbuf = valloc(HHMR_CHUNKSIZE);
+  HH_addHostMemStat(HHST_MPIBUFCOPY, HHMR_CHUNKSIZE);
 
-  fprintf(stderr, "[HHMPI_Isend(R)@p%d] called: dest=%d, tag=%d\n", 
-	  HH_MYID, dest, tag);
+  fprintf(stderr, "[HHMPI_Isend(R)@p%d] [%.2lf] start: dest=%d, tag=%d\n", 
+	  HH_MYID, Wtime_conv_prt(ctp->tm_start), dest, tag);
 
   if (!isTypeContiguous(datatype)) {
     fprintf(stderr, "[HHRTMPI_Isend(R)@p%d] non contiguous datatype is specified. not supported yet\n",
@@ -295,9 +346,6 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
 	    HHMR_TAG_ACK(tag), comm, &ctp->ireq);
   /* finish of ctp->ireq should be checked later */
 
-  fprintf(stderr, "[HHMPI_Isend(R)@p%d] Irecv for ack--> request=0x%lx\n",
-	  HH_MYID, ctp->ireq);
-
   addCommTask(ctp);
   *((commtask **)reqp) = ctp;
 
@@ -316,10 +364,11 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
   ctp->tag = tag;
   ctp->comm = comm;
 
-  ctp->commbuf = malloc(HHMR_CHUNKSIZE);
+  ctp->commbuf = valloc(HHMR_CHUNKSIZE);
+  HH_addHostMemStat(HHST_MPIBUFCOPY, HHMR_CHUNKSIZE);
 
-  fprintf(stderr, "[HHMPI_Irecv(R)@p%d] called: src=%d, tag=%d\n", 
-	  HH_MYID, source, tag);
+  fprintf(stderr, "[HHMPI_Irecv(R)@p%d] [%.2lf] start: src=%d, tag=%d\n", 
+	  HH_MYID, Wtime_conv_prt(ctp->tm_start), source, tag);
 
   if (!isTypeContiguous(datatype)) {
     fprintf(stderr, "[HHMPI_Irecv(R)@p%d] non contiguous datatype is specified. not supported yet\n",
@@ -329,9 +378,6 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 
   /* Start recving the first header */
   MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, source, tag, comm, &ctp->ireq);
-
-  fprintf(stderr, "[HHMPI_Irecv(R)@p%d] Irecv for first hdr--> request=0x%lx\n",
-	  HH_MYID, ctp->ireq);
 
   addCommTask(ctp);
   *((commtask **)reqp) = ctp;

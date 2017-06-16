@@ -18,6 +18,21 @@ proc *HHL;
 proc2 hhl2s;
 proc2 *HHL2 = &hhl2s;
 
+double HH_wtime()
+{
+  return Wtime();
+}
+
+double HH_wtime_conv_prt(double t)
+{
+  return Wtime_conv_prt(t);
+}
+
+double HH_wtime_prt()
+{
+  return Wtime_prt();
+}
+
 int HH_mutex_init(pthread_mutex_t *ml)
 {
   int rc;

@@ -45,10 +45,11 @@ int HH_madvise(void *p, size_t size, int kind);
 /* scheduling */
 int HH_yield();
 
-/* obsolete */
-int HH_devLock();
-int HH_devUnlock();
-int HH_devSetMode(int kind);
+/* time measurement aux functions */
+double HH_wtime();
+double HH_wtime_conv_prt(double t);
+double HH_wtime_prt();
+
 
 /****************************************/
 /* MPI-1 compatible interface */

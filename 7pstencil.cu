@@ -459,6 +459,8 @@ int comm_boundary(int bufid)
   double st, et;
   long ms;
   int i;
+  //int logflag = (myy < 2 && myz < 3);
+  int logflag = 1;
 
   MPI_Request reqs[16];
   int nreqs;
@@ -511,7 +513,7 @@ int comm_boundary(int bufid)
   }
 
   ms = (long)((et-st)*1000);
-  if (myy < 2 && myz < 2) {
+  if (logflag) {
     fprintf(stderr,
 	    "[comm_boundary@p%d] cudaMemcpy D2H %ldMB took %ldms. call Waitall...\n",
 	    myid, (sizeof(REAL)*ss)>>20, ms);
@@ -544,7 +546,7 @@ int comm_boundary(int bufid)
   cudaDeviceSynchronize();
   et = Wtime();
   ms = (long)((et-st)*1000);
-  if (myy < 2 && myz < 2) {
+  if (logflag) {
     fprintf(stderr,
 	    "[comm_boundary@p%d] cudaMemcpy H2D %ldMB took %ldms\n",
 	    myid, (sizeof(REAL)*rs)>>20, ms);
@@ -607,8 +609,14 @@ int mainloop()
       ms = (long)((et-st)*1000);
       long flop = (long)nx*(ey-sy)*(ez-sz)*ntinner*FLOP_PER_POINT;
       double gflops = (double)flop/(et-st)/1.0e+9;
+#if 0
       fprintf(stderr, "[mainloop@p%d] COMP %ld ms for %dx%dx%d (%.3lfGFlops) t=[%d,%d)\n",
 	      myid, ms, nx, ey-sy, ez-sz, gflops, iter, iter+ntinner);
+#else
+      fprintf(stderr, "[mainloop@p%d] [%.2lf-%.2lf]  COMP %ld ms for %dx%dx%d (%.3lfGFlops) t=[%d,%d)\n",
+	      myid, HH_wtime_conv_prt(st), HH_wtime_conv_prt(et),
+	      ms, nx, ey-sy, ez-sz, gflops, iter, iter+ntinner);
+#endif
     }
 
     if (myid == 0) {

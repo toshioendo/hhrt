@@ -231,7 +231,7 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   else 
 #endif
     if ((size_t)buf % align != 0) {
-#if 1
+#if 0
       fprintf(stderr, "[HH:fileheap::write_small@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
 	      HH_MYID, buf, size);
 #endif
@@ -361,7 +361,7 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   else 
 #endif
     if ((size_t)buf % align != 0) {
-#if 1
+#if 0
       fprintf(stderr, "[HH:fileheap::read_s@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
 	      HH_MYID, buf, size);
 #endif
