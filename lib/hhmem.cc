@@ -78,6 +78,7 @@ heap::heap(size_t heapsize0)
 
   swap_stat = HHSW_SWAPPED; // swapIn() should be called soon for first heap allocation
   strcpy(name, "(HEAP)");
+  nswapped = 0;
 
   return;
 }
@@ -90,6 +91,10 @@ int heap::finalize()
 
   heapptr = NULL;
   heapsize = 0;
+#if 1
+  fprintf(stderr, "[HH:%s::finalize@p%d] This heap has been swapped for %d times\n",
+	  name, HH_MYID, nswapped);
+#endif
 
   return 0;
 }
@@ -600,6 +605,7 @@ int heap::swapOut()
   }
 #endif
 
+  nswapped++; //statistics
   releaseHeap();
 
   return 0;

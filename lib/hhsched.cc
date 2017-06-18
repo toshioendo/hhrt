@@ -224,7 +224,7 @@ int HH_sleepForMemory()
     }
     HH_unlockSched();
     
-    usleep(1000);
+    usleep(10*1000);
   } while (1);
   
   // check #running procs

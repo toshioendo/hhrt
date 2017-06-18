@@ -220,6 +220,7 @@ class heap {
 
   int memkind; // HHM_*
   int swap_stat; // HHSW_*
+  int nswapped;
 };
 
 #ifdef USE_CUDA

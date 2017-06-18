@@ -138,6 +138,7 @@ void *hostheap::allocCapacity(size_t offset, size_t size)
 
 #ifdef USE_CUDA
   if (HHL2->conf.pin_hostbuf) {
+    double st = Wtime();
     cudaError_t crc;
     if (offset != (size_t)0) {
       crc = cudaHostUnregister(heapptr);
@@ -157,6 +158,10 @@ void *hostheap::allocCapacity(size_t offset, size_t size)
       HHstacktrace();
       exit(1);
     }
+    double et = Wtime();
+    fprintf(stderr, "[HH:%s::allocCapacity@p%d] [%.2lf-%.2lf] HH_PIN_HOSTBUF pin took %.3lfsec\n",
+	    name, Wtime_conv_prt(st), Wtime_conv_prt(et), et-st);
+    
   }
   
 #endif
@@ -206,6 +211,7 @@ int hostheap::releaseHeap()
     /* Free memory! */
 #ifdef USE_CUDA
     if (HHL2->conf.pin_hostbuf) {
+      double st = Wtime();
       cudaError_t crc;
       crc = cudaHostUnregister(heapptr);
       // BUG if heap has been expanded by multiple HostRegister
@@ -215,6 +221,9 @@ int hostheap::releaseHeap()
 	HHstacktrace();
 	exit(1);
       }
+      double et = Wtime();
+      fprintf(stderr, "[HH:%s::releaseHeap@p%d] [%.2lf-%.2lf] HH_PIN_HOSTBUF unpin took %.3lfsec\n",
+	      name, Wtime_conv_prt(st), Wtime_conv_prt(et), et-st);
     }
   
 #endif
@@ -272,9 +281,21 @@ int hostheap::checkSwapResSelf(int kind, int *pline)
   int res = -1;
   int line = -991; // debug
 
+
   if (kind == HHSW_OUT) {
-    res = HHSS_OK;
-    line = __LINE__;
+    if (HHL2->ncurcomms > 0) {
+#if 0
+      fprintf(stderr, "[HH:%s::checkSwapRes@p%d] ##### Now %d msgs are flying. Refrain from host swapout\n",
+	      name, HH_MYID, HHL2->ncurcomms);
+#endif
+      res = HHSS_EBUSY;
+      line = __LINE__;
+    }
+    else {
+      res = HHSS_OK;
+      line = __LINE__;
+    }
+    
   }
   else if (kind == HHSW_IN) {
     if (HH_countHostUsers() >= HHL2->conf.nlphost) {

@@ -90,7 +90,13 @@ static int addCommTask(commtask *ctp)
 /* Rendezvous established in send side */
 int sendRend(commtask *ctp)
 {
+  assert(ctp->tm_rend == 0.0);
   ctp->tm_rend = Wtime();
+
+  HH_lockSched();
+  HHL2->ncurcomms++;
+  HH_unlockSched();
+
   return 0;
 }
 
@@ -105,6 +111,12 @@ int sendFin(commtask *ctp)
   HH_addHostMemStat(HHST_MPIBUFCOPY, -HHMR_CHUNKSIZE);
   ctp->ireq = MPI_REQUEST_NULL;
   ctp->fin = 1;
+
+  HH_lockSched();
+  HHL2->ncurcomms--;
+  assert(HHL2->ncurcomms >= 0);
+  HH_unlockSched();
+
   return 0;
 }
 
@@ -122,14 +134,22 @@ int progressSend(commtask *ctp)
       return 0;
     }
     ctp->ireq = MPI_REQUEST_NULL;
+
+    if (ctp->cursor == 0) {
+      /* first ack is recvd. */
+      sendRend(ctp);
+    }
+
   }
 
   assert(ctp->ireq == MPI_REQUEST_NULL);
 
-  if (ctp->cursor == 0) {
+#if 0
+  if (ctp->cursor == 0 && ctp->tm_rend == 0.0) {
     /* first ack is recvd. */
     sendRend(ctp);
   }
+#endif
 
   if (ctp->cursor >= ctp->psize) {
     sendFin(ctp);
@@ -177,11 +197,16 @@ int progressSend(commtask *ctp)
 /* Rendezvous established in recv side */
 int recvRend(commtask *ctp, MPI_Status *statp)
 {
+  assert(ctp->tm_rend == 0.0);
   ctp->tm_rend = Wtime();
   ctp->partner = statp->MPI_SOURCE;
   ctp->tag = statp->MPI_TAG;
   fprintf(stderr, "[HHMPI(R):progressRecv@p%d] [%.2lf] sending ACK for (src=%d, tag=%d)!\n",
 	  HH_MYID, Wtime_prt(), ctp->partner, ctp->tag);
+
+  HH_lockSched();
+  HHL2->ncurcomms++;
+  HH_unlockSched();
   return 0;
 }
 
@@ -197,6 +222,11 @@ int recvFin(commtask *ctp)
   ctp->ireq = MPI_REQUEST_NULL;
   ctp->fin = 1;
   /* finished */
+
+  HH_lockSched();
+  HHL2->ncurcomms--;
+  assert(HHL2->ncurcomms >= 0);
+  HH_unlockSched();
   return 0;
 }
 
