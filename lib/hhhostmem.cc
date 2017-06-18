@@ -365,9 +365,9 @@ int hostheap::releaseSwapResAsLower(int kind)
 }
 
 // copy from contiguous region to contiguous region
-int hostheap::writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size)
+int hostheap::writeSeq(void *tgt, void *buf, int bufkind, size_t size)
 {
-  void *hp = tgt; //offs2ptr(offs);
+  void *hp = tgt;
 #ifdef USE_CUDA
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
 #else
@@ -383,7 +383,6 @@ int hostheap::writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_
 	      name, HH_MYID, hp,buf,size>>20, copystream, crc);
       exit(1);
     }
-    //copyD2H(hp, buf, size, copystream, "HH:hostheap::write_s");
     cudaStreamSynchronize(copystream);
   } 
   else 
@@ -395,9 +394,9 @@ int hostheap::writeSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_
   return 0;
 }
 
-int hostheap::readSeq(void *tgt /*ssize_t offs*/, void *buf, int bufkind, size_t size)
+int hostheap::readSeq(void *tgt, void *buf, int bufkind, size_t size)
 {
-  void *hp = tgt; //offs2ptr(offs);
+  void *hp = tgt;
 #ifdef USE_CUDA
   assert(bufkind == HHM_DEV || bufkind == HHM_HOST);
 #else
