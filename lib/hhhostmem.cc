@@ -90,11 +90,10 @@ hostheap::hostheap() : heap(0L)
 	    HH_MYID, crc);
     exit(1);
   }
-#if 0
-  fprintf(stderr, "[HH:hostheap::init@p%d] cudaStreamCreate -> str %ld\n",
-	  HH_MYID, copystream);
-#endif
 
+  copyunit = (size_t)8*1024*1024;
+  crc = cudaHostAlloc(&copybuf, copyunit, cudaHostAllocDefault);
+  assert(crc == cudaSuccess);
 #endif
 
   return;
@@ -377,13 +376,27 @@ int hostheap::writeSeq(void *tgt, void *buf, int bufkind, size_t size)
 #ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
-    crc = cudaMemcpyAsync(hp, buf, size, cudaMemcpyDeviceToHost, copystream);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:%s::writeSeq@p%d] ERROR: cudaMemcpy(%p,%p,%ldMiB)(D2H)(str=%ld) failed!! rc=%d\n",
-	      name, HH_MYID, hp,buf,size>>20, copystream, crc);
-      exit(1);
+    if (1 || HHL2->conf.pin_hostbuf) {
+      crc = cudaMemcpyAsync(hp, buf, size, cudaMemcpyDeviceToHost, copystream);
+      if (crc != cudaSuccess) {
+	fprintf(stderr, "[HH:%s::writeSeq@p%d] ERROR: cudaMemcpy(%p,%p,%ldMiB)(D2H)(str=%ld) failed!! rc=%d\n",
+		name, HH_MYID, hp,buf,size>>20, copystream, crc);
+	exit(1);
+      }
+      cudaStreamSynchronize(copystream);
     }
-    cudaStreamSynchronize(copystream);
+    else {
+      size_t cur;
+      for (cur = 0; cur < size; cur += copyunit) {
+	size_t copysize = copyunit;
+	if (cur+copysize > size) copysize = size-cur;
+	crc = cudaMemcpyAsync(copybuf, piadd(buf, cur),copysize,
+			      cudaMemcpyDeviceToHost, copystream);
+	assert(crc == cudaSuccess);
+	cudaStreamSynchronize(copystream);
+	memcpy(piadd(hp, cur), copybuf, copysize);
+      }
+    }
   } 
   else 
 #endif
@@ -406,13 +419,28 @@ int hostheap::readSeq(void *tgt, void *buf, int bufkind, size_t size)
 #ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
-    crc = cudaMemcpyAsync(buf, hp, size, cudaMemcpyHostToDevice, copystream);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:%s::readSeq@p%d] cudaMemcpy(%ldMiB) failed!!\n",
-	      name, HH_MYID, size>>20);
-      exit(1);
+    /* host to device */
+    if (1 || HHL2->conf.pin_hostbuf) {
+      crc = cudaMemcpyAsync(buf, hp, size, cudaMemcpyHostToDevice, copystream);
+      if (crc != cudaSuccess) {
+	fprintf(stderr, "[HH:%s::readSeq@p%d] cudaMemcpy(%ldMiB) failed!!\n",
+		name, HH_MYID, size>>20);
+	exit(1);
+      }
+      cudaStreamSynchronize(copystream);
     }
-    cudaStreamSynchronize(copystream);
+    else {
+      size_t cur;
+      for (cur = 0; cur < size; cur += copyunit) {
+	size_t copysize = copyunit;
+	if (cur+copysize > size) copysize = size-cur;
+	memcpy(copybuf, piadd(hp, cur), copysize);
+	crc = cudaMemcpyAsync(piadd(buf, cur), copybuf, copysize,
+			      cudaMemcpyHostToDevice, copystream);
+	assert(crc == cudaSuccess);
+	cudaStreamSynchronize(copystream);
+      }
+    }
   }
   else 
 #endif

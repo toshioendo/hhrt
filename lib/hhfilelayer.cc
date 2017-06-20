@@ -89,6 +89,7 @@ int HH_openSFile(char sfname[256])
 {
   int sfd;
   sfd = open(sfname, O_CREAT | O_RDWR | O_DIRECT, 0700);
+  //sfd = open(sfname, O_CREAT | O_RDWR, 0700);
   if (sfd == -1) {
     fprintf(stderr, "[HH_openSFile@p%d] ERROR in open(%s)\n",
 	    HH_MYID, sfname);
@@ -150,6 +151,7 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
 
   heapptr = FILEHEAP_PTR;
   align = 512L;
+  //align = 8L;
   memkind = HHM_FILE;
 
   userid = id;
@@ -231,7 +233,7 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
   else 
 #endif
     if ((size_t)buf % align != 0) {
-#if 0
+#if 01
       fprintf(stderr, "[HH:fileheap::write_small@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
 	      HH_MYID, buf, size);
 #endif
@@ -361,7 +363,7 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
   else 
 #endif
     if ((size_t)buf % align != 0) {
-#if 0
+#if 01
       fprintf(stderr, "[HH:fileheap::read_s@p%d] buf=0x%lx (size=0x%lx) is not aligned; so copy once more. This is not an error, but slow\n",
 	      HH_MYID, buf, size);
 #endif

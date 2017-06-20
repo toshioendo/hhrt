@@ -283,6 +283,8 @@ class hostheap: public heap {
 
 #ifdef USE_CUDA
   cudaStream_t copystream;
+  void *copybuf;
+  size_t copyunit;
 #endif
 };
 
