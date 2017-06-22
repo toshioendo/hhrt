@@ -95,6 +95,7 @@ int sendRend(commtask *ctp)
 
   HH_lockSched();
   HHL2->ncurcomms++;
+  HH_prioInc(ctp->partner, 1);
   HH_unlockSched();
 
   return 0;
@@ -206,6 +207,7 @@ int recvRend(commtask *ctp, MPI_Status *statp)
 
   HH_lockSched();
   HHL2->ncurcomms++;
+  HH_prioInc(ctp->partner, 1);
   HH_unlockSched();
   return 0;
 }

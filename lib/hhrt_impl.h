@@ -398,6 +398,8 @@ struct proc {
   } cuda;
 #endif
 
+  int prio_score; // testing. will relate to scheduling prority?
+
   int host_use;
   /* statistics */
   struct {
@@ -504,6 +506,7 @@ int HH_openSFile(char sfname[256]);
 // hhsched.cc: scheduling
 int HH_lockSched();
 int HH_unlockSched();
+int HH_prioInc(int rank, int inc);
 
 int HH_progressSched();
 int HH_sleepForMemory();

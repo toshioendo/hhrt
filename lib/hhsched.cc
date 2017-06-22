@@ -36,6 +36,36 @@ int HH_countProcsInMode(int mode)
   return n;
 }
 
+int HH_prioInc(int rank, int inc)
+{
+  /* is rank on the same node? */
+  for (int ip = 0; ip < HHS->nlprocs; ip++) {
+    proc *pp = &HHS->lprocs[ip];
+    if (pp->rank == rank) {
+      pp->prio_score += inc;
+      return 0;
+    }
+  }
+  return 0;
+}
+
+int HH_prioGetMax(int *argmaxp)
+{
+  /* get the highest prio_score of local&runnable processes */
+  int ans = -99999;
+  int argmax = -1;
+  for (int ip = 0; ip < HHS->nlprocs; ip++) {
+    proc *pp = &HHS->lprocs[ip];
+    if (pp->pmode == HHP_RUNNABLE && pp->prio_score > ans) {
+      ans = pp->prio_score;
+      argmax = pp->rank;
+    }
+  }
+
+  if (argmaxp != NULL) *argmaxp = argmax;
+  return ans;
+}
+
 // This function assumes sched_ml is locked
 // This must be called after h->checkSwapRes() returns OK
 int HH_swapHeap(heap *h, int kind)
@@ -214,6 +244,26 @@ int HH_sleepForMemory()
 	  HH_MYID, getpid());
 #endif
 
+#if 0
+  // check priority
+  // BUG: This still causes  deadlock
+  do {
+    HH_lockSched();
+    int hrank;
+    int hp = HH_prioGetMax(&hrank);
+    if (HHL->prio_score >= hp) {
+      HH_unlockSched();
+      fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d, proceed\n",
+	      HH_MYID, Wtime_prt(), HHL->prio_score);
+      break;
+    }
+    fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d < %d (p%d), thus I backoff now\n",
+	    HH_MYID, Wtime_prt(), HHL->prio_score, hp, hrank);
+    HH_unlockSched();
+    usleep(50*1000);
+  } while (1);
+#endif
+  
   do {
     HH_progressSched();
 
@@ -233,6 +283,11 @@ int HH_sleepForMemory()
     int nrp = HH_countProcsInMode(HHP_RUNNING);
     if (nrp+1 <= HHL2->conf.maxrp) { // ok
       HHL->pmode = HHP_RUNNING;
+
+      fprintf(stderr, "[HH_sleepForMemory@p%d] I'm going to wake up; prio_score=%d\n",
+	      HH_MYID, HHL->prio_score);
+      HHL->prio_score = 0;
+
       HH_unlockSched();
       HH_profSetMode("RUNNING");
       break;
@@ -254,6 +309,7 @@ int HH_sleepForMemory()
 
 int HH_enterBlocking()
 {
+  assert(HHL->in_api == 0); ///
   if (HHL->in_api == 0) {
 #ifdef HHLOG_API
     fprintf(stderr, "[HH_enterBlocking@p%d] [%.2lf] start\n",
@@ -281,11 +337,13 @@ int HH_exitBlocking()
 	    HH_MYID, Wtime_prt());
 #endif
   }
+  assert(HHL->in_api == 0); ///
   return 0;
 }
 
 int HH_enterGComm(const char *str)
 {
+  assert(HHL->in_api == 0); ///
 
   if (HHL->in_api == 0) {
 #ifdef HHLOG_API
@@ -322,6 +380,9 @@ int HH_exitGComm()
 	    HH_MYID, Wtime_prt(), HHL2->api_str);
 #endif
   }
+
+  assert(HHL->in_api == 0); ///
+
   return 0;
 }
 

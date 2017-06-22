@@ -236,6 +236,8 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   }
   sprintf(HHL->msg, "[HH:initProc@p%d] no msg", HH_MYID);
 
+  HHL->prio_score = 0; // testing
+
   HH_profInit();
 #ifdef USE_CUDA
   HH_cudaInitProc();
