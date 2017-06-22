@@ -275,7 +275,7 @@ int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
 
   HH_exitBlocking();
 
-  if (HHL->in_api == 0) {
+if (1 /*HHL->in_api == 0*/) {
     double t0 = Wtime(), t1;
     /* request finalizer */
 #if 0

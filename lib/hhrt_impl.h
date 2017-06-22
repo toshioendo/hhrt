@@ -387,9 +387,10 @@ struct proc {
   int rank;
   int lrank;
   int pid;
-  int curfsdirid; /* fileswap dir id now this process is using (constant) */
   int pmode; /* process mode: HHP_* */
-  int in_api; /* 0: usual, >=1: in API */
+  //int in_api; /* 0: usual, >=1: in API */
+
+  int curfsdirid; /* fileswap dir id now this process is using (constant) */
 
 #ifdef USE_CUDA
   struct {
