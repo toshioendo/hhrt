@@ -526,9 +526,9 @@ int HHMPI_Recv( void *buf, int count, MPI_Datatype dt, int src,
 int HHMPI_Barrier(MPI_Comm comm)
 {
   int rc;
-  HH_enterGComm("Barrier");
+  HH_enterBlockingForColl("Barrier");
   rc = MPI_Barrier(comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   return rc;
 }

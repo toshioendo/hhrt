@@ -275,7 +275,7 @@ int HHMPI_Waitall(int n, MPI_Request *reqs, MPI_Status *stats)
 
   HH_exitBlocking();
 
-if (1 /*HHL->in_api == 0*/) {
+  {
     double t0 = Wtime(), t1;
     /* request finalizer */
 #if 0
@@ -394,9 +394,9 @@ static int is_me(MPI_Comm comm, int root)
 int HHMPI_Barrier(MPI_Comm comm)
 {
   int rc;
-  HH_enterGComm("Barrier");
+  HH_enterBlockingForColl("Barrier");
   rc = MPI_Barrier(comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   return rc;
 }
@@ -414,14 +414,14 @@ int HHMPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root,
     HH_reqfin_setup_recv(&fin, buffer, count, datatype, comm);
   }
 
-  HH_enterGComm("Bcast");
+  HH_enterBlockingForColl("Bcast");
   if (is_me(comm, root)) {
     rc = MPI_Bcast(fin.send.cptr, fin.send.csize, fin.send.ctype, root, comm);
   }
   else {
     rc = MPI_Bcast(fin.recv.cptr, fin.recv.csize, fin.recv.ctype, root, comm);
   }
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -439,10 +439,10 @@ int HHMPI_Reduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
     HH_reqfin_setup_recv /*Red*/(&fin, recvbuf, count, datatype, comm);
   }
 
-  HH_enterGComm("Reduce");
+  HH_enterBlockingForColl("Reduce");
   rc = MPI_Reduce(fin.send.cptr, fin.recv.cptr, fin.send.csize, fin.send.ctype,
 		  op, root, comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -458,10 +458,10 @@ int HHMPI_Allreduce(void *sendbuf, void *recvbuf, int count,
   HH_reqfin_setup_send /*Red*/(&fin, sendbuf, count, datatype, comm);
   HH_reqfin_setup_recv /*Red*/(&fin, recvbuf, count, datatype, comm);
 
-  HH_enterGComm("Allreduce");
+  HH_enterBlockingForColl("Allreduce");
   rc = MPI_Allreduce(fin.send.cptr, fin.recv.cptr, fin.send.csize, fin.send.ctype,
 		     op, comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -482,10 +482,10 @@ int HHMPI_Gather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
     HH_reqfin_setup_recv(&fin, recvbuf, recvcount*np, recvtype, comm);
   }
 
-  HH_enterGComm("Gather");
+  HH_enterBlockingForColl("Gather");
   MPI_Gather(fin.send.cptr, fin.send.csize, fin.send.ctype,
 	     fin.recv.cptr, fin.recv.csize/np, fin.recv.ctype, root, comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -503,10 +503,10 @@ int HHMPI_Allgather(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   HH_reqfin_setup_send(&fin, sendbuf, sendcount, sendtype, comm);
   HH_reqfin_setup_recv(&fin, recvbuf, recvcount*np, recvtype, comm);
 
-  HH_enterGComm("Allgather");
+  HH_enterBlockingForColl("Allgather");
   MPI_Allgather(fin.send.cptr, fin.send.csize, fin.send.ctype,
 		fin.recv.cptr, fin.recv.csize/np, fin.recv.ctype, comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -527,10 +527,10 @@ int HHMPI_Scatter(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   }
   HH_reqfin_setup_recv(&fin, recvbuf, recvcount, recvtype, comm);
 
-  HH_enterGComm("Scatter");
+  HH_enterBlockingForColl("Scatter");
   MPI_Scatter(fin.send.cptr, fin.send.csize/np, fin.send.ctype,
 	      fin.recv.cptr, fin.recv.csize, fin.recv.ctype, root, comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -548,10 +548,10 @@ int HHMPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
   HH_reqfin_setup_send(&fin, sendbuf, sendcount*np, sendtype, comm);
   HH_reqfin_setup_recv(&fin, recvbuf, recvcount*np, recvtype, comm);
 
-  HH_enterGComm("Alltoall");
+  HH_enterBlockingForColl("Alltoall");
   MPI_Alltoall(fin.send.cptr, fin.send.csize/np, fin.send.ctype,
 	      fin.recv.cptr, fin.recv.csize/np, fin.recv.ctype, comm);
-  HH_exitGComm();
+  HH_exitBlocking();
 
   HH_reqfin_finalize(&fin);
 
@@ -563,9 +563,9 @@ int HHMPI_Comm_split(MPI_Comm comm, int color, int key,
 {
   int rc;
   MPI_Comm newcomm2;
-  HH_enterGComm("Comm_Split");
+  HH_enterBlockingForColl("Comm_Split");
   rc = MPI_Comm_split(comm, color, key, &newcomm2);
-  HH_exitGComm();
+  HH_exitBlocking();
   *newcomm = newcomm2;
   return rc;
 }
