@@ -249,8 +249,16 @@ class devheap: public heap {
   virtual int readSeq(void *tgt, void *buf, int bufkind, size_t size) {};
 
   void *allocCapacity(size_t dummy, size_t heapsize);
+  void *allocCapacity1st(size_t heapsize);
+  int initCopyBufs();
+
   void *hp_baseptr;
   dev *device;
+
+  // moved from hostheap
+  cudaStream_t copystream;
+  void *copybuf;
+  size_t copyunit;
 };
 #endif
 
@@ -281,7 +289,7 @@ class hostheap: public heap {
   int swapfd;
   int mmapflags;
 
-#ifdef USE_CUDA
+#if 0 && defined USE_CUDA
   cudaStream_t copystream;
   void *copybuf;
   size_t copyunit;
@@ -422,7 +430,6 @@ struct proc2 {
 
 #ifdef USE_CUDA
   heap *devheaps[MAX_LDEVS]; // CUDA
-
 #endif
 #ifdef USE_SWAP_THREAD
   pthread_t swap_tid;
@@ -522,7 +529,7 @@ int HH_exitBlocking();
 #ifdef USE_CUDA
 // hhcuda.cc: for CUDA
 dev *HH_curdev();
-heap *HH_curdevheap();
+devheap *HH_curdevheap();
 int HH_cudaInitNode(hhconf *confp);
 int HH_cudaInitProc();
 int HH_cudaCheckDev();

@@ -31,11 +31,15 @@ heap *HH_devheapCreate(dev *d)
 // devheap class (child class of heap)
 devheap::devheap(size_t heapsize0, dev *device0) : heap(heapsize0)
 {
+  // We do not do substantial initialization work yet
   expandable = 0;
 
   heapptr = NULL;
   align = 256L;
   memkind = HHM_DEV;
+
+  copyunit = 0L;
+  copybuf = NULL;
 
   device = device0;
   sprintf(name, "devheap(d%d)", device->devid);
@@ -60,46 +64,38 @@ int devheap::finalize()
 /*************************************/
 int HH_printMemHandle(FILE *out, cudaIpcMemHandle_t *handle);
 
-void *devheap::allocCapacity(size_t dummy, size_t heapsize)
+int devheap::initCopyBufs()
+{
+  cudaError_t crc;
+  copyunit = (size_t)8*1024*1024;
+  crc = cudaHostAlloc(&copybuf, copyunit, cudaHostAllocDefault);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH_cudaInitBufs@p%d] ERROR: cudaHostAlloc failed (rc=%d)\n",
+	    HH_MYID, crc);
+    exit(1);
+  }
+
+  crc = cudaStreamCreate(&copystream);
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH_cudaInitBufs@p%d] ERROR: cudaStreamCreate failed (rc=%d)\n",
+	    HH_MYID, crc);
+    exit(1);
+  }
+
+  return 0;
+}
+
+void *devheap::allocCapacity1st(size_t heapsize)
 {
   dev *d = device;
-  cudaError_t crc;
-  void *dp;
-
-  assert(HHL->cuda.hpid >= 0 && HHL->cuda.hpid < HHS->cuda.ndh_slots);
-  if (hp_baseptr == NULL) {
-    if (HHL->lrank == 0) {
-      hp_baseptr = d->hp_baseptr0;
-    }
-    else {
+  if (HHL->lrank == 0) {
+    hp_baseptr = d->hp_baseptr0;
+  }
+  else {
+    cudaError_t crc;
 #if 0 //// ugly test with cudaDeviceReset()
-      int i;
-      for (i = 5; i >= 0; i--) {
-	crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
-	if (crc != cudaSuccess) {
-	  fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
-		name, HH_MYID, cudaGetErrorString(crc));
-	  fprintf(stderr, "[HH:%s::allocCapacity@p%d]  handle is ",
-		  name, HH_MYID);
-	  HH_printMemHandle(stderr, &d->hp_handle);
-	  fprintf(stderr, "\n");
-	  int devid = -1;
-	  cudaGetDevice(&devid);
-	  fprintf(stderr, "[HH:%s::allocCapacity@p%d]  current using dev %d\n",
-		  name, HH_MYID, devid);
-	  exit(1);
-	}
-
-	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  (i=%d) I got hp_baseptr=%p\n",
-		name, HH_MYID, i, hp_baseptr);
-
-	if (i > 0) {
-	  cudaDeviceReset();
-	  fprintf(stderr, "[HH:%s::allocCapacity@p%d]  cudaDeviceReset done for test\n",
-		  name, HH_MYID);
-	}
-      }
-#else
+    int i;
+    for (i = 5; i >= 0; i--) {
       crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
       if (crc != cudaSuccess) {
 	fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
@@ -114,8 +110,47 @@ void *devheap::allocCapacity(size_t dummy, size_t heapsize)
 		name, HH_MYID, devid);
 	exit(1);
       }
-#endif
+      
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d]  (i=%d) I got hp_baseptr=%p\n",
+	      name, HH_MYID, i, hp_baseptr);
+      
+      if (i > 0) {
+	cudaDeviceReset();
+	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  cudaDeviceReset done for test\n",
+		name, HH_MYID);
+      }
     }
+#else
+    crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
+    if (crc != cudaSuccess) {
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
+	      name, HH_MYID, cudaGetErrorString(crc));
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d]  handle is ",
+	      name, HH_MYID);
+      HH_printMemHandle(stderr, &d->hp_handle);
+      fprintf(stderr, "\n");
+      int devid = -1;
+      cudaGetDevice(&devid);
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d]  current using dev %d\n",
+	      name, HH_MYID, devid);
+      exit(1);
+    }
+#endif
+
+  }
+
+  initCopyBufs();
+  return 0;
+}
+
+void *devheap::allocCapacity(size_t dummy, size_t heapsize)
+{
+  dev *d = device;
+  void *dp;
+
+  assert(HHL->cuda.hpid >= 0 && HHL->cuda.hpid < HHS->cuda.ndh_slots);
+  if (hp_baseptr == NULL) {
+    allocCapacity1st(heapsize);
   }
 
   dp = piadd(hp_baseptr, d->default_heapsize*HHL->cuda.hpid);

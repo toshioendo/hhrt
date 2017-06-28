@@ -19,7 +19,7 @@ dev *HH_curdev()
   return &HHS->cuda.devs[HHL->cuda.curdevid];
 }
 
-heap *HH_curdevheap()
+devheap /*heap*/ *HH_curdevheap()
 {
   if (HHL->cuda.curdevid < 0) {
     fprintf(stderr, 
@@ -34,7 +34,8 @@ heap *HH_curdevheap()
 	    HH_MYID, HHL->cuda.curdevid);
     exit(1);
   }
-  return h;
+  return dynamic_cast<devheap *>(h);
+  //return h;
 }
 
 int HH_printMemHandle(FILE *out, cudaIpcMemHandle_t *handle)
@@ -81,7 +82,6 @@ static int initSharedDevmem(dev *d)
 #endif
   return 0;
 }
-
 
 static int initDev(int devid, int lsize, hhconf *confp)
 {
@@ -145,6 +145,7 @@ static int initDev(int devid, int lsize, hhconf *confp)
   
   d->np_in = 0;
   d->np_out = 0;
+
   return 0;
 }
 
@@ -233,6 +234,8 @@ int HH_cudaCheckDev()
 #endif
     return 0;
   }
+
+  // Do initialization for this device
 
   double st = Wtime_prt(), et;
 #ifdef HHLOG_SCHED

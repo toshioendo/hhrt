@@ -82,7 +82,7 @@ hostheap::hostheap() : heap(0L)
   swapfd = -1; // anonymous mmap
   mmapflags = MAP_PRIVATE|MAP_ANONYMOUS;
 
-#ifdef USE_CUDA
+#if 0 && defined USE_CUDA
   cudaError_t crc;
   crc = cudaStreamCreate(&copystream);
   if (crc != cudaSuccess) {
@@ -376,6 +376,11 @@ int hostheap::writeSeq(void *tgt, void *buf, int bufkind, size_t size)
 #ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
+    // obtain tools for D2H copy from upper layer
+    cudaStream_t copystream = HH_curdevheap()->copystream;
+    size_t copyunit = HH_curdevheap()->copyunit;
+    void *copybuf = HH_curdevheap()->copybuf;
+    
     if (1 || HHL2->conf.pin_hostbuf) {
       crc = cudaMemcpyAsync(hp, buf, size, cudaMemcpyDeviceToHost, copystream);
       if (crc != cudaSuccess) {
@@ -387,6 +392,7 @@ int hostheap::writeSeq(void *tgt, void *buf, int bufkind, size_t size)
     }
     else {
       size_t cur;
+      
       for (cur = 0; cur < size; cur += copyunit) {
 	size_t copysize = copyunit;
 	if (cur+copysize > size) copysize = size-cur;
@@ -419,6 +425,11 @@ int hostheap::readSeq(void *tgt, void *buf, int bufkind, size_t size)
 #ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
+    // obtain tools for H2D copy from upper layer
+    cudaStream_t copystream = HH_curdevheap()->copystream;
+    size_t copyunit = HH_curdevheap()->copyunit;
+    void *copybuf = HH_curdevheap()->copybuf;
+
     /* host to device */
     if (1 || HHL2->conf.pin_hostbuf) {
       crc = cudaMemcpyAsync(buf, hp, size, cudaMemcpyHostToDevice, copystream);
