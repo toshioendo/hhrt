@@ -20,7 +20,7 @@ extern "C" {
 
 //#define USE_MMAPSWAP // testing. use mmaped host buffer, instead of fileheap
 
-#define HHRT_VERSION 20170602
+#define HHRT_VERSION 20170628
 
 #  define HH(X) HH##X
 
@@ -29,11 +29,9 @@ enum {
   HHMADV_NORMAL,
   HHMADV_CANDISCARD,
   HHMADV_READONLY,
-};
-
-enum {
-  HHDEV_NORMAL = 0,
-  HHDEV_NOTUSED,
+  HHMADV_RECVONLY,
+  HHMADV_SENDONLY,
+  HHMADV_MAX, // a sentinel
 };
 
 /****************************************/

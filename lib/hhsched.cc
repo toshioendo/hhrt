@@ -238,32 +238,37 @@ int HH_sleepForMemory()
 {
   HHL->pmode = HHP_RUNNABLE;
   HH_profSetMode("RUNNABLE");
-  
-#ifdef HHLOG_SCHED
-  fprintf(stderr, "[HH_sleepForMemory@p%d] start sleeping (pid=%d)\n",
-	  HH_MYID, getpid());
-#endif
 
-#if 0
+#if 01
   // check priority
   // BUG: This still causes  deadlock
+  double st = Wtime();
   do {
     HH_lockSched();
     int hrank;
     int hp = HH_prioGetMax(&hrank);
-    if (HHL->prio_score >= hp) {
+    int adds = (int)((Wtime()-st)/0.1);
+    if (HHL->prio_score+adds >= hp) {
       HH_unlockSched();
-      fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d, proceed\n",
-	      HH_MYID, Wtime_prt(), HHL->prio_score);
+      fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d(+%d), proceed\n",
+	      HH_MYID, Wtime_prt(), HHL->prio_score, adds);
       break;
     }
-    fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d < %d (p%d), thus I backoff now\n",
-	    HH_MYID, Wtime_prt(), HHL->prio_score, hp, hrank);
+#if 0
+    fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d(+%d) < %d (p%d), thus I backoff now\n",
+	    HH_MYID, Wtime_prt(), HHL->prio_score, adds, hp, hrank);
+#endif
     HH_unlockSched();
     usleep(50*1000);
   } while (1);
 #endif
+ 
   
+#ifdef HHLOG_SCHED
+  fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] go to RUNNABLE. start sleeping (pid=%d)\n",
+	  HH_MYID, Wtime_prt(), getpid());
+#endif
+
   do {
     HH_progressSched();
 
@@ -284,12 +289,13 @@ int HH_sleepForMemory()
     if (nrp+1 <= HHL2->conf.maxrp) { // ok
       HHL->pmode = HHP_RUNNING;
 
-      fprintf(stderr, "[HH_sleepForMemory@p%d] I'm going to wake up; prio_score=%d\n",
-	      HH_MYID, HHL->prio_score);
-      HHL->prio_score = 0;
+      // for priority
+      HHS->wake_count++;
+      HHL->prio_score = HHS->wake_count;
 
       HH_unlockSched();
       HH_profSetMode("RUNNING");
+
       break;
     }
     HH_unlockSched();

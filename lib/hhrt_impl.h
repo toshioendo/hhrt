@@ -466,6 +466,8 @@ struct shdata {
   struct proc lprocs[MAX_LSIZE];
   char hostname[HOSTNAMELEN];
 
+  int wake_count; // priority test
+
   double stime; // start time. mainly used for profiling and debug print
 };
 

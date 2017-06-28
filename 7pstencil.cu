@@ -502,6 +502,9 @@ int comm_boundary(int bufid)
       }
       assert(bp >= 0 && bp < npy*npz);
 
+#ifdef USE_MADVISE
+      HH_madvise(cip->sbuf, cip->bufsize, HHMADV_SENDONLY); /* hint for optimization */
+#endif
       MPI_Isend(cip->sbuf, cip->bufsize/sizeof(REAL), REAL_MT, bp, 
 		0, MPI_COMM_WORLD, &reqs[nreqs]);
       nreqs++; ss += cip->bufsize/sizeof(REAL);
@@ -538,6 +541,9 @@ int comm_boundary(int bufid)
     int bpy = myy+cip->poffy;
     int bpz = myz+cip->poffz;
     if (bpy >= 0 && bpy < npy && bpz >= 0 && bpz < npz) {
+#ifdef USE_MADVISE
+      HH_madvise(cip->sbuf, cip->bufsize, HHMADV_NORMAL); /* hint for optimization */
+#endif
       idx = IDX(0, cip->ridxy, cip->ridxz);
       cudaMemcpy2D(dps[bufid]+idx, sizeof(REAL)*bufx*bufy, cip->rbuf, sizeof(REAL)*bufx*cip->county, 
 		   sizeof(REAL)*bufx*cip->county, cip->countz, cudaMemcpyHostToDevice);

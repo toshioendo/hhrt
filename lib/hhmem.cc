@@ -563,7 +563,8 @@ int heap::swapOut()
       /* scan all buffers in queue */
       membuf *mbp = *it;
       void *dp = mbp->ptr;
-      if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
+      if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY
+	  || mbp->kind == HHMADV_SENDONLY) {
 	if (mbp->sptr == NULL) {
 	  void *sp = lower->alloc(mbp->size);
 #if 0
@@ -583,6 +584,18 @@ int heap::swapOut()
 	  nskipped++;
 	  sskipped += mbp->size;
 	}
+      }
+      else if (mbp->kind == HHMADV_RECVONLY) {
+	/* allocate swap buffer, but no need to copy */
+	assert(mbp->sptr == NULL);
+	void *sp = lower->alloc(mbp->size);
+	mbp->sptr = sp;
+#if 01
+	fprintf(stderr, "[HH:%s::swapOut@p%d] RECVONLY buffer found (size=%ld)\n",
+		name, HH_MYID, mbp->size);
+#endif
+	nskipped++;
+	sskipped += mbp->size;
       }
       else {
 	assert(mbp->kind == HHMADV_FREED || mbp->kind == HHMADV_CANDISCARD);
@@ -704,11 +717,11 @@ int heap::swapIn()
       /* scan all buffers in queue */
       membuf *mbp = *it;
       void *dp = mbp->ptr;
-      if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY) {
-	//lower->readSeq(lower->ptr2offs(mbp->sptr), dp, memkind, mbp->size); // to be fixed
+      if (mbp->kind == HHMADV_NORMAL || mbp->kind == HHMADV_READONLY 
+	  || mbp->kind == HHMADV_RECVONLY) {
 	lower->readSeq(mbp->sptr, dp, memkind, mbp->size);
 
-	if (mbp->kind == HHMADV_NORMAL) {
+	if (mbp->kind != HHMADV_READONLY) {
 	  /* Discard replica in lower layer */
 	  lower->free(mbp->sptr);
 	  mbp->sptr = NULL;
@@ -716,6 +729,17 @@ int heap::swapIn()
 
 	nmoved++;
 	smoved += mbp->size;
+      }
+      else if (mbp->kind == HHMADV_SENDONLY) {
+	// free the swapper buffer, without data copy
+	lower->free(mbp->sptr);
+	mbp->sptr = NULL;
+#if 01
+	fprintf(stderr, "[HH:%s::swapIn@p%d] SENDONLY buffer found (size=%ld)\n",
+		name, HH_MYID, mbp->size);
+#endif
+	nskipped++;
+	sskipped += mbp->size;
       }
       else {
 	assert(mbp->kind == HHMADV_FREED || mbp->kind == HHMADV_CANDISCARD);
@@ -823,26 +847,32 @@ int heap::madvise(void *p, size_t size, int kind)
   }
 
   if (kind == HHMADV_NORMAL) {
-    mbp->kind = kind;
-
-    if (mbp->sptr != NULL) {
+    if (swap_stat == HHSW_NONE && mbp->sptr != NULL) {
       // there may be replica in lower layer. this must be invalidated
       mbp->sptr = NULL;
-      fprintf(stderr, "[HH:%s::madvise@p%d] WARNING: replica may be resident eternally. should be fixed\n",
-	      name, HH_MYID);
+      fprintf(stderr, "[HH:%s::madvise@p%d] WARNING: (kind %d -> %d) replica may be resident eternally. should be fixed\n",
+	      name, HH_MYID, mbp->kind, kind);
     }
+
+    mbp->kind = kind;
   }
-  else if (kind == HHMADV_CANDISCARD || kind == HHMADV_READONLY) {
+  else if (kind >= 0 && kind < HHMADV_MAX) {
     if (p == mbp->ptr && size >= mbp->usersize) {
-      /* mark CANDISCARD if the whole region is specified */
+      /* change the kind if the whole region is specified */
       mbp->kind = kind;
     }
     else {
-      fprintf(stderr, "[HH:heap::madvise@p%d] size %ld is specified for size %ld object. This madvise is ignored\n",
-	      HH_MYID, size, mbp->usersize);
+      fprintf(stderr, "[HH:%s::madvise@p%d] size %ld is specified for size %ld object. This madvise is ignored\n",
+	      name, HH_MYID, size, mbp->usersize);
     }
   }
-  return 0;
+  else {
+    fprintf(stderr, "[HH:%s::madvise@p%d] ERROR: unknown kind %d is specified\n",
+	    name, HH_MYID, size, mbp->usersize);
+    return -1;
+  }
+
+ return 0;
 }
 
 int heap::dump()
@@ -862,6 +892,12 @@ int heap::dump()
     }
     else if (mbp->kind == HHMADV_READONLY) {
       strcpy(kind, "READONLY");
+    }
+    else if (mbp->kind == HHMADV_RECVONLY) {
+      strcpy(kind, "RECVONLY");
+    }
+    else if (mbp->kind == HHMADV_SENDONLY) {
+      strcpy(kind, "SENDONLY");
     }
     else if (mbp->kind == HHMADV_FREED) {
       strcpy(kind, "FREED");

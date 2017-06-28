@@ -95,7 +95,6 @@ int sendRend(commtask *ctp)
 
   HH_lockSched();
   HHL2->ncurcomms++;
-  HH_prioInc(ctp->partner, 1);
   HH_unlockSched();
 
   return 0;
@@ -207,7 +206,6 @@ int recvRend(commtask *ctp, MPI_Status *statp)
 
   HH_lockSched();
   HHL2->ncurcomms++;
-  HH_prioInc(ctp->partner, 1);
   HH_unlockSched();
   return 0;
 }
@@ -224,6 +222,8 @@ int recvFin(commtask *ctp)
   ctp->ireq = MPI_REQUEST_NULL;
   ctp->fin = 1;
   /* finished */
+
+  HH_madvise(ctp->ptr, ctp->psize, HHMADV_NORMAL);
 
   HH_lockSched();
   HHL2->ncurcomms--;
@@ -390,6 +390,11 @@ int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
 	    HHMR_TAG_ACK(tag), comm, &ctp->ireq);
   /* finish of ctp->ireq should be checked later */
 
+  /* change target's priority */
+  HH_lockSched();
+  HH_prioInc(dest, 1);
+  HH_unlockSched();
+
   addCommTask(ctp);
   *((commtask **)reqp) = ctp;
 
@@ -420,6 +425,8 @@ int HHMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 	    HH_MYID);
     exit(1);
   }
+
+  HH_madvise(ctp->ptr, ctp->psize, HHMADV_RECVONLY);
 
   /* Start recving the first header */
   MPI_Irecv((void*)&ctp->hdr, sizeof(commhdr), MPI_BYTE, source, tag, comm, &ctp->ireq);

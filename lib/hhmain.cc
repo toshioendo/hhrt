@@ -161,6 +161,8 @@ static int initNode(int lsize, int size, hhconf *confp)
   HHS->nprocs = size;
   strcpy(HHS->hostname, hostname);
 
+  HHS->wake_count = 0;
+
   HH_mutex_init(&HHS->sched_ml);
 
 #ifdef USE_CUDA
@@ -227,7 +229,6 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
 
   /* default mode */
   HHL->pmode = HHP_RUNNABLE;
-  //HHL->in_api = 0;
 
   /* statistics */
   int i;
