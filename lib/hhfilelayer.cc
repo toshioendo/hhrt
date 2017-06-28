@@ -163,22 +163,6 @@ fileheap::fileheap(int id, fsdir *fsd0) : heap(0L)
   int i;
   for (i = 0; i < 2; i++) {
     copybufs[i] = valloc(copyunit);
-#ifdef USE_CUDA
-    cudaError_t crc;
-    crc = cudaHostRegister(copybufs[i], copyunit, 0 /*cudaHostRegisterPortable*/);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:fileheap::init@p%d] cudaHostRegister(%ldMiB) failed (rc=%d)\n",
-	      HH_MYID, copyunit>>20, crc);
-      exit(1);
-    }
-
-    crc = cudaStreamCreate(&copystreams[i]);
-    if (crc != cudaSuccess) {
-      fprintf(stderr, "[HH:fileheap::init@p%d] cudaStreamCreate failed (rc=%d)\n",
-	      HH_MYID, crc);
-      exit(1);
-    }
-#endif
   }
 
   return;
@@ -188,10 +172,6 @@ int fileheap::finalize()
 {
   int i;
   for (i = 0; i < 2; i++) {
-#ifdef USE_CUDA
-    cudaStreamDestroy(copystreams[i]);
-    cudaHostUnregister(copybufs[i]);
-#endif
     free(copybufs[i]);
   }
   if (sfd != -1) {
@@ -221,6 +201,8 @@ int fileheap::write_small(ssize_t offs, void *buf, int bufkind, size_t size)
 #ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
+    // currently this does not work, since copystreams are not initialized
+    assert(0);
     crc = cudaMemcpyAsync(copybufs[0], buf, size, cudaMemcpyDeviceToHost, copystreams[0]);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:fileheap::write_small@p%d] cudaMemcpy failed\n",
@@ -352,6 +334,7 @@ int fileheap::read_small(ssize_t offs, void *buf, int bufkind, size_t size)
 #ifdef USE_CUDA
   if (bufkind == HHM_DEV) {
     cudaError_t crc;
+    // currently this does not work, since copystreams are not initialized
     crc = cudaMemcpyAsync(buf, copybufs[0], size, cudaMemcpyHostToDevice, copystreams[0]);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:fileheap::read_s@p%d] cudaMemcpy failed\n",

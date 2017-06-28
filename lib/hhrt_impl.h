@@ -422,6 +422,7 @@ struct proc2 {
 
 #ifdef USE_CUDA
   heap *devheaps[MAX_LDEVS]; // CUDA
+
 #endif
 #ifdef USE_SWAP_THREAD
   pthread_t swap_tid;
