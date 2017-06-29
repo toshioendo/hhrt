@@ -45,6 +45,8 @@ devheap::devheap(size_t heapsize0, dev *device0) : heap(heapsize0)
   sprintf(name, "devheap(d%d)", device->devid);
   hp_baseptr = NULL;
 
+  cudaflag = (HHL->lrank == 0)? 1: 0;
+
   return;
 }
 
@@ -57,6 +59,12 @@ int devheap::finalize()
     device->dhslot_users[HHL->cuda.hpid] = -1;
   }
   HH_unlockSched();
+
+#if defined USE_DEVRESET
+  if (HHL->lrank != 0 && cudaflag == 1) {
+    resetCuda();
+  }
+#endif
 
   return 0;
 }
@@ -85,9 +93,19 @@ int devheap::initCopyBufs()
   return 0;
 }
 
+int devheap::resetCuda()
+{
+  fprintf(stderr, "[HH:%s::resetCuda@p%d] [%.2f] Here I am going to deep sleep (cudaDeviceReset)\n",
+	  name, HH_MYID, Wtime_prt());
+  cudaDeviceReset();
+  cudaflag = 0;
+  return 0;
+}
+
 void *devheap::allocCapacity1st(size_t heapsize)
 {
   dev *d = device;
+  void *org_baseptr = hp_baseptr;
   if (HHL->lrank == 0) {
     hp_baseptr = d->hp_baseptr0;
   }
@@ -137,9 +155,26 @@ void *devheap::allocCapacity1st(size_t heapsize)
     }
 #endif
 
+   
+  }
+  // here hp_baseptr is valid
+
+  if (org_baseptr != NULL) {
+    if (hp_baseptr != org_baseptr) {
+      fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: new baseptr %p != org %p !!! Reconsider HHRT implementation...\n",
+	      name, HH_MYID, hp_baseptr, org_baseptr);
+      exit(1);
+    }
+    fprintf(stderr, "[HH:%s::allocCapacity@p%d] OK: baseptr %p recovered!!\n",
+	    name, HH_MYID, hp_baseptr);
+  }
+  else {
+    fprintf(stderr, "[HH:%s::allocCapacity@p%d] I got baseptr %p for the first time!!\n",
+	    name, HH_MYID, hp_baseptr);
   }
 
   initCopyBufs();
+  cudaflag = 1; // this process is connected to CUDA
   return 0;
 }
 
@@ -149,7 +184,8 @@ void *devheap::allocCapacity(size_t dummy, size_t heapsize)
   void *dp;
 
   assert(HHL->cuda.hpid >= 0 && HHL->cuda.hpid < HHS->cuda.ndh_slots);
-  if (hp_baseptr == NULL) {
+
+  if (hp_baseptr == NULL || cudaflag == 0) {
     allocCapacity1st(heapsize);
   }
 

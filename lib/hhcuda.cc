@@ -19,7 +19,7 @@ dev *HH_curdev()
   return &HHS->cuda.devs[HHL->cuda.curdevid];
 }
 
-devheap /*heap*/ *HH_curdevheap()
+devheap *HH_curdevheap()
 {
   if (HHL->cuda.curdevid < 0) {
     fprintf(stderr, 
@@ -35,7 +35,17 @@ devheap /*heap*/ *HH_curdevheap()
     exit(1);
   }
   return dynamic_cast<devheap *>(h);
-  //return h;
+}
+
+int HH_resetCudaAll()
+{
+  for (int id = 0; id < MAX_LDEVS; id++) {
+    devheap *dh = dynamic_cast<devheap *>(HHL2->devheaps[id]);
+    if (dh != NULL) {
+      dh->resetCuda();
+    }
+  }
+  return 0;
 }
 
 int HH_printMemHandle(FILE *out, cudaIpcMemHandle_t *handle)
@@ -124,6 +134,10 @@ static int initDev(int devid, int lsize, hhconf *confp)
 
 #ifdef USE_CUDA_MPS
   avail -= tax_per_proc * 1;
+#elif defined USE_DEVRESET
+  int nlp = confp->nlphost;
+  if (lsize < nlp) nlp = lsize;
+  avail -= tax_per_proc * (nlp + 2);
 #else
   avail -= tax_per_proc * lsize;
 #endif

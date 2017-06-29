@@ -353,6 +353,13 @@ int hostheap::releaseSwapResSelf(int kind)
     fprintf(stderr, "[HH:%s::releaseSwapRes@p%d] [%.2f] I release host capacity\n",
 	    name, HH_MYID, Wtime_prt());
 #endif
+#if defined USE_CUDA && defined USE_DEVRESET
+    if (HHL->lrank != 0) {
+      HH_unlockSched();
+      HH_resetCudaAll();
+      HH_lockSched();
+    }
+#endif
     HH_profEndAction("H2F");
   }
   return 0;

@@ -11,7 +11,7 @@ int HH_lockSched()
   double st = Wtime(), et;
   pthread_mutex_lock(&HHS->sched_ml);
   et = Wtime();
-  if (et-st > 0.1) {
+  if (et-st > 0.3) {
     fprintf(stderr, "[HH_lockSched@p%d] [%.2lf-%.2lf] %s:%d LOCK TOOK LONG\n",
 	    HH_MYID, Wtime_conv_prt(st), Wtime_conv_prt(et), __FILE__, __LINE__);
   }

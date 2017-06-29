@@ -33,6 +33,8 @@ using namespace std;
 
 #define USE_SWAP_THREAD 1
 
+#define USE_DEVRESET 1
+
 #define HHLOG_SCHED
 #define HHLOG_SWAP
 #define HHLOG_API
@@ -250,8 +252,10 @@ class devheap: public heap {
 
   void *allocCapacity(size_t dummy, size_t heapsize);
   void *allocCapacity1st(size_t heapsize);
+  int resetCuda();
   int initCopyBufs();
 
+  int cudaflag; // flag for whether CUDA from this process is initialized
   void *hp_baseptr;
   dev *device;
 
@@ -533,6 +537,7 @@ devheap *HH_curdevheap();
 int HH_cudaInitNode(hhconf *confp);
 int HH_cudaInitProc();
 int HH_cudaCheckDev();
+int HH_resetCudaAll();
 
 // hhcudamem.cc: CUDA device memory layer
 heap *HH_devheapCreate(dev *d);

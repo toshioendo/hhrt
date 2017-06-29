@@ -507,6 +507,7 @@ void HH_atexit_func()
 {
   fprintf(stderr, "[HH_atexit_func@p%d] finalize...\n", HH_MYID);
   HH_finalize();
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 }
 
