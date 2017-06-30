@@ -144,16 +144,9 @@ int progressSend(commtask *ctp)
 
   assert(ctp->ireq == MPI_REQUEST_NULL);
 
-#if 0
-  if (ctp->cursor == 0 && ctp->tm_rend == 0.0) {
-    /* first ack is recvd. */
-    sendRend(ctp);
-  }
-#endif
-
   if (ctp->cursor >= ctp->psize) {
     sendFin(ctp);
-    return 0;
+    return 1;
   }
 
   /* divide original message and send */
@@ -191,7 +184,7 @@ int progressSend(commtask *ctp)
 
   ctp->cursor += size;
 
-  return 0;
+  return 1;
 }
 
 /* Rendezvous established in recv side */
@@ -292,7 +285,7 @@ int progressRecv(commtask *ctp)
 
   if (ctp->cursor >= ctp->psize) {
     recvFin(ctp);
-    return 0;
+    return 1;
   }
 
   /* start to recv divided messages */
@@ -310,7 +303,7 @@ int progressRecv(commtask *ctp)
 
   ctp->cursor += size;
 
-  return 0;
+  return 1;
 }
 
 int progress1(commtask *ctp)
@@ -320,28 +313,30 @@ int progress1(commtask *ctp)
     return 0;
   }
 
+  int rc;
   /* now ctp->hdr is valid */
   if (ctp->kind == HHMR_SEND) {
-    progressSend(ctp);
+    rc = progressSend(ctp);
   }
   else if (ctp->kind == HHMR_RECV) {
-    progressRecv(ctp);
+    rc = progressRecv(ctp);
   }
   else {
     fprintf(stderr, "[HHMPI(R):progress1] Unknown kind %d\n", ctp->kind);
     exit(1);
   }
 
-  return 0;
+  return rc;
 }
 
 /* should be called to progress communication */
 int HHMPIR_progress()
 {
+  int rc = 0;
   list<commtask *>::iterator it;
   for (it = HHLMR->commtasks.begin(); it != HHLMR->commtasks.end(); it++) {
     commtask *ctp = *it;
-    progress1(ctp);
+    rc += progress1(ctp);
 
     if (ctp->fin) {
       /* finished. remove from list */
@@ -349,7 +344,7 @@ int HHMPIR_progress()
       break;
     }
   }
-  return 0;
+  return rc;
 }
 
 int HHMPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest,
@@ -471,10 +466,10 @@ int HHMPI_Waitall(int n, HHMPI_Request *reqs, MPI_Status *stats)
       break;
     }
 
-    HH_progressSched();
-    HHMPIR_progress();
+    rc = HH_progressSched();
+    rc += HHMPIR_progress();
 
-    usleep(1);
+    if (rc == 0) usleep(10*1000);
   } while (1);
 
   HH_exitBlocking();

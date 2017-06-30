@@ -161,7 +161,7 @@ static int initNode(int lsize, int size, hhconf *confp)
   HHS->nprocs = size;
   strcpy(HHS->hostname, hostname);
 
-  HHS->wake_count = 0;
+  HHS->wake_count = lsize;
 
   HH_mutex_init(&HHS->sched_ml);
 
@@ -237,7 +237,7 @@ static int initProc(int lrank, int lsize, int rank, int size, hhconf *confp)
   }
   sprintf(HHL->msg, "[HH:initProc@p%d] no msg", HH_MYID);
 
-  HHL->prio_score = 0; // testing
+  HHL->prio_score = lrank; // testing
 
   HH_profInit();
 #ifdef USE_CUDA
@@ -523,7 +523,13 @@ int HHMPI_Init(int *argcp, char ***argvp)
 
 int HHMPI_Finalize()
 {
-#if 0
+#if defined USE_CUDA && defined USE_DEVRESET
+  if (HHL->lrank != 0) {
+    HH_resetCudaAll();
+  }
+#endif
+
+#if 0 // actual finalization is postponed to HH_atexit_func()
   HH_finalize();
   MPI_Finalize();
 #endif

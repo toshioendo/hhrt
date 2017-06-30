@@ -240,14 +240,13 @@ int HH_sleepForMemory()
   HH_profSetMode("RUNNABLE");
 
 #if 01
-  // check priority
-  // BUG: This still causes  deadlock
+  // Back off if I have low priority
   double st = Wtime();
   do {
     HH_lockSched();
     int hrank;
     int hp = HH_prioGetMax(&hrank);
-    int adds = (int)((Wtime()-st)/0.1);
+    int adds = (int)((Wtime()-st)/2.0*(double)HHS->nlprocs);
     if (HHL->prio_score+adds >= hp) {
       HH_unlockSched();
       fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d(+%d), proceed\n",

@@ -54,17 +54,18 @@ int devheap::finalize()
 {
   heap::finalize();
 
+#if 0 && defined USE_DEVRESET
+  if (HHL->lrank != 0 && cudaflag == 1) {
+    resetCuda();
+    sleep(1);
+  }
+#endif
+
   HH_lockSched();
   if (device->dhslot_users[HHL->cuda.hpid] == HH_MYID) {
     device->dhslot_users[HHL->cuda.hpid] = -1;
   }
   HH_unlockSched();
-
-#if defined USE_DEVRESET
-  if (HHL->lrank != 0 && cudaflag == 1) {
-    resetCuda();
-  }
-#endif
 
   return 0;
 }
@@ -95,9 +96,20 @@ int devheap::initCopyBufs()
 
 int devheap::resetCuda()
 {
+#if 01
   fprintf(stderr, "[HH:%s::resetCuda@p%d] [%.2f] Here I am going to deep sleep (cudaDeviceReset)\n",
 	  name, HH_MYID, Wtime_prt());
-  cudaDeviceReset();
+#endif
+  cudaError_t crc;
+  crc = cudaDeviceReset();
+  if (crc != cudaSuccess) {
+    fprintf(stderr, "[HH:%s::resetCuda@p%d] [%.2f] ERROR: cudaDeviceReset failed! (rc=%d)\n",
+	    name, HH_MYID, Wtime_prt(), crc);
+  }
+#if 1
+  fprintf(stderr, "[HH:%s::resetCuda@p%d] [%.2f] cudaDeviceReset finished\n",
+	  name, HH_MYID, Wtime_prt());
+#endif
   cudaflag = 0;
   return 0;
 }
@@ -111,34 +123,6 @@ void *devheap::allocCapacity1st(size_t heapsize)
   }
   else {
     cudaError_t crc;
-#if 0 //// ugly test with cudaDeviceReset()
-    int i;
-    for (i = 5; i >= 0; i--) {
-      crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
-      if (crc != cudaSuccess) {
-	fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
-		name, HH_MYID, cudaGetErrorString(crc));
-	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  handle is ",
-		name, HH_MYID);
-	HH_printMemHandle(stderr, &d->hp_handle);
-	fprintf(stderr, "\n");
-	int devid = -1;
-	cudaGetDevice(&devid);
-	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  current using dev %d\n",
-		name, HH_MYID, devid);
-	exit(1);
-      }
-      
-      fprintf(stderr, "[HH:%s::allocCapacity@p%d]  (i=%d) I got hp_baseptr=%p\n",
-	      name, HH_MYID, i, hp_baseptr);
-      
-      if (i > 0) {
-	cudaDeviceReset();
-	fprintf(stderr, "[HH:%s::allocCapacity@p%d]  cudaDeviceReset done for test\n",
-		name, HH_MYID);
-      }
-    }
-#else
     crc = cudaIpcOpenMemHandle(&hp_baseptr, d->hp_handle, cudaIpcMemLazyEnablePeerAccess);
     if (crc != cudaSuccess) {
       fprintf(stderr, "[HH:%s::allocCapacity@p%d] ERROR: cudaIpcOpenMemHandle failed! (%s)\n",
@@ -147,15 +131,16 @@ void *devheap::allocCapacity1st(size_t heapsize)
 	      name, HH_MYID);
       HH_printMemHandle(stderr, &d->hp_handle);
       fprintf(stderr, "\n");
+
+      system("nvidia-smi");
+      fflush(0);
+
       int devid = -1;
       cudaGetDevice(&devid);
       fprintf(stderr, "[HH:%s::allocCapacity@p%d]  current using dev %d\n",
 	      name, HH_MYID, devid);
       exit(1);
     }
-#endif
-
-   
   }
   // here hp_baseptr is valid
 
