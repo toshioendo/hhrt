@@ -290,6 +290,12 @@ int hostheap::checkSwapResSelf(int kind, int *pline)
       res = HHSS_EBUSY;
       line = __LINE__;
     }
+#ifdef USE_FIXED_FILESWAP
+    if (HHL->lrank < HHL2->conf.nlphost-4) {
+      res = HHSS_NONEED; // this process is never swapped out to lower
+      line = __LINE__;
+    }
+#endif
     else {
       res = HHSS_OK;
       line = __LINE__;

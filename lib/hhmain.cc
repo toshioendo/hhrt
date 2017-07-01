@@ -515,7 +515,7 @@ int HHMPI_Init(int *argcp, char ***argvp)
 {
   MPI_Init(argcp, argvp);
   HH_init();
-#if 1
+#if 0
   atexit(HH_atexit_func);
 #endif
   return 0;
@@ -523,14 +523,18 @@ int HHMPI_Init(int *argcp, char ***argvp)
 
 int HHMPI_Finalize()
 {
+#if 1
+  HH_finalize();
+#endif
+
 #if defined USE_CUDA && defined USE_DEVRESET
   if (HHL->lrank != 0) {
     HH_resetCudaAll();
   }
 #endif
 
-#if 0 // actual finalization is postponed to HH_atexit_func()
-  HH_finalize();
+#if 1
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 #endif
   return 0;

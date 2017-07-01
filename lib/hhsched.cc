@@ -239,14 +239,14 @@ int HH_sleepForMemory()
   HHL->pmode = HHP_RUNNABLE;
   HH_profSetMode("RUNNABLE");
 
-#if 01
+#if 0
   // Back off if I have low priority
   double st = Wtime();
   do {
     HH_lockSched();
     int hrank;
     int hp = HH_prioGetMax(&hrank);
-    int adds = (int)((Wtime()-st)/2.0*(double)HHS->nlprocs);
+    int adds = (int)((Wtime()-st)/1.0 /*2.0*/*(double)HHS->nlprocs);
     if (HHL->prio_score+adds >= hp) {
       HH_unlockSched();
       fprintf(stderr, "[HH_sleepForMemory@p%d] [%.2lf] My prio_score %d(+%d), proceed\n",

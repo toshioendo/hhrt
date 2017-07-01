@@ -641,6 +641,56 @@ int mainloop()
   return bufid;
 }
 
+/* calc exectime as max(et) - min(st) */
+/* result is returned in process 0 */
+double calc_exectime(double st, double et)
+{
+  double data[2];
+
+  /* Gather st, et */
+  if (myid != 0) {
+    data[0] = st;
+    data[1] = et;
+    fprintf(stderr, "[7pstencil:calc_exectime@p%d] send time: %lf-%lf\n",
+	    myid, st, et);
+    MPI_Send(data, 2, MPI_DOUBLE, 0, 100, MPI_COMM_WORLD);
+    return 0.0;
+  }
+  else {
+    double *alldata;
+    MPI_Request reqs[256];
+    MPI_Status stats[256];
+    int i;
+    if (nprocs > 256) {
+      fprintf(stderr, "[7pstencil] currently np (%d) must be <= 256\n",
+	      nprocs);
+      exit(1);
+    }
+    alldata = (double*)malloc(sizeof(double)*2*nprocs);
+    for (i = 1; i < nprocs; i++) {
+      MPI_Irecv((void*)&alldata[(i-1)*2], 2, MPI_DOUBLE, i, 100, MPI_COMM_WORLD, &reqs[i-1]);
+    }
+    MPI_Waitall(nprocs-1, reqs, stats);
+
+    /* find min st and max et */
+    double minst = st;
+    double maxet = et;
+    for (i = 1; i < nprocs; i++) {
+#if 0
+      fprintf(stderr, "[7pstencil:calc_exectime] recvd time from p%d: %lf-%lf\n",
+	      i, alldata[(i-1)*2], alldata[(i-1)*2+1]);
+#endif
+      if (alldata[(i-1)*2] < minst) minst = alldata[(i-1)*2];
+      if (alldata[(i-1)*2+1] > maxet) maxet = alldata[(i-1)*2+1];
+    }
+
+#if 0    
+    fprintf(stderr, "[7pstencil:calc_exectime] st=%lf, et=%lf, exectime=%lf\n",
+	    minst, maxet, maxet-minst);
+#endif
+    return maxet-minst;
+  }
+}
 
 int main(int argc, char **argv)
 {
@@ -689,7 +739,7 @@ int main(int argc, char **argv)
   /* copy local stencil data to device */
   bufid = 0;
 
-  struct timeval st, et;
+  double st, et;
   if (myid == 0) {
     fprintf(stderr, "######## %dx%dx%dx%d, Total array size %ldMiB (w/doule buf, w/o halo)\n",
 	    nx, ny, nz, nt, (size_t)nx*ny*nz*2*sizeof(REAL)/(1024*1024));
@@ -697,21 +747,26 @@ int main(int argc, char **argv)
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  gettimeofday(&st, NULL);
+  st = Wtime();
   
   /* main loop */
   bufid = mainloop();
-  
-  MPI_Barrier(MPI_COMM_WORLD);
-  
-  gettimeofday(&et, NULL);
+
+  et = Wtime();
+  /* calc execution time of mainloop */
+  double sec = calc_exectime(st, et);
+
   if (myid == 0) {
-    long ms = (et.tv_sec-st.tv_sec)*1000+(et.tv_usec-st.tv_usec)/1000;
     long flop = (long)nx*ny*nz*nt*FLOP_PER_POINT;
-    double gf = (double)flop/ms/1000000.0;
+    double gf = (double)flop/sec/1.0e+9;
     fprintf(stderr, "%dx%dx%dx%dx%d (bt=%d)\n", nx, ny, nz, nt, FLOP_PER_POINT, bt);
-    fprintf(stderr, "#########  mainloop() took %ld msec, %.3lf GFlops  ######## \n",
-	    ms, gf);
+#if 0
+    fprintf(stderr, "######### mainloop() took %.3lf msec, %.3lf GFlops  ######## \n",
+	    sec, gf);
+#else
+    fprintf(stderr, "######### [%.3lf-%.3lf] mainloop() took %.3lf msec, %.3lf GFlops  ######## \n",
+	    HH_wtime_conv_prt(st), HH_wtime_conv_prt(et), sec, gf);
+#endif
   }
 
 #ifndef INIT_ON_GPU

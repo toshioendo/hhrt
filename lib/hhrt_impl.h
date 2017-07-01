@@ -35,6 +35,9 @@ using namespace std;
 
 #define USE_DEVRESET 1
 
+// some processes are not swapped to file
+#define USE_FIXED_FILESWAP 1
+
 #define HHLOG_SCHED
 #define HHLOG_SWAP
 #define HHLOG_API
